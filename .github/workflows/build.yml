@@ -10,6 +10,13 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            build/mac-auth
+          key: ios-mac-auth-${{ runner.arch }}-${{ hashFiles('scripts/build-ios-mac-auth.py', 'vendor/mac-adi-rust/**') }}
       - name: Verified local Apple runtime
         run: |
           brew install sevenzip cmake pkgconf xcodegen
@@ -22,8 +29,6 @@ jobs:
           rustup target add aarch64-apple-ios
       - name: Local Mac authentication interpreter (no JIT)
         run: python3 scripts/build-ios-mac-auth.py
-      - name: Native signing core
-        run: cargo +stable build --locked --release --lib --target aarch64-apple-ios
       - name: Source format tests
         run: |
           swiftc ios/DirectSide/Models.swift ios/Tests/main.swift -o /tmp/directside-source-tests
@@ -32,6 +37,12 @@ jobs:
         run: |
           cd ios
           xcodegen generate
+      - name: Local interpreter provisioning probe
+        run: |
+          xcodebuild -project ios/DirectSide.xcodeproj -scheme DirectSideAnisetteProbe -configuration Release -destination "platform=macOS,arch=$(uname -m)" -derivedDataPath build-probe CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES build
+          build-probe/Build/Products/Release/DirectSideAnisetteProbe "$PWD/ios/Resources/MacAnisetteRuntime"
+      - name: Native signing core
+        run: cargo +stable build --locked --release --lib --target aarch64-apple-ios
       - name: iPhone application
         run: |
           xcodebuild -project ios/DirectSide.xcodeproj -scheme DirectSide -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
@@ -39,10 +50,6 @@ jobs:
           cp -R build/Build/Products/Release-iphoneos/DirectSide.app package/Payload/
           cd package
           ditto -c -k --sequesterRsrc --keepParent Payload DirectSide.ipa
-      - name: Local interpreter provisioning probe
-        run: |
-          xcodebuild -project ios/DirectSide.xcodeproj -scheme DirectSideAnisetteProbe -configuration Release -destination 'platform=macOS' -derivedDataPath build-probe CODE_SIGNING_ALLOWED=NO build
-          build-probe/Build/Products/Release/DirectSideAnisetteProbe "$PWD/ios/Resources/MacAnisetteRuntime"
       - uses: actions/upload-artifact@v4
         with:
           name: DirectSide-iPhone-unsigned

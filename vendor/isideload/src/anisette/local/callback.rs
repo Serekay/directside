@@ -1,13 +1,16 @@
 //! In-process Swift/AnisetteKit bridge. Secrets never enter UI events or command queues.
 use super::*;
-use std::{ffi::{c_char,CStr},sync::{Mutex,OnceLock}};
+use std::{ffi::{c_char,CStr,CString},sync::{Mutex,OnceLock}};
 use serde::Deserialize;
 
 pub type Generate=unsafe extern "C" fn()->*mut c_char;
 pub type Release=unsafe extern "C" fn(*mut c_char);
+pub type Resync=unsafe extern "C" fn(*const c_char)->*mut c_char;
 #[derive(Clone,Copy)]
 struct Callbacks {generate:Generate,release:Release}
 static CALLBACKS:OnceLock<Callbacks>=OnceLock::new();
+static RESYNC:OnceLock<Resync>=OnceLock::new();
+pub fn register_resync(resync:Resync)->bool {RESYNC.set(resync).is_ok()}
 
 pub fn register(generate:Generate,release:Release)->bool {
     CALLBACKS.set(Callbacks{generate,release}).is_ok()
@@ -53,6 +56,21 @@ impl LocalAnisetteProvider {
 }
 #[async_trait::async_trait]
 impl AnisetteProvider for LocalAnisetteProvider {
+    async fn resync(&self,sim:&str)->Result<AnisetteDataResponse,Report> {
+        if sim.len()>65536 {bail!("Local synchronization request is too large.");}
+        let resync=*RESYNC.get().ok_or_else(||report!("Local authentication synchronization is unavailable."))?;
+        let sim=CString::new(sim).map_err(|_|report!("Invalid local synchronization request."))?;
+        let callbacks=self.callbacks;
+        let payload=tokio::task::spawn_blocking(move||{
+            let pointer=unsafe{resync(sim.as_ptr())};
+            if pointer.is_null(){bail!("Local synchronization returned no response.");}
+            let result=Payload::decode(unsafe{CStr::from_ptr(pointer)}.to_bytes());
+            unsafe{(callbacks.release)(pointer)};
+            result
+        }).await.map_err(|_|report!("Local synchronization worker stopped."))??;
+        *self.pending.lock().map_err(|_|report!("Local authentication state is unavailable."))?=None;
+        Ok(AnisetteDataResponse::Data(payload.data()))
+    }
     async fn get_client_info(&self)->Result<AnisetteClientInfo,Report> {
         let payload=self.generate().await?;
         let info=AnisetteClientInfo{client_info:payload.client_info.clone(),user_agent:payload.user_agent.clone()};

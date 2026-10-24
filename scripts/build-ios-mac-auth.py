@@ -12,6 +12,20 @@ REVISION='a53ddc9ac6d65b24936d4a37917333fcd816cfd0'
 
 def run(*args,**kwargs):subprocess.run(list(map(str,args)),check=True,**kwargs)
 
+def require_rw_interpreter(source):
+    path=source/'qemu/accel/tcg/translate-all.c'
+    text=path.read_text()
+    original='    int prot = PROT_WRITE | PROT_READ | PROT_EXEC;'
+    replacement='''#ifdef CONFIG_TCG_INTERPRETER
+    int prot = PROT_WRITE | PROT_READ;
+#else
+    int prot = PROT_WRITE | PROT_READ | PROT_EXEC;
+#endif'''
+    if replacement not in text:
+        if text.count(original)!=1:raise RuntimeError('Unicorn allocation patch does not match pinned source')
+        text=text.replace(original,replacement).replace('#ifdef USE_MAP_JIT','#if defined(USE_MAP_JIT) && !defined(CONFIG_TCG_INTERPRETER)')
+        path.write_text(text)
+
 def main():
     if platform.system()!='Darwin':raise RuntimeError('This build needs the Apple SDK on macOS.')
     source=ROOT/'.tools/unicorn-tci'
@@ -19,6 +33,7 @@ def main():
         run('git','clone','--depth','1','--branch','2.1.4-xcf-a53ddc9','https://github.com/mahee96/unicorn.git',source)
     actual=subprocess.check_output(['git','-C',str(source),'rev-parse','HEAD'],text=True).strip()
     if actual!=REVISION:raise RuntimeError('Unicorn source revision mismatch')
+    require_rw_interpreter(source)
     for name,sdk,arch,target in [('mac','macosx',platform.machine(),None),('ios','iphoneos','arm64','aarch64-apple-ios')]:
         output=ROOT/'build/mac-auth'/name;output.mkdir(parents=True,exist_ok=True)
         args=['cmake','-S',source,'-B',output,'-DCMAKE_BUILD_TYPE=Release',
@@ -27,6 +42,7 @@ def main():
             '-DBUILD_SHARED_LIBS=OFF','-DUNICORN_LEGACY_STATIC_ARCHIVE=ON',
             '-DCMAKE_OSX_SYSROOT='+sdk,'-DCMAKE_OSX_ARCHITECTURES='+arch]
         if target:args+=['-DCMAKE_SYSTEM_NAME=iOS','-DCMAKE_OSX_DEPLOYMENT_TARGET=17.0','-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY']
+        else:args+=['-DCMAKE_OSX_DEPLOYMENT_TARGET=13.0']
         run(*args)
         config=output/'config-host.h'
         text=config.read_text()

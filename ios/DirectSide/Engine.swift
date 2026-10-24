@@ -62,6 +62,7 @@ import SwiftUI
         managed = load("apps.json") ?? []
         refreshBootstrap()
         guard ds_set_anisette_callback(ds_swift_anisette_generate,ds_swift_anisette_release) else {self.error="Could not connect the local authentication runtime.";return}
+        guard ds_set_anisette_resync_callback(ds_swift_anisette_resync) else {self.error="Could not connect local authentication synchronization.";return}
         ds_start()
         coreStarted=true
         importSigningIfNeeded()
