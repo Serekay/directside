@@ -77,8 +77,16 @@ class DirectSide(tk.Tk):
         style.configure('Horizontal.TProgressbar', troughcolor=FIELD, background=ACCENT, borderwidth=0, thickness=5)
 
     def build_ui(self):
-        outer = tk.Frame(self, bg=BG)
-        outer.pack(fill='both', expand=True, padx=32, pady=27)
+        canvas = tk.Canvas(self, bg=BG, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self, orient='vertical', command=canvas.yview)
+        scrollbar.pack(side='right', fill='y')
+        canvas.pack(side='left', fill='both', expand=True)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        outer = tk.Frame(canvas, bg=BG, padx=32, pady=27)
+        content = canvas.create_window((0, 0), window=outer, anchor='nw')
+        outer.bind('<Configure>', lambda _: canvas.configure(scrollregion=canvas.bbox('all')))
+        canvas.bind('<Configure>', lambda event: canvas.itemconfigure(content, width=event.width))
+        self.bind('<MouseWheel>', lambda event: canvas.yview_scroll(-int(event.delta / 120), 'units'))
         header = tk.Frame(outer, bg=BG)
         header.pack(fill='x', pady=(0, 19))
         png = ROOT / 'assets' / 'brand-128.png'
@@ -118,7 +126,6 @@ class DirectSide(tk.Tk):
         self.install_button = ttk.Button(package, text='DirectSide auf dem iPhone einrichten', style='Primary.TButton', command=self.install)
         self.install_button.grid(row=2, column=0, columnspan=2, sticky='ew')
         package.columnconfigure(0, weight=1)
-        ttk.Progressbar(outer, maximum=100, variable=None).pack_forget()
         self.progress = ttk.Progressbar(outer, maximum=100)
         self.progress.pack(fill='x', pady=(10, 12))
         ttk.Label(outer, textvariable=self.status, wraplength=740).pack(anchor='w')
