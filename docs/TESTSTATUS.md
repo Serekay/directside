@@ -4,6 +4,13 @@ Release 0.1.0 vom Besitzer am 24. Oktober 2026 ausdrücklich freigegeben.
 Repository bleibt privat. EXE und IPA stammen unverändert aus dem geprüften
 Build 847f4bf; die Freigabe ersetzt keine noch ausstehenden Gerätetests.
 
+[Release v0.1.0](https://github.com/Serekay/directside/releases/tag/v0.1.0)
+mit `DirectSide.exe`, `DirectSide.ipa` und `SHA256SUMS.txt` veröffentlicht.
+Dateigrößen und GitHub-SHA256 aller Assets mit lokalen Dateien abgeglichen.
+Der Release-Client der Windows-App erkennt die stabile Version und beide Assets;
+IPA-Download darüber einschließlich Hash- und Bundle-ID-Prüfung bestanden.
+Private Repository-Sichtbarkeit nach Veröffentlichung erneut geprüft.
+
 LiveContainer wurde inzwischen vom Besitzer geöffnet und fordert die Einrichtung
 des JIT-less-Modus an. Diagnose und Start einer Gast-App sind noch nicht bestätigt.
 Die folgenden Einträge dokumentieren auch frühere Entwicklungsstände.
