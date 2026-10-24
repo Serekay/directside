@@ -315,7 +315,7 @@ async fn install(engine: &mut Engine, request: &Value) -> Result<(), Report> {
         emit(json!({"event":"progress","value":(p*85.0).clamp(0.0,85.0)}));
     }),None).await?;
     if directside {
-        bootstrap(Some(engine),&provider,&path).await?;
+        bootstrap(engine,&provider,&path).await?;
     }
     emit(json!({"event":"installed","path":request["path"],"device_id":id,"bootstrap_ready":directside}));
     Ok(())
@@ -355,7 +355,7 @@ async fn usb_remote_pairing(provider:&impl idevice::provider::IdeviceProvider,ud
     Ok(pairing)
 }
 
-async fn repair_directside(request:&Value)->Result<(),Report> {
+async fn repair_directside(engine:&mut Engine,request:&Value)->Result<(),Report> {
     let id=text(request,"device_id")?;
     let path=PathBuf::from(text(request,"path")?);
     let info=isideload::sideload::application::inspect_ipa(&path)?;
@@ -363,33 +363,23 @@ async fn repair_directside(request:&Value)->Result<(),Report> {
     let mut mux=UsbmuxdConnection::default().await?;
     let device=mux.get_devices().await?.into_iter().find(|d|d.udid==id).ok_or_else(||report!("iPhone nicht mehr verbunden."))?;
     let provider=device.to_provider(UsbmuxdAddr::from_env_var()?,"DirectSide");
-    bootstrap(None,&provider,&path).await?;
+    bootstrap(engine,&provider,&path).await?;
     emit(json!({"event":"directside_repaired","device_id":id}));Ok(())
 }
 
-async fn bootstrap(engine: Option<&mut Engine>, provider: &impl idevice::provider::IdeviceProvider, ipa: &std::path::Path) -> Result<(),Report> {
+async fn bootstrap(engine: &mut Engine, provider: &impl idevice::provider::IdeviceProvider, ipa: &std::path::Path) -> Result<(),Report> {
     use idevice::house_arrest::HouseArrestClient;
     let info=pairing_step("Geräteinformationen für die Kopplung lesen …",10,async {isideload::util::device::IdeviceInfo::from_device(provider).await}).await?;
     let pairing=usb_remote_pairing(provider,&info.udid).await?;
-    let (bundle,signing)=if let Some(engine)=engine {
-        let team=engine.get_team().await?;
-        let signing=pairing_step("Signierschlüssel für DirectSide vorbereiten …",35,async {engine.bootstrap_signing_identity().await}).await?;
-        (format!("com.directside.app.{}",team.team_id),Some(signing))
-    }else {
-        let bundle=pairing_step("Installiertes DirectSide suchen …",10,async {
-            let mut proxy=idevice::installation_proxy::InstallationProxyClient::connect(provider).await?;
-            let apps=proxy.get_apps(Some("User"),None).await?;
-            let matches:Vec<_>=apps.keys().filter(|id|*id=="com.directside.app" || id.starts_with("com.directside.app.")).cloned().collect();
-            if matches.len()!=1 {bail!("DirectSide konnte nicht eindeutig auf diesem Gerät gefunden werden.");}Ok(matches[0].clone())
-        }).await?;
-        (bundle,None)
-    };
+    let team=engine.get_team().await?;
+    let signing=pairing_step("Signierschlüssel für DirectSide vorbereiten …",35,async {engine.bootstrap_signing_identity().await}).await?;
+    let bundle=format!("com.directside.app.{}",team.team_id);
     let mut afc=pairing_step("DirectSide für die Übertragung öffnen …",10,async {Ok(HouseArrestClient::connect(provider).await?.vend_documents(bundle).await?)}).await?;
     let mut files=vec![
         ("DirectSide-pairing.plist",pairing.to_bytes()),
         ("DirectSide-original.ipa",std::fs::read(ipa)?),
+        ("DirectSide-signing.json",signing),
     ];
-    if let Some(signing)=signing {files.push(("DirectSide-signing.json",signing));}
     files.push(("DirectSide-bootstrap.json",serde_json::to_vec(&json!({"udid":info.udid,"name":info.name}))?));
     pairing_step("Pairing und Original-IPA übertragen und prüfen …",90,async {
     for (name,data) in files {
@@ -561,7 +551,7 @@ pub async fn run() {
             "export_livecontainer"=>match engine.as_mut() {Some(e)=>export_livecontainer(e,&request).await,None=>Err(report!("Bitte zuerst anmelden."))},
             "pair_local"=>pair_local(&request).await,
             "reveal_developer_mode"=>reveal_developer_mode(&request).await,
-            "repair_directside"=>repair_directside(&request).await,
+            "repair_directside"=>match engine.as_mut() {Some(e)=>repair_directside(e,&request).await,None=>Err(report!("Zum Übertragen des Signierschlüssels bitte am PC anmelden."))},
             "restore" => {
                 match tokio::time::timeout(Duration::from_secs(45),restore()).await {
                     Ok(Ok(Some(e)))=>{engine=Some(e);Ok(())},

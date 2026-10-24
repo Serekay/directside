@@ -469,6 +469,7 @@ class DesktopBridge(QObject):
     @Slot(result=bool)
     def repairDirectSide(self):
         if self.data['busy'] or self.data['updateBusy'] or not self.data['devices']:return False
+        if not self.data['loggedIn']:self.fail('Zum Übertragen des Signierschlüssels bitte am PC anmelden.');return False
         paths=[Path(self.data['ipa']),HOME/'DirectSide.ipa',ROOT/'dist'/'DirectSide.ipa']
         for path in paths:
             try:

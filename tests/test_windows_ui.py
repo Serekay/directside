@@ -267,11 +267,13 @@ class WindowsUIStateTests(unittest.TestCase):
   self.assertEqual(self.sent,[])
   self.assertIn('Signing certificate limit',self.bridge.data['error'])
 
- def test_setup_repair_does_not_reinstall_or_require_an_apple_login(self):
+ def test_setup_repair_requires_login_to_transfer_signing_identity_without_reinstalling(self):
   import zipfile,plistlib
   ipa=Path(self.folder.name)/'DirectSide.ipa'
   with zipfile.ZipFile(ipa,'w') as archive:archive.writestr('Payload/DirectSide.app/Info.plist',plistlib.dumps({'CFBundleIdentifier':'com.directside.app'}))
   self.bridge.update(busy=False,loggedIn=False,devices=[{'id':'phone'},{'id':'tablet'}],deviceIndex=1,ipa=str(ipa))
+  self.assertFalse(self.bridge.repairDirectSide());self.assertEqual(self.sent,[])
+  self.bridge.update(loggedIn=True)
   self.assertTrue(self.bridge.repairDirectSide())
   self.assertEqual(self.sent,[{'command':'repair_directside','device_id':'tablet','path':str(ipa)}])
   self.assertTrue(self.bridge.data['settingUp']);self.assertEqual(self.bridge.data['challenge'],'')

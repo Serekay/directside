@@ -4,6 +4,26 @@ Entwicklungsstand, keine Release-Freigabe.
 
 ## Bestätigung vom Besitzer und neue Einrichtung
 
+Nachtrag Signieridentität: Der erste reine Pairing-Reparaturweg ließ die
+Signieridentität aus. Nach der erfolgreichen Pairing-Reparatur meldete der
+Besitzer deshalb beim LiveContainer-Installieren Fehler 7460. Die Einrichtung
+überträgt jetzt zwingend auch die passende Identität und benötigt hierfür die
+Apple-Anmeldung im Windows-Programm. Export und LiveContainer-Zertifikatsübergabe
+verwenden ausschließlich einen vorhandenen Schlüssel und ein dazu passendes
+aktives Apple-Zertifikat; sie erzeugen weder einen Schlüssel noch einen CSR.
+Der Regressionstest prüft auch das Ersetzen eines bereits auf dem iPhone
+erzeugten anderen Schlüssels sowie die Ablehnung unpassender Transfers ohne
+Beschädigung des gespeicherten Schlüssels. 46 Python-/UI-Tests und zwei gezielte
+Vendor-Tests bestanden. Die PC-Sitzung ließ sich bei der automatischen Prüfung
+nicht wiederherstellen; die vollständige Identitätsreparatur ist daher noch
+nach Anmeldung des Besitzers über die neue Windows-Oberfläche zu prüfen.
+
+iOS Build 5 entfernt den zusätzlichen QR-Einstieg unter den Quellen und das
+Einstellungen-Icon auf Entdecken. Meine Apps trennt nun Signaturen, eine knappe
+Update-Übersicht und die installierten Apps. Import ist unter dem Plus-Icon,
+Geräteverwaltung beim Abschnitt Installiert. Es gibt keine zusätzlichen
+Zurück-Buttons, entsprechend der zurückgenommenen Änderung des Besitzers.
+
 Nachtrag USB-Pairing: Der Besitzer meldete eine Code-Abfrage ohne Code auf dem
 iPhone. Vergleich mit `nab138/iloader/src-tauri/src/pairing.rs` bestätigt: Über
 den bereits vertrauten USB-Lockdown-Kanal verwendet iLoader automatisch die
