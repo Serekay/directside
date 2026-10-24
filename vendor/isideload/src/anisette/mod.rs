@@ -50,6 +50,8 @@ impl AnisetteData {
             ),
             ("X-Apple-I-MD".to_string(), self.one_time_password.clone()),
             ("X-Apple-I-MD-M".to_string(), self.machine_id.clone()),
+            ("X-Apple-I-MD-RINFO".to_string(), self.routing_info.clone()),
+            ("X-Apple-I-MD-LU".to_string(), self._local_user_id.clone()),
             // (
             //     "X-Mme-Client-Info".to_string(),
             //     self.device_description.clone(),

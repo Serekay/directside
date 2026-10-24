@@ -56,6 +56,7 @@ import SwiftUI
         sources = load("sources.json") ?? []
         managed = load("apps.json") ?? []
         refreshBootstrap()
+        guard ds_set_anisette_callback(ds_swift_anisette_generate,ds_swift_anisette_release) else {self.error="Could not connect the local authentication runtime.";return}
         ds_start()
         timer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.poll() }

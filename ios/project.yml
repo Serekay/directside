@@ -8,12 +8,25 @@ settings:
     SWIFT_VERSION: '5.0'
     CODE_SIGNING_ALLOWED: NO
     ENABLE_BITCODE: NO
+packages:
+  AnisetteKit:
+    url: https://github.com/mahee96/AnisetteKit.git
+    revision: db8b41022697b6c19be8a5f01a1ce834145a2a26
 targets:
   DirectSide:
     type: application
     platform: iOS
     sources:
       - DirectSide
+      - path: Resources/AnisetteRuntime
+        type: folder
+        buildPhase: resources
+      - path: ../licenses/AnisetteKit-AGPL-3.0.txt
+        buildPhase: resources
+      - path: ../THIRD_PARTY.md
+        buildPhase: resources
+    dependencies:
+      - package: AnisetteKit
     info:
       path: DirectSide/Info.plist
       properties:
@@ -44,8 +57,26 @@ targets:
         SWIFT_OBJC_BRIDGING_HEADER: DirectSide/Bridge.h
         LIBRARY_SEARCH_PATHS: ['$(inherited)', '$(PROJECT_DIR)/../target/aarch64-apple-ios/release']
         OTHER_LDFLAGS: ['$(inherited)', '-ldirectside_core', '-framework', Security, '-framework', SystemConfiguration, '-framework', CoreFoundation, '-liconv', '-lresolv']
+  DirectSideAnisetteProbe:
+    type: tool
+    platform: macOS
+    deploymentTarget: '13.0'
+    sources:
+      - DirectSide/LocalAnisette.swift
+      - Tests/AnisetteProbe.swift
+    dependencies:
+      - package: AnisetteKit
+    settings:
+      base:
+        PRODUCT_NAME: DirectSideAnisetteProbe
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGNING_ALLOWED: NO
 schemes:
   DirectSide:
     build:
       targets:
         DirectSide: all
+  DirectSideAnisetteProbe:
+    build:
+      targets:
+        DirectSideAnisetteProbe: all

@@ -10,6 +10,8 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+      - name: Verified local Apple runtime
+        run: python3 scripts/prepare-anisette-runtime.py
       - name: Rust
         run: |
           rustup toolchain install stable --profile minimal
@@ -32,6 +34,10 @@ jobs:
           cp -R build/Build/Products/Release-iphoneos/DirectSide.app package/Payload/
           cd package
           ditto -c -k --sequesterRsrc --keepParent Payload DirectSide.ipa
+      - name: Local interpreter provisioning probe
+        run: |
+          xcodebuild -project ios/DirectSide.xcodeproj -scheme DirectSideAnisetteProbe -configuration Release -destination 'platform=macOS' -derivedDataPath build-probe CODE_SIGNING_ALLOWED=NO build
+          build-probe/Build/Products/Release/DirectSideAnisetteProbe "$PWD/ios/Resources/AnisetteRuntime"
       - uses: actions/upload-artifact@v4
         with:
           name: DirectSide-iPhone-unsigned
