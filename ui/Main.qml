@@ -27,6 +27,10 @@ ApplicationWindow {
     property color ink: "#f4f5f7"
     property color muted: "#92979f"
     property bool ready: s.loggedIn && s.devices.length > 0 && s.ipa.length > 0 && !s.busy
+    property bool authenticating: (s.busy && !s.scanning) || s.authState==="signing_in"
+    property string accountStatus: s.loggedIn ? t("Angemeldet") : s.authState==="checking" ? t("Sitzung prüfen …") : s.authState==="signing_in" ? t("Bei Apple anmelden …") : s.authState==="expired" ? t("Sitzung abgelaufen") : t("Nicht angemeldet")
+    property bool quotaKnown: s.appIdsLimit>0 && s.appIdsAvailable>=0
+    property string quotaText: quotaKnown ? "App IDs · "+Math.max(0,s.appIdsLimit-s.appIdsAvailable)+" / "+s.appIdsLimit+" "+t("verbraucht")+" · "+s.appIdsAvailable+" "+t("frei") : "App IDs · "+(s.loggedIn ? t("Nicht verfügbar") : t("Anmelden"))
 
     component Label: Text {
         color: win.ink; font.family: win.font.family; font.pixelSize: 14
@@ -52,10 +56,13 @@ ApplicationWindow {
         background: Rectangle {radius:12; color:control.primary ? (control.down ? "#27b994" : control.hovered ? "#65e8c5" : win.accent) : control.hovered ? "#35383e" : control.quiet ? "transparent" : "#2a2d33"; border.width:control.primary || control.quiet ? 0 : 1; border.color:"#3b3e45"; Behavior on color {ColorAnimation{duration:120}}}
     }
     component IconButton: Action {
+        id:iconControl
         property string hint: ""
+        property string iconName: ({"⚙":"settings","↻":"refresh","▦":"apps","?":"help","−":"minimize","□":"maximize","×":"close","‹":"back","›":"forward","≡":"activity","…":"more"})[text] || "more"
         implicitWidth:36; implicitHeight:36; quiet:true
         ToolTip.visible: hovered; ToolTip.text:hint; ToolTip.delay:500
         Accessible.name:hint
+        contentItem: Item {Image {anchors.centerIn:parent;width:iconControl.text==="↻" || iconControl.text==="▦"?26:21;height:width;source:"../assets/icons/"+iconControl.iconName+".svg";sourceSize.width:width*2;sourceSize.height:height*2}}
     }
     component Field: TextField {
         id: field
@@ -79,9 +86,10 @@ ApplicationWindow {
                 Image {source:s.icon;Layout.preferredWidth:38;Layout.preferredHeight:38;sourceSize.width:76;sourceSize.height:76}
                 Label {text:"DirectSide";font.pixelSize:22;font.weight:Font.DemiBold;font.letterSpacing:-0.6}
                 Badge {text:"0.1.0"}
+                Badge {text:s.devices.length?win.t("●  USB verbunden"):win.t("Nicht verbunden");tone:s.devices.length?"ok":"warning"}
                 Item {Layout.fillWidth:true}
                 IconButton {text:"⚙";hint:win.t("Einstellungen");onClicked:win.page=win.page==="settings" ? "install":"settings"}
-                IconButton {id:moreButton;text:"⋯";hint:win.t("Menü");onClicked:moreMenu.popup()
+                IconButton {id:moreButton;text:"?";hint:win.t("Hilfe & Aktivität");onClicked:moreMenu.popup()
                     Menu {id:moreMenu;y:moreButton.height
                         MenuItem {text:win.t("Hilfe");onTriggered:win.page="help"}
                         MenuItem {text:win.t("Aktivität");onTriggered:win.page="activity"}
@@ -99,7 +107,9 @@ ApplicationWindow {
             spacing:22
             ColumnLayout {
                 Layout.preferredWidth:286;Layout.minimumWidth:286;Layout.maximumWidth:286;Layout.fillHeight:true;spacing:16
-                Label {text:"APPLE ACCOUNT";color:win.muted;font.pixelSize:10;font.letterSpacing:1.6;font.weight:Font.DemiBold;Layout.leftMargin:4}
+                Item {Layout.fillWidth:true;Layout.preferredHeight:30
+                    Label {anchors.verticalCenter:parent.verticalCenter;text:"APPLE ACCOUNT";color:win.muted;font.pixelSize:10;font.letterSpacing:1.6;font.weight:Font.DemiBold;anchors.left:parent.left;anchors.leftMargin:4}
+                }
                 Card {
                     Layout.fillWidth:true
                     Layout.preferredHeight: accountColumn.implicitHeight+40
@@ -112,11 +122,9 @@ ApplicationWindow {
                                 Label {text:s.loggedIn ? s.email : win.t("Dein Account");color:win.muted;font.pixelSize:11;Layout.fillWidth:true}
                             }
                         }
-                        Badge {visible:s.loggedIn;text:win.t("●  Angemeldet");positive:true}
-                        Badge {visible:!s.loggedIn;text:win.t("Lokale Apple-Anmeldung");tone:s.authLocal?"ok":"warning"}
-                        Field {id:email;visible:!s.loggedIn && !s.challenge;Layout.fillWidth:true;placeholderText:"Apple-ID";text:s.email;enabled:!s.busy;onAccepted:password.forceActiveFocus()}
-                        Field {id:password;visible:!s.loggedIn && !s.challenge;Layout.fillWidth:true;placeholderText:win.t("Passwort");echoMode:TextInput.Password;enabled:!s.busy;onAccepted:loginButton.clicked()}
-                        Action {id:loginButton;visible:!s.loggedIn && !s.challenge;Layout.fillWidth:true;text:win.t("Anmelden");primary:true;enabled:!s.busy;onClicked:{backend.login(email.text,password.text);password.clear()}}
+                        Field {id:email;objectName:"emailField";visible:!s.loggedIn && !s.challenge;Layout.fillWidth:true;placeholderText:"Apple-ID";text:s.email;enabled:!win.authenticating;onTextEdited:backend.editEmail(text);onAccepted:password.forceActiveFocus()}
+                        Field {id:password;objectName:"passwordField";visible:!s.loggedIn && !s.challenge;Layout.fillWidth:true;placeholderText:win.t("Passwort");echoMode:TextInput.Password;enabled:!win.authenticating;onAccepted:loginButton.clicked()}
+                        Action {id:loginButton;objectName:"loginButton";visible:!s.loggedIn && !s.challenge;Layout.fillWidth:true;text:win.authenticating?win.t("Bitte warten …"):win.t("Anmelden");primary:true;enabled:!win.authenticating;onClicked:if(backend.login(email.text,password.text))password.clear()}
                         Action {visible:s.loggedIn && !s.challenge;Layout.fillWidth:true;text:win.t("Abmelden");enabled:!s.busy;onClicked:backend.logout()}
                         ColumnLayout {
                             visible:s.challenge.length>0;Layout.fillWidth:true;spacing:10
@@ -142,16 +150,14 @@ ApplicationWindow {
                     }
                 }
                 Item {Layout.fillHeight:true}
-                RowLayout {spacing:8;Badge {text:win.t("10 App-IDs / Account")} Badge {text:win.t("7 Tage")}}
             }
             ColumnLayout {
                 Layout.fillWidth:true;Layout.fillHeight:true;spacing:16
-                RowLayout {
+                RowLayout {Layout.preferredHeight:30
                     IconButton {visible:win.page!=="install";text:"‹";hint:win.t("Zurück");onClicked:win.page="install"}
                     Label {text:win.page==="settings"?win.t("Einstellungen"):win.page==="activity"?win.t("Aktivität"):win.page==="help"?win.t("Hilfe"):win.page==="apps"?win.t("Installierte Apps"):win.t("DEIN GERÄT");font.pixelSize:win.page==="install"?10:17;font.letterSpacing:win.page==="install"?1.6:0;color:win.page==="install"?win.muted:win.ink;font.weight:Font.DemiBold}
                     Item {Layout.fillWidth:true}
                     Action {visible:win.page==="activity";text:win.t("Kopieren");enabled:s.logs.length>0;onClicked:backend.copyActivity()}
-                    Badge {visible:win.page==="install";text:s.devices.length?win.t("●  USB verbunden"):win.t("Nicht verbunden");tone:s.devices.length?"ok":"warning"}
                 }
                 Card {
                     visible:win.page==="install";Layout.fillWidth:true;Layout.preferredHeight:122
@@ -163,21 +169,20 @@ ApplicationWindow {
                         }
                         ColumnLayout {Layout.fillWidth:true;spacing:6
                             Label {text:s.devices.length ? s.devices[s.deviceIndex].name:win.t("iPhone verbinden");font.pixelSize:19;font.weight:Font.DemiBold;Layout.fillWidth:true}
-                            RowLayout {Badge {text:"USB";tone:s.devices.length?"ok":"warning"} Badge {text:s.slotsUsed>=0?s.slotsUsed+win.t(" / 3 Apps · dieses Gerät"):win.t("App-Plätze nicht geprüft");tone:s.slotsUsed>=0 && s.slotsUsed<3?"ok":"warning"}}
                         }
                         ComboBox {visible:s.devices.length>1;model:s.devices;textRole:"label";currentIndex:s.deviceIndex;enabled:!s.busy;onActivated:index=>backend.selectDevice(index);Layout.maximumWidth:210}
-                        IconButton {text:"↻";hint:win.t("Geräte aktualisieren");enabled:!s.busy;onClicked:backend.refresh()}
-                        IconButton {text:"▦";hint:win.t("Installierte Apps");enabled:s.devices.length>0;onClicked:{win.appPage=0;win.page="apps"}}
+                        IconButton {text:"↻";implicitWidth:44;implicitHeight:44;hint:win.t("Geräte aktualisieren");enabled:!s.busy;onClicked:backend.refresh()}
+                        IconButton {text:"▦";implicitWidth:44;implicitHeight:44;hint:win.t("Installierte Apps");enabled:s.devices.length>0;onClicked:{win.appPage=0;win.page="apps"}}
                     }
                 }
                 Card {
                     visible:win.page==="install";Layout.fillWidth:true;Layout.fillHeight:true;Layout.minimumHeight:272;border.color:s.vpnState==="missing"?"#805440":"#30333a"
-                    ColumnLayout {anchors.fill:parent;anchors.margins:24;spacing:16
-                        RowLayout {visible:s.vpnState!=="missing";spacing:14
+                    ColumnLayout {anchors.fill:parent;anchors.margins:24;spacing:12
+                        RowLayout {visible:s.vpnState!=="missing";spacing:8
                             Image {source:s.icon;Layout.preferredWidth:56;Layout.preferredHeight:56;sourceSize.width:112;sourceSize.height:112}
                             ColumnLayout {spacing:6
                                 Label {text:win.t("DirectSide für iPhone");font.pixelSize:21;font.weight:Font.DemiBold;font.letterSpacing:-0.4}
-                                RowLayout {Badge {text:"iOS 17+"} Badge {text:win.t("Pairing inklusive");positive:true}}
+                                Label {text:"iOS 17+ · "+win.t("Pairing inklusive");font.pixelSize:12;color:win.muted}
                             }
                         }
                         RowLayout {visible:s.vpnState==="missing";Layout.fillWidth:true;spacing:20
@@ -190,7 +195,6 @@ ApplicationWindow {
                                 Text {text:win.t("Der Anleitung in der App folgen.");color:win.muted;font.pixelSize:13;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                             }
                         }
-                        Item {Layout.fillHeight:true}
                         Rectangle {visible:s.vpnState!=="missing";Layout.fillWidth:true;implicitHeight:52;radius:12;color:"#15171b";border.color:"#30343b"
                             RowLayout {anchors.fill:parent;anchors.leftMargin:15;anchors.rightMargin:8;spacing:12
                                 Label {text:"↳";color:win.muted;font.pixelSize:19}
@@ -200,11 +204,7 @@ ApplicationWindow {
                         }
                         Action {visible:s.vpnState==="missing" && !s.ipaName;text:win.t("IPA auswählen");enabled:!s.busy;onClicked:backend.chooseIPA()}
                         Action {text:s.success?win.t("✓  Installiert"):s.busy && !s.scanning?win.t("Bitte warten …"):win.t("Auf Gerät installieren  →");primary:true;enabled:win.ready;Layout.fillWidth:true;implicitHeight:48;onClicked:backend.install()}
-                        RowLayout {visible:s.vpnState!=="missing";spacing:8
-                            Badge {text:s.loggedIn?"✓ Apple-ID":win.t("Apple-ID fehlt");tone:s.loggedIn?"ok":"missing"}
-                            Badge {text:s.devices.length?win.t("✓ Gerät"):win.t("Gerät fehlt");tone:s.devices.length?"ok":"missing"}
-                            Badge {text:s.ipaName?"✓ IPA":win.t("IPA fehlt");tone:s.ipaName.length>0?"ok":"missing"}
-                        }
+                        Item {Layout.fillHeight:true}
                     }
                 }
                 Card {
@@ -236,7 +236,6 @@ ApplicationWindow {
                             ComboBox {model:["English","Deutsch"];currentIndex:s.language==="de"?1:0;onActivated:index=>backend.setLanguage(index===1?"de":"en")}
                         }
                         Item {Layout.fillHeight:true}
-                        RowLayout {Badge {visible:s.email.length>0;text:win.t("Apple-ID gespeichert")} Badge {text:win.t("Windows-Schlüsselbund");positive:true}}
                     }
                 }
                 Card {
@@ -260,7 +259,6 @@ ApplicationWindow {
                     ColumnLayout {anchors.fill:parent;anchors.margins:20;spacing:14
                         RowLayout {Layout.fillWidth:true
                             ComboBox {model:s.devices;textRole:"label";currentIndex:s.deviceIndex;enabled:!s.busy;Layout.fillWidth:true;onActivated:index=>{win.appPage=0;backend.selectDevice(index)}}
-                            Badge {text:s.slotsUsed>=0?s.slotsUsed+win.t(" / 3 Plätze"):win.t("Nicht geprüft");tone:s.slotsUsed>=0 && s.slotsUsed<3?"ok":"warning"}
                         }
                         RowLayout {spacing:8
                             Action {text:win.t("Alle Apps · ")+s.installedApps.length;quiet:win.developerOnly;onClicked:{win.appPage=0;win.developerOnly=false}}
@@ -301,17 +299,31 @@ ApplicationWindow {
             }
         }
         Rectangle {
-            id:footer;anchors{left:parent.left;right:parent.right;bottom:parent.bottom;margins:1} height:54;color:"#17191e";radius:18
+            id:footer;anchors{left:parent.left;right:parent.right;bottom:parent.bottom;margins:1} height:88;color:"#17191e";radius:18
             Rectangle {anchors.top:parent.top;width:parent.width;height:18;color:parent.color}
-            RowLayout {anchors.fill:parent;anchors.leftMargin:26;anchors.rightMargin:20;spacing:10
-                Rectangle {width:6;height:6;radius:3;color:s.error?"#ff8d76":s.busy?"#eac17e":win.accent}
-                Label {text:(s.error || (s.busy && !s.scanning?s.status:s.lcPrepared?win.t("Zertifikat übertragen · auf dem iPhone fortfahren"):s.success?win.t("Installiert"):win.t("Bereit"))).split("\n")[0];font.pixelSize:12;color:s.error?"#ffb49a":win.muted;Layout.fillWidth:true}
+            ColumnLayout {anchors.fill:parent;anchors.leftMargin:24;anchors.rightMargin:24;anchors.topMargin:8;anchors.bottomMargin:12;spacing:4
+            RowLayout {Layout.fillWidth:true;spacing:8
+                Item {Layout.fillWidth:true}
+                Label {visible:!!s.error || (s.busy && !s.scanning) || s.lcPrepared || s.success;text:(s.error || (s.busy && !s.scanning?s.status:s.lcPrepared?win.t("Zertifikat übertragen · auf dem iPhone fortfahren"):s.success?win.t("Installiert"):"")).split("\n")[0];font.pixelSize:12;color:s.error?"#ffb49a":win.muted;Layout.maximumWidth:parent.width-150;horizontalAlignment:Text.AlignRight}
                 IconButton {visible:s.error.length>0;text:"≡";hint:win.t("Aktivität");onClicked:win.page="activity"}
                 ProgressBar {visible:s.busy && !s.scanning;Layout.preferredWidth:100;from:0;to:100;value:s.progress;indeterminate:s.progress<=0
                     background:Rectangle{implicitHeight:4;radius:2;color:"#343a42"}
                     contentItem:Item {Rectangle{width:parent.width*(s.progress>0?s.progress/100:0.4);height:4;radius:2;color:win.accent}}
                 }
                 IconButton {visible:s.error.length>0;text:"×";hint:win.t("Fehler ausblenden");onClicked:backend.dismissError()}
+            }
+            RowLayout {Layout.fillWidth:true;spacing:8
+                Item {Layout.fillWidth:true}
+                Badge {visible:win.page==="settings" && s.email.length>0 && s.email===s.savedEmail;text:win.t("Apple-ID gespeichert")}
+                Badge {visible:win.page==="settings";text:win.t("Windows-Schlüsselbund")}
+                Badge {id:quotaBadge;objectName:"quotaBadge";text:win.quotaText;tone:!win.quotaKnown?"warning":s.appIdsAvailable===0?"missing":s.appIdsAvailable<=3?"warning":"ok"
+                    ToolTip.visible:quotaHover.hovered;ToolTip.text:win.t("Neue App-Kennungen pro Account innerhalb von 7 Tagen. Keine installierten Apps.")+(s.appIdsRegistered>=0?"\n"+s.appIdsRegistered+" "+win.t("registrierte Kennungen"):"");HoverHandler {id:quotaHover}
+                }
+                Badge {visible:win.page==="install" || win.page==="apps";text:s.slotsUsed>=0?"Apps · "+s.slotsUsed+" / 3 · "+win.t("Gerät"):win.t("App-Plätze nicht geprüft");tone:s.slotsUsed<0?"warning":s.slotsUsed>=3?"missing":s.slotsUsed===2?"warning":"ok"}
+                Badge {visible:win.page==="install" && !s.ipaName;text:win.t("IPA fehlt");tone:"missing"}
+                Badge {objectName:"sessionBadge";text:win.accountStatus;tone:s.loggedIn?"ok":s.authState==="expired"?"missing":"warning"}
+                Badge {text:win.t("7 Tage")}
+            }
             }
         }
     }

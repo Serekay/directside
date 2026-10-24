@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'ui'))
-from PySide6.QtCore import QUrl,Qt
+from PySide6.QtCore import QUrl,Qt,QObject,QMetaObject
 from PySide6.QtWidgets import QApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
@@ -86,5 +86,42 @@ class WindowsUIStateTests(unittest.TestCase):
   self.assertEqual(len(engine.rootObjects()),1)
   root=engine.rootObjects()[0];root.setWidth(960);root.setHeight(680)
   APP.processEvents();self.assertTrue(root.flags() & Qt.FramelessWindowHint)
+  root.close();engine.deleteLater();APP.processEvents()
+
+ def test_email_draft_survives_poll_and_login_waits_for_scan(self):
+  self.bridge.initializing=False;self.bridge.update(busy=False,authState='expired')
+  engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
+  engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')));root=engine.rootObjects()[0]
+  email=root.findChild(QObject,'emailField');password=root.findChild(QObject,'passwordField');button=root.findChild(QObject,'loginButton')
+  email.setProperty('text','person@example.com');QMetaObject.invokeMethod(email,'textEdited')
+  password.setProperty('text','fixture-password')
+  self.bridge.auto_refresh();APP.processEvents()
+  self.assertEqual(email.property('text'),'person@example.com')
+  self.assertTrue(email.property('enabled'));self.assertTrue(button.property('enabled'))
+  QMetaObject.invokeMethod(button,'clicked');APP.processEvents()
+  self.assertEqual(password.property('text'),'')
+  self.assertEqual([r['command'] for r in self.sent],['devices'])
+  self.bridge.handle({'event':'devices','devices':[{'id':'phone','name':'Test phone'}]});APP.processEvents()
+  self.assertEqual([r['command'] for r in self.sent],['devices','login'])
+  self.assertEqual(self.sent[-1]['email'],'person@example.com')
+  self.assertIsNone(self.bridge.pendingLogin)
+  self.assertFalse(email.property('enabled'))
+  root.close();engine.deleteLater();APP.processEvents()
+
+ def test_expired_session_and_real_registration_allowance(self):
+  self.bridge.handle({'event':'logged_out','reason':'expired'})
+  self.assertFalse(self.bridge.data['loggedIn']);self.assertEqual(self.bridge.data['authState'],'expired')
+  engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
+  engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')));root=engine.rootObjects()[0]
+  self.bridge.handle({'event':'account_quota','limit':10,'available':3,'registered':1});APP.processEvents()
+  badge=root.findChild(QObject,'quotaBadge')
+  self.assertEqual(badge.property('text'),'App IDs · 7 / 10 used · 3 left')
+  self.assertEqual(badge.property('tone'),'warning')
+  self.bridge.handle({'event':'account_quota','limit':10,'available':0,'registered':1});APP.processEvents()
+  self.assertEqual(badge.property('tone'),'missing')
+  self.bridge.handle({'event':'account_quota','limit':10,'available':8,'registered':1});APP.processEvents()
+  self.assertEqual(badge.property('tone'),'ok')
+  self.bridge.handle({'event':'logged_out'});APP.processEvents()
+  self.assertEqual(self.bridge.data['appIdsAvailable'],-1)
   root.close();engine.deleteLater();APP.processEvents()
 if __name__=='__main__':unittest.main()

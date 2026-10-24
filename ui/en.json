@@ -140,5 +140,16 @@
   "Apple-Installer-Prüfsumme stimmt nicht. Installation gestoppt.": "Apple installer checksum mismatch. Installation stopped.",
   "LiveContainer-Prüfsumme stimmt nicht.": "LiveContainer checksum mismatch.",
   "Unerwartete LiveContainer-Bundle-ID.": "Unexpected LiveContainer bundle ID.",
-  "Kopieren": "Copy"
+  "Kopieren": "Copy",
+  "Hilfe & Aktivität": "Help & activity",
+  "Angemeldet": "Signed in",
+  "Nicht angemeldet": "Not signed in",
+  "Sitzung abgelaufen": "Session expired",
+  "Sitzung abgelaufen · bitte anmelden": "Session expired · sign in again",
+  "verbraucht": "used",
+  "frei": "left",
+  "Nicht verfügbar": "Unavailable",
+  "Neue App-Kennungen pro Account innerhalb von 7 Tagen. Keine installierten Apps.": "New app identifiers per account within 7 days. Separate from installed app slots.",
+  "registrierte Kennungen": "registered identifiers",
+  "Gerät": "device"
 }
