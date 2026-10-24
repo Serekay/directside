@@ -50,13 +50,16 @@ struct ContentView:View {
                 Label(engine.slotsText,systemImage:"square.grid.3x1")
                 Label("Signierung mit deiner eigenen Apple-ID",systemImage:"key")
             }
+            Section("LiveContainer · optional") {
+                Label(LiveContainerBridge.available ? "Installiert":"Noch nicht installiert",systemImage:"square.stack.3d.up")
+                Button("LiveContainer einrichten"){LiveContainerBridge.configure(engine:engine)}.disabled(!engine.liveContainerCertificateReady)
+                Text(engine.liveContainerCertificateReady ? "Zertifikat bereit. Nach der Übergabe in LiveContainer den JIT-less-Test ausführen.":"Am PC: Einstellungen → LiveContainer installieren → Zertifikat übertragen.").font(.caption).foregroundStyle(.secondary)
+            }
             Section {
                 DisclosureGroup("Erweiterte Verbindungseinstellungen") {
                     TextField("VPN-Gegenstelle",text:$connection.peer).textInputAutocapitalization(.never).autocorrectionDisabled()
                     TextField("Remote-Pairing-Port",value:$connection.port,format:.number).keyboardType(.numberPad)
                     Button("Speichern"){connection.save()}
-                    TextField("Anisette-Server",text:$engine.server).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
-                    Text("Client-Info und User-Agent werden automatisch zusammen vom Server übernommen.").font(.caption).foregroundStyle(.secondary)
                 }
             }
             Section {HStack{Text("DirectSide");Spacer();Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0").foregroundStyle(.secondary)};Text("Unabhängiger App-Katalog mit lokaler Signierung. LocalDevVPN wird als separate Verbindung verwendet.").font(.caption).foregroundStyle(.secondary)}

@@ -1,4 +1,5 @@
 pub mod remote_v3;
+pub mod local;
 
 use crate::auth::grandslam::GrandSlam;
 use plist::Dictionary;

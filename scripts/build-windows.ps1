@@ -29,6 +29,13 @@ try {
     if ($LASTEXITCODE) { throw 'Dependencies failed.' }
     & $python -m unittest discover -s tests
     if ($LASTEXITCODE) { throw 'UI tests failed.' }
+    # Local-only Apple runtime for this private desktop package. Never uploaded to Git.
+    $appleRuntime = Join-Path ${env:ProgramFiles} 'iTunes\CoreADI64.dll'
+    if (!(Test-Path 'bin\apple\CoreADI64.dll')) {
+        if (!(Test-Path $appleRuntime)) { throw 'Local Apple CoreADI runtime unavailable; no remote fallback is allowed.' }
+        New-Item -ItemType Directory -Path bin\apple -Force | Out-Null
+        Copy-Item -LiteralPath $appleRuntime -Destination bin\apple\CoreADI64.dll
+    }
     $originalPath = $env:PATH
     try {
         $pythonDirectory = Split-Path (& $python -c 'import sys; print(sys.executable)') -Parent

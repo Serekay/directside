@@ -5,7 +5,7 @@ use tokio::sync::RwLock;
 
 use crate::util::callbacks::TwoFactorCallback;
 use crate::{
-    anisette::{AnisetteDataGenerator, AnisetteProvider, remote_v3::RemoteV3AnisetteProvider},
+    anisette::{AnisetteDataGenerator, AnisetteProvider},
     auth::apple_account::AppleAccount,
 };
 
@@ -50,8 +50,7 @@ impl AppleAccountBuilder {
         self
     }
 
-    /// Set an anisette provider to use. RemoteV3AnisetteProvider is used by default if none is provided.
-    /// You should create your own instance of RemoteV3AnisetteProvider if you want to use a different anisette server.
+    /// Set an explicit anisette provider. DirectSide has no implicit remote fallback.
     ///
     /// # Arguments
     /// - `anisette_provider`: The anisette provider to use
@@ -83,10 +82,7 @@ impl AppleAccountBuilder {
         let debug = self.debug.unwrap_or(false);
         let anisette_generator = match self.anisette_generator {
             Some(generator) => generator,
-            None => {
-                let provider = RemoteV3AnisetteProvider::default()?;
-                AnisetteDataGenerator::new(Arc::new(RwLock::new(provider)))
-            }
+            None => bail!("DirectSide benötigt einen expliziten lokalen Anisette-Provider. Ein Fremdserver wird nicht automatisch verwendet."),
         };
 
         AppleAccount::new(

@@ -6,6 +6,7 @@
 - Windows: MSVC-Build-Tools oder ein passend eingerichtetes GNU/LLVM-Toolchain-Setup.
 - iOS: macOS mit Xcode, XcodeGen und dem Rust-Target `aarch64-apple-ios`.
 - Windows-Oberfläche: Python 3.13 oder neuer, PySide6/Qt Quick und PyInstaller (Versionen in `ui/requirements.txt`).
+- Windows-Build: Apples CoreADI64.dll aus x64-iTunes. Die private Paketkonfiguration übernimmt sie in `bin/apple`; sie bleibt aus Git ausgeschlossen.
 
 ## Windows
 
@@ -20,6 +21,8 @@ Der Build läuft lokal, führt die Tests aus und schreibt `dist/DirectSide.exe`.
 Die Qt-Quick-Oberfläche liegt in `ui/Main.qml`, die Python-Anbindung in `ui/desktop.py`. Eigene Titelleiste, verschiebbares und skalierbares Fenster, kompakte Status-Badges, Icon-Einstellungen und integrierte Bestätigungen ersetzen die frühere Tkinter-Oberfläche. Die normale Ansicht hat keine Scrollbar.
 
 ## iPhone
+
+Windows-Lokalisierung: `ui/en.json` und `ui/i18n.py`, QML verwendet `win.t(...)`. Englisch ist Standard; Sprache und Apple-ID werden gespeichert. Unbekannte technische Detailmeldungen bleiben unverändert. `ui/components.py` enthält Komponentenprüfung und festgelegte Downloads mit Prüfsummen.
 
 ```sh
 rustup target add aarch64-apple-ios
@@ -51,4 +54,4 @@ Erfolg nur für tatsächlich ausgeführte Tests dokumentieren. Keine Release-Fre
 
 ## Paketprüfung
 
-Die versionierte Konfiguration liegt in `packaging/DirectSide.spec`. Der lokale Build isoliert PATH von fremden Toolchains und nimmt keine fremde ICU-DLL mit auf. Nach dem Packen startet er die tatsächliche EXE mit `--smoke-test` und prüft Qt, QML, Fenster-Icon und den mitgelieferten Signierkern. Der Bericht liegt unter `build/smoke-test.json`. Es werden dafür keine Apple-Zugangsdaten benötigt.
+Die versionierte Konfiguration liegt in `packaging/DirectSide.spec`. Der lokale Build isoliert PATH von fremden Toolchains und nimmt keine fremde ICU-DLL mit auf. Nach dem Packen startet er die tatsächliche EXE mit `--smoke-test` und prüft Qt, QML, Fenster-Icon, Signierkern und tatsächliche lokale Anisette-Erzeugung. Der Bericht liegt unter `build/smoke-test.json`. Apple-Zugangsdaten werden nicht benötigt; eine unprovisionierte lokale Laufzeit kann Apples eigene Provisionierungsendpunkte kontaktieren.

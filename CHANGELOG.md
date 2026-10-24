@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Automatische USB-Erkennung, App-Belegung und VPN-Prüfung pro Gerät. Benutzer-Apps als Kacheln mit echten Geräte-Icons und Seitenwechsel ohne Scrollbar.
+- Kurze LocalDevVPN-Karte mit lokalem App-Store-QR-Code; rote, gelbe und grüne Status-Badges.
+- Hilfe im ⋯-Menü und gespeicherte Sprachwahl Englisch/Deutsch; Standard Englisch.
+- Optionale LiveContainer-Standalone-Installation mit Hashprüfung und lokaler Zertifikatsübertragung. Neue iOS-Übergabe im Quellcode; Hardwaretest und neuer iPhone-Build ausstehend.
+
+- Windows-Anisette lokal über CoreADI im eigenen Prozess; kein automatischer Fremdserver-Fallback und keine Serveradresse in den Einstellungen.
+- Komponentenprüfung mit Fehlend-/Gestoppt-/Installiert-Badges und integrierter Einrichtung der Apple-USB-Unterstützung; Apple-Download mit SHA-256-Prüfung und regulärer Windows-Administratorbestätigung.
+- Lokale iOS-Authentifizierung ausdrücklich noch nicht implementiert; Selbsterneuerung und LiveContainer-Integration nicht als funktionsgeprüft freigegeben.
+
 - Qt-Quick-Oberfläche im iLoader-Stil: Karten, Status-Badges, Icon-Einstellungen und eigene Titelleiste ohne Scrollbar in der Hauptansicht.
 - Integrierte Bestätigungen und lokal gespeicherte Apple-ID samt Schlüsselbund-Sitzung.
 - Inkompatible ICU-DLL aus dem Paket entfernt; isolierter Build und Starttest der fertigen EXE für Qt, QML, Icon und Signierkern.
