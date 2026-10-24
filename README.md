@@ -2,7 +2,7 @@
 
 Sideload with your own Apple ID. DirectSide combines a Windows setup app with a native iPhone app for browsing sources, installing apps and managing updates.
 
-**Development preview.** On-device Apple sign-in and self-renewal are still in development. LiveContainer setup needs device testing.
+**Development preview.** On-device Apple sign-in and self-renewal are implemented and build successfully; device validation is pending. Windows sign-in currently encounters Apple error −80046. LiveContainer setup also needs device testing.
 
 ## A clear view of your devices
 

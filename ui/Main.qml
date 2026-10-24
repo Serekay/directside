@@ -150,6 +150,7 @@ ApplicationWindow {
                     IconButton {visible:win.page!=="install";text:"‹";hint:win.t("Zurück");onClicked:win.page="install"}
                     Label {text:win.page==="settings"?win.t("Einstellungen"):win.page==="activity"?win.t("Aktivität"):win.page==="help"?win.t("Hilfe"):win.page==="apps"?win.t("Installierte Apps"):win.t("DEIN GERÄT");font.pixelSize:win.page==="install"?10:17;font.letterSpacing:win.page==="install"?1.6:0;color:win.page==="install"?win.muted:win.ink;font.weight:Font.DemiBold}
                     Item {Layout.fillWidth:true}
+                    Action {visible:win.page==="activity";text:win.t("Kopieren");enabled:s.logs.length>0;onClicked:backend.copyActivity()}
                     Badge {visible:win.page==="install";text:s.devices.length?win.t("●  USB verbunden"):win.t("Nicht verbunden");tone:s.devices.length?"ok":"warning"}
                 }
                 Card {
@@ -293,8 +294,8 @@ ApplicationWindow {
                 }
                 Card {
                     visible:win.page==="activity";Layout.fillWidth:true;Layout.fillHeight:true
-                    ListView {anchors.fill:parent;anchors.margins:20;clip:true;model:s.logs;spacing:12
-                        delegate:Text {required property string modelData;width:ListView.view.width;text:modelData;wrapMode:Text.Wrap;color:"#adb4bf";font.family:"Consolas";font.pixelSize:12}
+                    ScrollView {anchors.fill:parent;anchors.margins:20;clip:true;contentWidth:availableWidth
+                        TextArea {text:s.logs.join("\n\n");readOnly:true;selectByMouse:true;wrapMode:TextEdit.Wrap;color:"#adb4bf";font.family:"Consolas";font.pixelSize:12;selectionColor:"#287e68";selectedTextColor:win.ink;background:null}
                     }
                 }
             }
@@ -304,7 +305,8 @@ ApplicationWindow {
             Rectangle {anchors.top:parent.top;width:parent.width;height:18;color:parent.color}
             RowLayout {anchors.fill:parent;anchors.leftMargin:26;anchors.rightMargin:20;spacing:10
                 Rectangle {width:6;height:6;radius:3;color:s.error?"#ff8d76":s.busy?"#eac17e":win.accent}
-                Label {text:s.error || (s.busy && !s.scanning?s.status:s.lcPrepared?win.t("Zertifikat übertragen · auf dem iPhone fortfahren"):s.success?win.t("Installiert"):win.t("Bereit"));font.pixelSize:12;color:s.error?"#ffb49a":win.muted;Layout.fillWidth:true}
+                Label {text:(s.error || (s.busy && !s.scanning?s.status:s.lcPrepared?win.t("Zertifikat übertragen · auf dem iPhone fortfahren"):s.success?win.t("Installiert"):win.t("Bereit"))).split("\n")[0];font.pixelSize:12;color:s.error?"#ffb49a":win.muted;Layout.fillWidth:true}
+                IconButton {visible:s.error.length>0;text:"≡";hint:win.t("Aktivität");onClicked:win.page="activity"}
                 ProgressBar {visible:s.busy && !s.scanning;Layout.preferredWidth:100;from:0;to:100;value:s.progress;indeterminate:s.progress<=0
                     background:Rectangle{implicitHeight:4;radius:2;color:"#343a42"}
                     contentItem:Item {Rectangle{width:parent.width*(s.progress>0?s.progress/100:0.4);height:4;radius:2;color:win.accent}}
