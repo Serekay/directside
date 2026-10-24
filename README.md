@@ -10,14 +10,17 @@ Ein eigener App-Katalog für iPhone mit nativer Magazin-Oberfläche, Quellenimpo
 |---|---|
 | `ios/` | Native SwiftUI-App mit dem bestätigten Magazin-Design |
 | `src/` | Gemeinsamer Rust-Kern für Anmeldung, Signierung, USB und Remote Pairing |
-| `ui/` | Native Windows-Anwendung zur Einrichtung |
+| `ui/` | Qt-Quick-Oberfläche im kompakten iLoader-Stil |
 | `assets/` | Eigenes DirectSide-Icon, Original und Windows-Symbole |
+| `packaging/` | Versionierte Konfiguration für das Windows-Paket |
+| `scripts/` | Lokaler Build inklusive Starttest der fertigen EXE |
+| `docs/` | Architektur, Entwicklungsanleitung und tatsächlicher Teststand |
 | `vendor/isideload/` | MIT-lizenzierte Signierbibliothek, mit kleiner dokumentierter Erweiterung |
-| `.github/workflows/` | Private Test-Builds für iOS und Windows |
+| `.github/workflows/` | Nur manuell gestartete private iPhone-Builds |
 
 ## Verwendung des Testpakets
 
-1. `DirectSide-Windows.exe` und `DirectSide.ipa` in denselben Ordner legen.
+1. `DirectSide.exe` und `DirectSide.ipa` in denselben Ordner legen.
 2. Das iPhone per USB anschließen, entsperren und dem PC vertrauen.
 3. In DirectSide für Windows mit der eigenen Apple-ID anmelden und das iPhone auswählen.
 4. „DirectSide auf dem iPhone einrichten“ starten. Pairing und Original-IPA werden dabei mit übertragen.
@@ -47,9 +50,11 @@ Passwörter werden nicht in Dateien oder Git gespeichert und nicht als Prozessar
 
 Windows merkt sich die Apple-ID und die gewählte Serveradresse unter `%LOCALAPPDATA%\DirectSide\preferences.json`. Das Passwort steht dort nicht. Bei gültiger Schlüsselbund-Sitzung erfolgt die Anmeldung nach dem Start automatisch; andernfalls ist die Apple-ID bereits ausgefüllt. Bestätigungscode, SMS-Auswahl, Team-Auswahl, Pairing, Fehler und nächste Schritte nach der Installation sind in das Hauptfenster integriert. Nur die normale Windows-Dateiauswahl öffnet ein eigenes Fenster.
 
+Windows wird ausschließlich lokal mit `scripts/build-windows.ps1` gebaut. Die aktuelle EXE liegt unter `dist/DirectSide.exe`. GitHub Actions baut nur die iPhone-IPA und nur bei manuellem Start. Pushes lösen keine Builds aus.
+
 ## Entwicklung und Freigabe
 
-Siehe [DEVELOPMENT.md](DEVELOPMENT.md), [ARCHITECTURE.md](ARCHITECTURE.md), [TESTSTATUS.md](TESTSTATUS.md) und [CHANGELOG.md](CHANGELOG.md).
+Siehe [DEVELOPMENT.md](docs/DEVELOPMENT.md), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [TESTSTATUS.md](docs/TESTSTATUS.md) und [CHANGELOG.md](CHANGELOG.md).
 
 Das GitHub-Repository bleibt privat. **Öffentliche Veröffentlichung, Sichtbarkeitsänderungen und Releases erfolgen nur nach ausdrücklicher Freigabe des Eigentümers, wenn Design und Gerätefunktionen geprüft sind.**
 

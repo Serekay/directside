@@ -1,5 +1,12 @@
 # Änderungen
 
+## Unreleased
+
+- Qt-Quick-Oberfläche im iLoader-Stil: Karten, Status-Badges, Icon-Einstellungen und eigene Titelleiste ohne Scrollbar in der Hauptansicht.
+- Integrierte Bestätigungen und lokal gespeicherte Apple-ID samt Schlüsselbund-Sitzung.
+- Inkompatible ICU-DLL aus dem Paket entfernt; isolierter Build und Starttest der fertigen EXE für Qt, QML, Icon und Signierkern.
+- Windows ausschließlich lokal gebaut; iPhone-Actions nur manuell. Alte Oberflächen und Paketvarianten entfernt, technische Dokumentation unter `docs/` geordnet.
+
 ## 0.1.0 — Entwicklung
 
 - Eigenes DirectSide-Branding und App-Icon.

@@ -5,7 +5,7 @@ import plistlib
 from pathlib import Path
 from zipfile import ZipFile
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'ui'))
-from app import ipa_identity,clean_error,Preferences,valid_code
+from common import ipa_identity,clean_error,Preferences,valid_code
 
 class BootstrapTests(unittest.TestCase):
     def test_only_main_app_determines_pairing_target(self):
