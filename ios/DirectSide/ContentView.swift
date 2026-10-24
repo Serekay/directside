@@ -14,7 +14,7 @@ struct ContentView:View {
     @Environment(\.scenePhase) private var phase
     var body:some View {
         TabView(selection:$tab) {
-            NavigationStack{DiscoverView(connection:connection,addSource:{sheet = .add},openAccount:{tab=3})}.tabItem{Label(L("Entdecken"),systemImage:"safari")}.tag(0)
+            NavigationStack{DiscoverView(connection:connection,addSource:{sheet = .add})}.tabItem{Label(L("Entdecken"),systemImage:"safari")}.tag(0)
             NavigationStack{LibraryView(connection:connection)}.tabItem{Label(L("Meine Apps"),systemImage:"square.stack")}.badge(engine.updates.count).tag(1)
             NavigationStack{SourcesView(connection:connection,addSource:{sheet = .add})}.tabItem{Label(L("Quellen"),systemImage:"square.stack.3d.up")}.tag(2)
             NavigationStack{SettingsView(connection:connection)}.tabItem{Label(L("Einstellungen"),systemImage:"gearshape")}.tag(3)

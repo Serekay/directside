@@ -387,5 +387,8 @@
   "Signierte App wird installiert …": "Installing signed app …",
   "Remote-Pairing-Port fehlt. Verbindung in den Einstellungen prüfen.": "Remote pairing port missing. Check Connection in Settings.",
   "Einstellungen öffnen": "Open settings",
-  "Zertifikat unter Einstellungen → LiveContainer erneut übertragen.": "Transfer the certificate again under Settings > LiveContainer."
+  "Zertifikat unter Einstellungen → LiveContainer erneut übertragen.": "Transfer the certificate again under Settings > LiveContainer.",
+  "Signaturen": "Signatures",
+  "Verwalten": "Manage",
+  "%@ Tage": "%@ days"
 }

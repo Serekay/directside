@@ -80,7 +80,6 @@ struct DiscoverView: View {
     @EnvironmentObject var engine:Engine
     @ObservedObject var connection:Connection
     var addSource:()->Void
-    var openAccount:()->Void
     @State private var query=""
     @State private var category="Alle"
     private var entries:[CatalogEntry] { engine.sources.flatMap { source in source.apps.map { CatalogEntry(app:$0,source:source) } } }
@@ -92,7 +91,6 @@ struct DiscoverView: View {
             LazyVStack(alignment:.leading,spacing:18) {
                 HStack {
                     VStack(alignment:.leading,spacing:5) { Text(L("DIRECTSIDE")).font(.caption2.weight(.semibold)).tracking(2).foregroundStyle(.secondary); Text(L("Entdecken")).font(.largeTitle.bold()).tracking(-1) }
-                    Spacer(); Button(action:openAccount) { Image(systemName:"gearshape.fill").font(.system(size:35)).symbolRenderingMode(.hierarchical) }.accessibilityLabel(L("Einstellungen öffnen"))
                 }
                 HStack(spacing:9) {Image(systemName:"magnifyingglass").foregroundStyle(.secondary); TextField(L("Apps, Entwickler und Quellen"),text:$query).font(.subheadline).autocorrectionDisabled()}.padding(12).background(Color(uiColor:.tertiarySystemFill),in:RoundedRectangle(cornerRadius:13))
                 if query.isEmpty,let feature { featured(feature) }
@@ -168,36 +166,6 @@ struct AppDetailView: View {
     private func info(_ label:String,_ value:String)->some View {HStack(alignment:.top) {Text(L(label)).foregroundStyle(.secondary);Spacer();Text(L(value)).multilineTextAlignment(.trailing).textSelection(.enabled)}.font(.caption).padding(.vertical,10)}
 }
 
-struct LibraryView: View {
-    @EnvironmentObject var engine:Engine
-    @ObservedObject var connection:Connection
-    @State private var showIPAImporter=false
-    var body: some View {
-        ScrollView {VStack(alignment:.leading,spacing:18) {
-            Text(L("Meine Apps")).font(.largeTitle.bold()).tracking(-1).padding(.top,10)
-            Button {showIPAImporter=true} label:{Label(L("IPA importieren"),systemImage:"square.and.arrow.down").font(.subheadline.bold())}.disabled(engine.busy)
-            HStack {Label(L(engine.slotsText),systemImage:"square.grid.3x1").font(.caption).foregroundStyle(.secondary);Spacer();Button(L("Prüfen")){engine.inspectConnection(peer:connection.peer,port:connection.port)}.font(.caption)}
-            VStack(alignment:.leading,spacing:16) {
-                HStack {VStack(alignment:.leading,spacing:5) {Text(L("Deine Apps bleiben bereit")).font(.headline);Text(L("DirectSide und \(engine.managed.filter{$0.id != "com.directside.app"}.count) weitere Apps")).font(.caption).foregroundStyle(.secondary)};Spacer();if let days=engine.remainingDays {Text(L("\(days)")).font(.largeTitle.bold())+Text(L(" Tage")).font(.caption)}}
-                Button {Task {await engine.renewAll(peer:connection.peer,port:connection.port)}} label:{Label(L("Alle Signaturen erneuern"),systemImage:"arrow.clockwise").font(.subheadline.bold()).frame(maxWidth:.infinity).padding(.vertical,6)}.buttonStyle(.borderedProminent).disabled(engine.busy || !engine.loggedIn)
-            }.padding(19).background(Style.accent.opacity(0.1),in:RoundedRectangle(cornerRadius:22))
-            SectionTitle(title:"Updates \(engine.updates.isEmpty ? "":"\(engine.updates.count)")",action:engine.updates.isEmpty ? nil:"Alle aktualisieren",onAction:{Task {await engine.updateAll(peer:connection.peer,port:connection.port)}})
-            if engine.updates.isEmpty {Label(L("Alles auf dem neuesten Stand"),systemImage:"checkmark.circle").font(.subheadline).foregroundStyle(.secondary).padding(.vertical,12)}
-            ForEach(engine.updates.map{CatalogEntry(app:$0.app,source:$0.source)}) {entry in VStack(alignment:.leading,spacing:10) {CatalogRow(app:entry.app,source:entry.source,connection:connection);if let notes=entry.app.latest?.localizedDescription {Text(L(notes)).font(.caption).foregroundStyle(.secondary).lineLimit(4)};Label(L(entry.source.name),systemImage:"square.stack.3d.up").font(.caption2).foregroundStyle(.secondary)}.padding(16).background(Style.surface,in:RoundedRectangle(cornerRadius:21))}
-            SectionTitle(title:"Installiert")
-            NavigationLink {DeviceManagementView(connection:connection)} label:{Label(L("Apps auf diesem Gerät verwalten"),systemImage:"trash").font(.subheadline)}
-            HStack(spacing:12) {BrandIcon();VStack(alignment:.leading,spacing:4){Text(L("DirectSide")).font(.subheadline.bold());Text(L(engine.selfExpirationText)).font(.caption).foregroundStyle(.secondary)};Spacer();Button(L("Erneuern")){engine.refreshSelf(peer:connection.peer,port:connection.port)}.font(.caption.bold()).buttonStyle(.bordered).buttonBorderShape(.capsule).disabled(engine.busy || !engine.loggedIn || !engine.pairingReady)}.padding(.vertical,8)
-            ForEach(engine.managed.filter{$0.id != "com.directside.app"}) {app in HStack(spacing:12) {Artwork(url:app.iconURL);VStack(alignment:.leading,spacing:4){Text(L(app.name)).font(.subheadline.bold());Text(L(engine.expirationText(app))).font(.caption).foregroundStyle(.secondary)};Spacer();Menu {Button(L("Signatur erneuern")){engine.refresh(app,peer:connection.peer,port:connection.port)}} label:{Image(systemName:"ellipsis").padding(12)}}.padding(.vertical,8)}
-        }.padding(21)}.background(Style.background).toolbar(.hidden,for:.navigationBar).refreshable{await engine.refreshSources()}.safeAreaInset(edge:.bottom){EngineProgress()}
-        .fileImporter(isPresented:$showIPAImporter,allowedContentTypes:[UTType(filenameExtension:"ipa") ?? .data],allowsMultipleSelection:false) {result in
-            switch result {
-            case .success(let files):if let file=files.first {Task{await engine.importIPA(file)}}
-            case .failure(let error):engine.fail(error.localizedDescription)
-            }
-        }
-    }
-}
-
 struct SourcesView: View {
     @EnvironmentObject var engine:Engine
     @ObservedObject var connection:Connection
@@ -207,8 +175,6 @@ struct SourcesView: View {
             HStack {VStack(alignment:.leading,spacing:6){Text(L("DEIN APP-KATALOG")).font(.caption2.weight(.semibold)).tracking(1.5).foregroundStyle(.secondary);Text(L("Quellen")).font(.largeTitle.bold()).tracking(-1)};Spacer();Button(action:addSource){Image(systemName:"plus").font(.title3).padding(11).background(Style.surface,in:Circle())}.accessibilityLabel(L("Quelle hinzufügen"))}
             Text(L("Deine Sammlungen. Immer aktuell.")).font(.subheadline).foregroundStyle(.secondary)
             ForEach(engine.sources) {source in NavigationLink {SourceDetailView(source:source,connection:connection)} label:{VStack(alignment:.leading,spacing:14) {HStack(spacing:12){Artwork(url:source.iconURL,fallback:"square.stack.3d.up.fill");VStack(alignment:.leading,spacing:4){Text(L(source.name)).font(.subheadline.bold()).foregroundStyle(.primary);Text(L(source.subtitle ?? source.sourceURL?.host ?? "")).font(.caption).foregroundStyle(.secondary).lineLimit(2)};Spacer();Image(systemName:"chevron.right").font(.caption).foregroundStyle(.secondary)};HStack(spacing:16){Label(L("\(source.apps.count) Apps"),systemImage:"square.grid.2x2");Label(L(engine.sourceFailures[source.id] == nil ? "Aktuell":"Nicht erreichbar"),systemImage:engine.sourceFailures[source.id] == nil ? "checkmark":"exclamationmark.circle")}.font(.caption2).foregroundStyle(.secondary)}.padding(17).background(Style.surface,in:RoundedRectangle(cornerRadius:21))}.buttonStyle(.plain)}
-            Button(action:addSource) {Label(L("Quelle per QR-Code hinzufügen"),systemImage:"qrcode.viewfinder").font(.subheadline.weight(.medium)).frame(maxWidth:.infinity).padding(.vertical,24).background(RoundedRectangle(cornerRadius:21).strokeBorder(Style.accent.opacity(0.3),style:StrokeStyle(lineWidth:1,dash:[5,4])))}
-            Button {Task {await engine.refreshSources()}} label:{Label(L(engine.refreshingSources ? "Quellen werden geprüft …":"Alle Quellen aktualisieren"),systemImage:"arrow.clockwise").font(.subheadline).frame(maxWidth:.infinity).padding(15).background(Style.surface,in:RoundedRectangle(cornerRadius:15))}.disabled(engine.refreshingSources)
         }.padding(21)}.background(Style.background).toolbar(.hidden,for:.navigationBar).refreshable{await engine.refreshSources()}
     }
 }

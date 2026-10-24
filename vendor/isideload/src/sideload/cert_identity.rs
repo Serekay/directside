@@ -36,6 +36,9 @@ mod local_tests {
     use crate::util::storage::InMemoryStorage;
     #[test]
     fn local_bootstrap_reuses_the_key_and_rejects_mismatched_certificates() {
+        let empty=InMemoryStorage::new();
+        assert!(CertificateIdentity::existing_private_key("missing@example.invalid",&empty).is_err());
+        assert!(empty.retrieve_data(&format!("{}/key",CertificateIdentity::account_key("missing@example.invalid"))).unwrap().is_none());
         let original=RsaPrivateKey::new(&mut rand::thread_rng(),2048).unwrap();
         let pair=KeyPair::from_pkcs8_pem_and_sign_algo(&original.to_pkcs8_pem(LineEnding::LF).unwrap(),&PKCS_RSA_SHA256).unwrap();
         let certificate=CertificateParams::new(vec![]).unwrap().self_signed(&pair).unwrap();
@@ -49,6 +52,11 @@ mod local_tests {
         let key=format!("{}/key",CertificateIdentity::account_key("fixture@example.invalid"));
         assert_eq!(storage.retrieve_data(&key).unwrap().unwrap(),original_der.as_bytes());
         let other=RsaPrivateKey::new(&mut rand::thread_rng(),2048).unwrap();
+        // An earlier failed phone install may already have generated a different
+        // local key. A validated desktop transfer must replace that key.
+        storage.store_data(&key,other.to_pkcs8_der().unwrap().as_bytes()).unwrap();
+        CertificateIdentity::import_bootstrap(&serde_json::to_vec(&transfer).unwrap(),&storage).unwrap();
+        assert!(CertificateIdentity::stored_key_matches("fixture@example.invalid",&storage,certificate.der()).unwrap());
         transfer["private_key"]=serde_json::json!(other.to_pkcs8_der().unwrap().as_bytes());
         assert!(CertificateIdentity::import_bootstrap(&serde_json::to_vec(&transfer).unwrap(),&storage).is_err());
         assert_eq!(storage.retrieve_data(&key).unwrap().unwrap(),original_der.as_bytes());
@@ -63,6 +71,16 @@ pub struct CertificateIdentity {
 }
 
 impl CertificateIdentity {
+    fn existing_private_key(apple_email:&str,storage:&dyn SideloadingStorage)->Result<RsaPrivateKey,Report> {
+        let bytes=storage.retrieve_data(&format!("{}/key",Self::account_key(apple_email)))?.ok_or_else(||report!("Signing key missing. Repair DirectSide setup on the PC to transfer the existing identity."))?;
+        Ok(RsaPrivateKey::from_pkcs8_der(&bytes)?)
+    }
+    /// Export/transfer must never create a private key or request another certificate.
+    pub async fn retrieve_existing(machine_name:&str,apple_email:&str,developer_session:&mut DeveloperSession,team:&DeveloperTeam,storage:&dyn SideloadingStorage)->Result<Self,Report> {
+        let private_key=Self::existing_private_key(apple_email,storage)?;
+        let (cert,certificate)=Self::find_matching(&private_key,machine_name,developer_session,team).await?.ok_or_else(||report!("No active certificate matches the stored signing key. No new certificate was requested."))?;
+        Ok(Self{machine_id:cert.machine_id.unwrap_or_default(),machine_name:cert.machine_name.unwrap_or_default(),certificate,private_key})
+    }
     fn account_key(email:&str)->String {hex::encode(Sha256::digest(email.as_bytes()))}
     pub fn stored_machine_name(email:&str,storage:&dyn SideloadingStorage)->Result<Option<String>,Report> {
         storage.retrieve(&format!("{}/machine-name",Self::account_key(email)))
