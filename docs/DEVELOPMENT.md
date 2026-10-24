@@ -6,7 +6,7 @@
 - Windows: MSVC-Build-Tools oder ein passend eingerichtetes GNU/LLVM-Toolchain-Setup.
 - iOS: macOS mit Xcode, XcodeGen und dem Rust-Target `aarch64-apple-ios`.
 - Windows-Oberfläche: Python 3.13 oder neuer, PySide6/Qt Quick und PyInstaller (Versionen in `ui/requirements.txt`).
-- Windows-Build: Apples CoreADI64.dll aus x64-iTunes. Die private Paketkonfiguration übernimmt sie in `bin/apple`; sie bleibt aus Git ausgeschlossen.
+- Windows-Build: `scripts/prepare-mac-runtime.py` bereitet die hashgeprüfte Mac-CoreADI aus Apples iTunes-Download in `bin/apple` vor. 7-Zip wird nur zur Vorbereitung auf dem Build-PC benötigt. Die fertige Anwendung benötigt keine separate iTunes-/Emulatorinstallation.
 
 ## Windows
 
@@ -17,6 +17,8 @@
 ```
 
 Der Build läuft lokal, führt die Tests aus und schreibt `dist/DirectSide.exe`. Die IPA liegt daneben. Für den lokalen GNU/LLVM-Compiler wird `libunwind.dll` mitgepackt. Die ignorierte `.cargo/config.toml` enthält nur lokale Compilerpfade.
+
+`scripts/prepare-windows-bootloader.py` baut den verifizierten PyInstaller-Starter gemäß offizieller Unicorn-Kompatibilitätsanleitung mit `--no-cfg`; Windows-Schutzrichtlinien bleiben unverändert. Standard ist die lokale LLVM-MinGW-Toolchain, alternativ `DIRECTSIDE_BOOTLOADER_CC` oder MSVC. Die Paketkonfiguration verwendet diesen Starter nur für DirectSide. `-OutputDirectory build/local-mac-auth` erlaubt einen Testbau, während eine ältere EXE geöffnet ist.
 
 Die Qt-Quick-Oberfläche liegt in `ui/Main.qml`, die Python-Anbindung in `ui/desktop.py`. Eigene Titelleiste, verschiebbares und skalierbares Fenster, kompakte Status-Badges, Icon-Einstellungen und integrierte Bestätigungen ersetzen die frühere Tkinter-Oberfläche. Die normale Ansicht hat keine Scrollbar.
 

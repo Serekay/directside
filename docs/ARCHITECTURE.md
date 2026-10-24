@@ -8,7 +8,9 @@ Unter Windows kommuniziert die Oberfläche über JSON-Zeilen in anonymen Prozess
 
 ## iPhone-Transport
 
-Windows generiert Anisette im eigenen Prozess über CoreADI64.dll. iOS verwendet AnisetteKit mit einem TCI-Interpreter und eingebetteten, hashgeprüften Apple-ARM64-Bibliotheken. Swift übergibt die Daten über einen registrierten C-Callback direkt an den Rust-Worker. Provisionierung kontaktiert Apple direkt; es gibt keinen Fremd-Anisette-Fallback. Identität und Provisionierungszustand liegen im Geräteschlüsselbund. Erfolgreiche lokale Provisionierung und OTP-Erzeugung wurden auf dem macOS-Buildrechner geprüft; Anmeldung und Erneuerung auf einem echten iPhone stehen aus.
+Windows führt Apples Mac-CoreADI aus iTunes 12.8.3 im eingebetteten Unicorn-Emulator aus. Ein interner Prozess derselben EXE übernimmt die lokale Erzeugung; Rust kommuniziert über eine kurzlebige Windows-Pipe, auf die nur Besitzer und System zugreifen können. Es gibt keinen Netzwerklistener oder Fremd-Anisette-Dienst und keine separate iTunes- oder Emulatorinstallation. Die Maschinenidentität und der Provisionierungszustand werden gemeinsam per Windows-DPAPI geschützt. Die frühere native Windows-CoreADI-Variante wurde nach wiederholtem Tokenfehler −80046 ersetzt. Anmeldung und Erstellung von Entwicklersitzungen bleiben bis zum tatsächlichen Account-Test unbestätigt.
+
+iOS verwendet weiterhin AnisetteKit mit TCI und eingebetteten, hashgeprüften Apple-ARM64-Bibliotheken. Swift übergibt die Daten über einen registrierten C-Callback an Rust. Provisionierung kontaktiert Apple direkt. Identität und Provisionierungszustand liegen im Geräteschlüsselbund. Ein erfolgreicher OTP-Test beweist keine erfolgreiche Apple-ID-Anmeldung; der aktuelle Windows-Mac-Emulator wurde nicht auf iOS übertragen.
 
 1. LocalDevVPN stellt den lokalen Netzwerkweg bereit.
 2. Bonjour ermittelt den Remote-Pairing-Port.

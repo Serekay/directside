@@ -9,7 +9,6 @@ use rootcause::prelude::*;
 use serde::Deserialize;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
-use tracing::warn;
 use web_time::SystemTime;
 
 #[derive(Deserialize, Debug, Clone)]
@@ -27,6 +26,7 @@ pub struct AnisetteData {
     device_unique_identifier: String,
     _local_user_id: String,
     generated_at: SystemTime,
+    extra_headers: HashMap<String,String>,
 }
 
 // Some headers don't seem to be required. I guess not including them is technically more efficient soooo
@@ -34,7 +34,7 @@ impl AnisetteData {
     pub fn get_headers(&self) -> HashMap<String, String> {
         //let dt: DateTime<Utc> = Utc::now().round_subsecs(0);
 
-        HashMap::from_iter([
+        let mut headers=HashMap::from_iter([
             // (
             //     "X-Apple-I-Client-Time".to_string(),
             //     dt.format("%+").to_string().replace("+00:00", "Z"),
@@ -56,7 +56,8 @@ impl AnisetteData {
             //     "X-Mme-Client-Info".to_string(),
             //     self.device_description.clone(),
             // ),
-        ])
+        ]);
+        headers.extend(self.extra_headers.clone());headers
     }
 
     pub fn get_header_map(&self) -> Result<HeaderMap, Report> {
@@ -93,14 +94,26 @@ impl AnisetteData {
     }
 
     pub fn needs_refresh(&self) -> bool {
-        let elapsed = self.generated_at.elapsed();
-        match elapsed {
-            Ok(elapsed) => elapsed.as_secs() > 60,
-            Err(_) => {
-                warn!("Unable to determine anisette data age, treating as expired");
-                true
-            }
-        }
+        otp_window_changed(self.generated_at,SystemTime::now())
+    }
+}
+
+fn otp_window_changed(generated:SystemTime,now:SystemTime)->bool {
+    match (generated.duration_since(web_time::UNIX_EPOCH),now.duration_since(web_time::UNIX_EPOCH)) {
+        (Ok(a),Ok(b))=>a.as_secs()/30!=b.as_secs()/30,
+        _=>true,
+    }
+}
+
+#[cfg(test)]
+mod clock_tests {
+    use super::*;
+    #[test]
+    fn otp_cache_rotates_at_real_clock_window_boundaries() {
+        let at=|seconds|web_time::UNIX_EPOCH+std::time::Duration::from_secs(seconds);
+        assert!(!otp_window_changed(at(31),at(59)));
+        assert!(otp_window_changed(at(59),at(60)));
+        assert!(otp_window_changed(at(60),at(59)));
     }
 }
 

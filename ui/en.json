@@ -124,7 +124,7 @@
   "Apple USB ist bereit.": "Apple USB is ready.",
   "Einrichtung beendet. Komponenten erneut prüfen.": "Setup finished. Check components again.",
   "Apple-Anmeldung wird aufgebaut …": "Preparing Apple authentication …",
-  "Anmeldung bestätigt. Developer-Team wird geladen …": "Signed in. Loading developer team …",
+  "Anmeldung bestätigt. Developer-Team wird geladen …": "Password verified. Creating developer session …",
   "Gespeicherte Sitzung konnte lokal nicht übernommen werden: ": "Could not restore the saved session locally: ",
   "Gerät prüfen, signieren und installieren …": "Checking device, signing and installing …",
   "Remote-Pairing für DirectSide einrichten …": "Setting up remote pairing for DirectSide …",
@@ -151,5 +151,6 @@
   "Nicht verfügbar": "Unavailable",
   "Neue App-Kennungen pro Account innerhalb von 7 Tagen. Keine installierten Apps.": "New app identifiers per account within 7 days. Separate from installed app slots.",
   "registrierte Kennungen": "registered identifiers",
-  "Gerät": "device"
+  "Gerät": "device",
+  "Apple verweigert die lokale Anmeldung (−80046).": "Apple rejected local sign-in (−80046)."
 }

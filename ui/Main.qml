@@ -321,7 +321,7 @@ ApplicationWindow {
                 }
                 Badge {visible:win.page==="install" || win.page==="apps";text:s.slotsUsed>=0?"Apps · "+s.slotsUsed+" / 3 · "+win.t("Gerät"):win.t("App-Plätze nicht geprüft");tone:s.slotsUsed<0?"warning":s.slotsUsed>=3?"missing":s.slotsUsed===2?"warning":"ok"}
                 Badge {visible:win.page==="install" && !s.ipaName;text:win.t("IPA fehlt");tone:"missing"}
-                Badge {objectName:"sessionBadge";text:win.accountStatus;tone:s.loggedIn?"ok":s.authState==="expired"?"missing":"warning"}
+                Badge {objectName:"sessionBadge";text:win.accountStatus;tone:s.loggedIn?"ok":s.authState==="expired" || s.authState==="rejected"?"missing":"warning"}
                 Badge {text:win.t("7 Tage")}
             }
             }

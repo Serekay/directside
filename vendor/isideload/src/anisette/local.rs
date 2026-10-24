@@ -1,13 +1,13 @@
-//! In-process Apple ADI. No HTTP listener, external generator or remote fallback.
+//! Local Apple ADI. No HTTP listener or remote fallback.
 use super::{AnisetteClientInfo, AnisetteData, AnisetteDataResponse, AnisetteProvider};
 use crate::auth::grandslam::GrandSlam;
 use rootcause::prelude::*;
 use std::sync::Arc;
 
 #[cfg(windows)]
-mod windows;
+mod mac_windows;
 #[cfg(windows)]
-pub use windows::LocalAnisetteProvider;
+pub use mac_windows::LocalAnisetteProvider;
 pub mod callback;
 #[cfg(target_os="ios")]
 pub use callback::LocalAnisetteProvider;

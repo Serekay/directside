@@ -14,9 +14,9 @@ pub fn register(generate:Generate,release:Release)->bool {
 }
 
 #[derive(Deserialize)]
-struct Payload {headers:std::collections::HashMap<String,String>,client_info:String,user_agent:String}
+pub(crate) struct Payload {headers:std::collections::HashMap<String,String>,pub(crate) client_info:String,pub(crate) user_agent:String}
 impl Payload {
-    fn decode(bytes:&[u8])->Result<Self,Report> {
+    pub(crate) fn decode(bytes:&[u8])->Result<Self,Report> {
         if bytes.len()>65536 {bail!("Local authentication response is too large.");}
         let value:serde_json::Value=serde_json::from_slice(bytes).map_err(|_|report!("Invalid local authentication response."))?;
         if let Some(error)=value.get("error").and_then(serde_json::Value::as_str) {bail!("Local iPhone authentication: {}",error);}
@@ -27,8 +27,9 @@ impl Payload {
         if payload.client_info.is_empty() || payload.user_agent.is_empty(){bail!("Local authentication client information is missing.");}
         Ok(payload)
     }
-    fn data(self)->AnisetteData {
-        AnisetteData{machine_id:self.headers["X-Apple-I-MD-M"].clone(),one_time_password:self.headers["X-Apple-I-MD"].clone(),routing_info:self.headers["X-Apple-I-MD-RINFO"].clone(),_device_description:self.client_info,device_unique_identifier:self.headers["X-Mme-Device-Id"].clone(),_local_user_id:self.headers["X-Apple-I-MD-LU"].clone(),generated_at:web_time::SystemTime::now()}
+    pub(crate) fn data(self)->AnisetteData {
+        let extra_headers=self.headers.iter().filter(|(key,_)|["X-Apple-I-Client-Time","X-Apple-I-TimeZone","X-Apple-Locale","X-Apple-I-SRL-NO"].contains(&key.as_str())).map(|(k,v)|(k.clone(),v.clone())).collect();
+        AnisetteData{machine_id:self.headers["X-Apple-I-MD-M"].clone(),one_time_password:self.headers["X-Apple-I-MD"].clone(),routing_info:self.headers["X-Apple-I-MD-RINFO"].clone(),_device_description:self.client_info,device_unique_identifier:self.headers["X-Mme-Device-Id"].clone(),_local_user_id:self.headers["X-Apple-I-MD-LU"].clone(),generated_at:web_time::SystemTime::now(),extra_headers}
     }
 }
 

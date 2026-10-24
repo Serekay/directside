@@ -1,6 +1,10 @@
 """Qt Quick desktop shell. The signing engine remains a separate local process."""
 import json
+import os
 import sys
+if '--local-anisette' in sys.argv:
+    from local_mac_auth import main as local_auth_main
+    sys.exit(local_auth_main())
 import threading
 import time
 from pathlib import Path
@@ -158,6 +162,8 @@ class DesktopBridge(QObject):
                 self.update(busy=False,scanning=False,vpnState='unknown',lcState='unknown',directsidePresent=False,slotsUsed=-1,developerApps=[],installedApps=[])
                 self.append_log('App-Prüfung nicht möglich. iPhone entsperren und Vertrauen bestätigen.');return
             self.fail(event.get('message','Unbekannter Fehler'))
+            if event.get('command')=='login' and 'Auth error -80046:' in event.get('message',''):
+                self.update(loggedIn=False,authState='rejected',error='Apple verweigert die lokale Anmeldung (−80046).',status='Anmeldung erforderlich')
             if event.get('command')=='local_auth_probe' and self.initializing:self.initializing=False;self.refresh()
         elif kind=='installed':self.installing=False;self.update(busy=False,success=True,progress=100,status='Installiert',challenge='');self.inspectDevice()
 
@@ -311,6 +317,7 @@ class DesktopBridge(QObject):
 
 
 def main():
+    os.environ['DIRECTSIDE_LOCAL_HELPER']=json.dumps([sys.executable]+([] if getattr(sys,'frozen',False) else [str(ROOT/'ui/desktop.py')]))
     if sys.platform=='win32':
         import ctypes
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('DirectSide.Desktop')

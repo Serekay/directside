@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Windows-Anisette durch eingebettete Mac-iTunes-CoreADI ersetzt: lokale Unicorn-Emulation, verschlüsselter Zustand, geprüfte TLS-Verbindung und interne Windows-Pipe statt Fremdserver oder zusätzlicher Installation. Tatsächliche lokale Provisionierung und OTP-Erzeugung auf Windows geprüft; Apple-ID-Login noch am Account zu bestätigen.
+- Getrennte akd-/Xcode-Identitäten für Anmeldung und Developer-API, frische OTP-Daten pro 30-Sekunden-Fenster und korrigierte Fortschrittsmeldung vor abgeschlossener Anmeldung.
+
 - Apple-ID-Eingabe bleibt bei automatischen Geräteabfragen erhalten. Anmeldeklicks während einer Abfrage werden anschließend ausgeführt; Passwort wird nur bei angenommener Anmeldung aus dem Eingabefeld entfernt.
 - Abgelaufene Sitzungen klar gekennzeichnet; kein irreführendes „Bereit“ im abgemeldeten Zustand. App-ID-Verbrauch aus Apples tatsächlichem Registrierungskontingent, getrennt von installierten Apps pro Gerät.
 - USB-Badge neben der Version, Hilfe-Fragezeichen, größere unterschiedliche Vektor-Icons für Aktualisierung und App-Übersicht; ausgerichtete Überschriften, kompakter Installationsbereich und Statusleiste unten rechts.
