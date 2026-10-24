@@ -1,0 +1,16 @@
+.tools/
+target/
+dist/
+build/
+*.spec
+__pycache__/
+.cargo/config.toml
+*.ipa
+*.mobiledevicepairing
+*.p12
+*.pfx
+*.mobileprovision
+*pairing*.plist
+*bootstrap*.json
+!tests/fixtures/**
+

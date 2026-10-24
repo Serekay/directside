@@ -1,0 +1,22 @@
+[package]
+name = "directside-engine"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "directside_core"
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+isideload = { path = "vendor/isideload" }
+idevice = { version = "0.1.61", default-features = false, features = ["usbmuxd", "ring", "tcp", "tunnel_tcp_stack", "house_arrest"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+serde_json = "1"
+rootcause = "0.12"
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+plist = "1.8"
+apple-codesign-quick = "0.1.0"
+
+[profile.release]
+strip = true
+
