@@ -266,4 +266,22 @@ class WindowsUIStateTests(unittest.TestCase):
   self.assertTrue(self.bridge.data['certificateLimit'])
   self.assertEqual(self.sent,[])
   self.assertIn('Signing certificate limit',self.bridge.data['error'])
+
+ def test_developer_mode_guide_uses_device_status_and_never_enables_or_reboots(self):
+  self.bridge.initializing=False
+  self.bridge.update(busy=False,devices=[{'id':'phone','name':'iPhone','label':'iPhone'}])
+  engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
+  engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')));root=engine.rootObjects()[0]
+  self.bridge.handle({'event':'device_components','device_id':'phone','developer_mode':False});APP.processEvents()
+  self.assertEqual(self.bridge.data['developerMode'],'disabled');self.assertEqual(root.property('page'),'developer')
+  self.assertTrue(root.findChild(QObject,'developerModeGuide').property('visible'));self.assertEqual(self.sent,[])
+  self.bridge.revealDeveloperMode();self.assertEqual(self.sent,[{'command':'reveal_developer_mode','device_id':'phone'}])
+  self.bridge.handle({'event':'developer_mode_revealed','device_id':'phone'})
+  self.bridge.handle({'event':'device_components','device_id':'phone','developer_mode':None});APP.processEvents()
+  self.assertEqual(self.bridge.data['developerMode'],'unknown')
+  self.bridge.handle({'event':'device_components','device_id':'phone','developer_mode':True});APP.processEvents()
+  self.assertEqual(self.bridge.data['developerMode'],'enabled')
+  self.bridge.handle({'event':'device_components','device_id':'other-phone','developer_mode':False})
+  self.assertEqual(self.bridge.data['developerMode'],'enabled')
+  root.close();engine.deleteLater();APP.processEvents()
 if __name__=='__main__':unittest.main()

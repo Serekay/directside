@@ -88,11 +88,11 @@ struct LiveContainerSettings:View {
                 Label(L("LiveContainer"),systemImage:"square.stack.3d.up.fill").font(.title2.bold())
                 Text(L("Mehrere Apps innerhalb einer Container-App ausführen. Gast-Apps belegen keine zusätzlichen der drei normalen App-Plätze. Nicht jede App ist kompatibel.")).foregroundStyle(.secondary)
             }
-            Section(L("Einrichten")) {
+            Section {
                 Label(L(installed ? "Installiert":"Nicht installiert"),systemImage:installed ? "checkmark.circle.fill":"arrow.down.app").foregroundStyle(installed ? Color.green:Color.orange)
                 if !installed {Button(L("LiveContainer installieren")){Task{await engine.installLiveContainer(peer:connection.peer,port:connection.port);installed=LiveContainerBridge.available}}.disabled(engine.busy)}
                 else {Button(L("Zertifikat übertragen")){engine.configureLiveContainer()}.disabled(engine.busy || !engine.loggedIn);Button(L("LiveContainer öffnen")){LiveContainerBridge.open()}}
-            } footer:{Text(L("DirectSide und LiveContainer belegen zusammen zwei App-Plätze."))}
+            } header:{Text(L("Einrichten"))} footer:{Text(L("DirectSide und LiveContainer belegen zusammen zwei App-Plätze."))}
             Section(L("So geht’s")) {
                 Label(L("1. Installieren und Zertifikat übertragen."),systemImage:"arrow.down.circle")
                 Label(L("2. In LiveContainer den JIT-less-Test ausführen."),systemImage:"checkmark.shield")
