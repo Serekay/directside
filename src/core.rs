@@ -106,7 +106,7 @@ async fn make_engine(session:DeveloperSession,email:&str)->Result<Engine,Report>
         .storage(Box::new(KeyringStorage::new("DirectSide.signing".to_string())))
         .build();
     let team = engine.get_team().await?;
-    emit(json!({"event":"logged_in","team":team.name,"team_id":team.team_id,"type":team.r#type}));
+    emit(json!({"event":"logged_in","team":team.name,"team_id":team.team_id,"type":team.r#type,"email":email}));
     Ok(engine)
 }
 

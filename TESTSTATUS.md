@@ -5,11 +5,12 @@ Diese Datei dokumentiert den Entwicklungsstand, keine Release-Freigabe.
 ## Erfolgreich geprüft
 
 - Rust-Kern unter Windows kompiliert; zwei Tests für HTTPS-Dienstadressen und das Drei-App-Limit bestanden. Eine bereits installierte App darf bei drei belegten Plätzen weiter erneuert werden; eine vierte wird abgelehnt.
-- Drei Python-Tests für IPA-Hauptbundle-Auswahl, mehrdeutige Pakete und bereinigte Fehlermeldungen bestanden.
+- Zehn Python-Tests für IPA-Hauptbundle-Auswahl, mehrdeutige Pakete, bereinigte Fehlermeldungen, lokale Account-Voreinstellungen, Code-Validierung und integrierte UI-Zustände bestanden. Die UI-Tests verwenden ausschließlich simulierte Protokollereignisse, keine Apple-Zugangsdaten.
 - iPhone-Kern für `aarch64-apple-ios` und native SwiftUI-App erfolgreich über Xcode gebaut; Quellenformat-Tests im macOS-Build bestanden.
 - Unsigned-IPA heruntergeladen und Archivstruktur, Bundle-ID, Versionsnummer, Mindest-iOS und ARM64-Mach-O-Datei geprüft.
 - Lokal gepackte Windows-EXE gestartet: Oberfläche, eigenes Icon, eingebetteter Signierkern und automatische IPA-Erkennung funktionieren.
 - USB-Erkennung eines angeschlossenen iPhones und lesender Abruf der installierten App-Metadaten funktionieren.
+- Eine bereits vom Benutzer aufgebaute Windows-Sitzung wurde beim Start der neuen EXE aus dem Schlüsselbund wiederhergestellt. Eine neue Apple-Anmeldung und Zwei-Faktor-Bestätigung wurden dadurch nicht erneut geprüft.
 
 Der erste iPhone-Build ist unter [GitHub Actions](https://github.com/Serekay/directside/actions/runs/40075822402) nachvollziehbar. Nach der Anpassung der Windows-Oberfläche wurde ein weiterer privater Build gestartet.
 

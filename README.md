@@ -45,6 +45,8 @@ App-Detailseiten bieten außerdem „In LiveContainer installieren“. Diese ers
 
 Passwörter werden nicht in Dateien oder Git gespeichert und nicht als Prozessargumente übergeben. Sitzung, Signierschlüssel und Anisette-Zustand liegen im jeweiligen Betriebssystem-Schlüsselbund. Die iPhone-Pairingdatei wird nach der Erstübertragung aus dem freigegebenen Dokumentordner in den geschützten App-Bereich verschoben. Apple-Zugangsdaten und Pairingdateien gehören niemals in GitHub oder Build-Artefakte.
 
+Windows merkt sich die Apple-ID und die gewählte Serveradresse unter `%LOCALAPPDATA%\DirectSide\preferences.json`. Das Passwort steht dort nicht. Bei gültiger Schlüsselbund-Sitzung erfolgt die Anmeldung nach dem Start automatisch; andernfalls ist die Apple-ID bereits ausgefüllt. Bestätigungscode, SMS-Auswahl, Team-Auswahl, Pairing, Fehler und nächste Schritte nach der Installation sind in das Hauptfenster integriert. Nur die normale Windows-Dateiauswahl öffnet ein eigenes Fenster.
+
 ## Entwicklung und Freigabe
 
 Siehe [DEVELOPMENT.md](DEVELOPMENT.md), [ARCHITECTURE.md](ARCHITECTURE.md), [TESTSTATUS.md](TESTSTATUS.md) und [CHANGELOG.md](CHANGELOG.md).
