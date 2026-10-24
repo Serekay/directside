@@ -55,7 +55,7 @@ struct ContentView:View {
         case .scan:
             QRScanner {raw in sheet=nil;Task{await engine.previewSource(raw)}}.ignoresSafeArea(edges:.bottom).navigationTitle(L("Quelle scannen")).toolbar{Button(L("Schließen")){sheet=nil}}
         case .preview:
-            if let source=engine.pendingSource {Form {Section {HStack(spacing:14){Artwork(url:source.iconURL,size:60,fallback:"square.stack.3d.up.fill");VStack(alignment:.leading,spacing:5){Text(L(source.name)).font(.headline);Text(L(source.sourceURL?.host ?? "")).font(.caption).foregroundStyle(.secondary)}};Text(L("\(source.apps.count) Apps"));if let description=source.description ?? source.subtitle {Text(L(description)).font(.subheadline).foregroundStyle(.secondary)}};Button(L("Quelle hinzufügen")){engine.acceptSource();sheet=nil};Button(L("Abbrechen"),role:.cancel){engine.pendingSource=nil;sheet=nil}}.navigationTitle(L("Quelle prüfen"))}
+            if let source=engine.pendingSource {Form {Section {HStack(spacing:14){Artwork(url:source.iconURL,size:60,fallback:"square.stack.3d.up.fill");VStack(alignment:.leading,spacing:5){Text(L(source.name)).font(.headline)}};Text(L("\(source.apps.count) Apps"));if let description=source.description ?? source.subtitle {Text(L(description)).font(.subheadline).foregroundStyle(.secondary)}};Button(L("Quelle hinzufügen")){engine.acceptSource();sheet=nil};Button(L("Abbrechen"),role:.cancel){engine.pendingSource=nil;sheet=nil}}.navigationTitle(L("Quelle prüfen"))}
         case .code:
             Form {
                 Text(L("Bestätige die Anmeldung und gib den sechsstelligen Code ein."))

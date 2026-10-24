@@ -149,6 +149,11 @@ enum Paths {
 }
 
 enum SourceURL {
+    static func isCancellation(_ error:Error)->Bool {
+        if error is CancellationError {return true}
+        let ns=error as NSError
+        return (ns.domain==NSURLErrorDomain && ns.code==NSURLErrorCancelled) || ns.domain=="Swift.CancellationError"
+    }
     static func parse(_ raw: String) throws -> URL {
         guard let components = URLComponents(string: raw.trimmingCharacters(in: .whitespacesAndNewlines)) else { throw DirectSideError.message("Ungültige Quellen-Adresse.") }
         if ["directside", "altstore", "sidestore"].contains(components.scheme?.lowercased() ?? ""),
@@ -160,5 +165,15 @@ enum SourceURL {
             throw DirectSideError.message("Bitte eine HTTP- oder HTTPS-Adresse für die Quelle verwenden.")
         }
         return url
+    }
+}
+
+enum SignatureStatus {
+    static func days(until date:Date?,now:Date=Date())->Int? {
+        date.map{max(0,Int(ceil($0.timeIntervalSince(now)/86400)))}
+    }
+    static func tone(days:Int?)->String {
+        guard let days else {return "unknown"}
+        return days<=1 ? "critical":days<=3 ? "warning":"ok"
     }
 }
