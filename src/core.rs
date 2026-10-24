@@ -153,11 +153,13 @@ async fn login(request: &Value) -> Result<Engine, Report> {
 }
 
 async fn make_engine(session:DeveloperSession,email:&str)->Result<Engine,Report> {
+    let storage=KeyringStorage::new("DirectSide.signing".to_string());
+    let machine=isideload::sideload::cert_identity::CertificateIdentity::stored_machine_name(email,&storage)?.unwrap_or_else(||if cfg!(target_os="ios") {"DirectSide iPhone"}else{"DirectSide Windows"}.to_string());
     let mut engine = SideloaderBuilder::<MaxCertsCallbackBox, ExtensionsBehaviorCallbackBox>::new(session,email.to_string())
         .team_selection(TeamSelection::PromptOnce(choose_team))
         .max_certs_behavior(MaxCertsBehavior::Error)
-        .machine_name(if cfg!(target_os="ios") {"DirectSide iPhone"}else{"DirectSide Windows"}.to_string())
-        .storage(Box::new(KeyringStorage::new("DirectSide.signing".to_string())))
+        .machine_name(machine)
+        .storage(Box::new(storage))
         .build();
     let team = engine.get_team().await?;
     emit(json!({"event":"logged_in","team":team.name,"team_id":team.team_id,"type":team.r#type,"email":email}));
@@ -233,10 +235,12 @@ async fn bootstrap(engine: &mut Engine, provider: &impl idevice::provider::Idevi
     let team=engine.get_team().await?;
     let bundle=format!("com.directside.app.{}",team.team_id);
     let mut afc=HouseArrestClient::connect(provider).await?.vend_container(bundle).await?;
+    let signing=engine.bootstrap_signing_identity().await?;
     for (name,data) in [
         ("DirectSide-pairing.plist",pairing.to_bytes()),
         ("DirectSide-bootstrap.json",serde_json::to_vec(&json!({"udid":info.udid,"name":info.name}))?),
         ("DirectSide-original.ipa",std::fs::read(ipa)?),
+        ("DirectSide-signing.json",signing),
     ] {
         let mut f=afc.open(format!("/Documents/{name}"),idevice::afc::opcode::AfcFopenMode::WrOnly).await?;
         for chunk in data.chunks(512*1024) {f.write_entire(chunk).await?;}
@@ -347,6 +351,15 @@ pub async fn run() {
                 }
             },
             "profile"=>{emit(json!({"event":"profile","expires_at":profile_expiry(std::path::Path::new(text(&request,"path").unwrap_or("")))}));Ok(())},
+            "import_signing"=>{
+                let result=(||->Result<(),Report>{
+                    let path=PathBuf::from(text(&request,"path")?);
+                    let bytes=std::fs::read(&path)?;
+                    let email=isideload::sideload::cert_identity::CertificateIdentity::import_bootstrap(&bytes,&KeyringStorage::new("DirectSide.signing".to_string()))?;
+                    std::fs::remove_file(path)?;
+                    emit(json!({"event":"signing_imported","email":email}));Ok(())
+                })();result
+            },
             "inspect_local"=>match tokio::time::timeout(Duration::from_secs(25),inspect_local(&request)).await {Ok(r)=>r,Err(_)=>Err(report!("Verbindung zum lokalen Gerät hat zu lange gedauert. LocalDevVPN prüfen."))},
             "login" => {
                 engine = None;
