@@ -118,12 +118,15 @@ fn require_confirmation(request:&Value)->Result<(),Report> {
 async fn certificates(engine:&mut Engine)->Result<(),Report> {
     use isideload::sideload::cert_identity::CertificateIdentity;
     let team=engine.get_team().await?;
-    let records=engine.get_dev_session().list_ios_certs(&team).await?;
+    // Management must show every record returned by Apple's iOS endpoint,
+    // including certificates with a shared/unknown platform. Signing selection
+    // keeps its own compatibility checks.
+    let records=engine.get_dev_session().list_all_development_certs(&team,isideload::dev::device_type::DeveloperDeviceType::Ios).await?;
     let storage=KeyringStorage::new("DirectSide.signing".to_string());
     let mut overview=Vec::new();
     for cert in records {
         let reusable=match &cert.cert_content {Some(bytes)=>CertificateIdentity::stored_key_matches(engine.get_email(),&storage,bytes.as_ref()).unwrap_or(false),None=>false};
-        overview.push(json!({"serial":cert.serial_number.unwrap_or_default(),"name":cert.machine_name.or(cert.name).unwrap_or_else(||"Apple Development".into()),"expires":cert.expiration_date.map(|d|d.to_xml_format()),"reusable":reusable}));
+        overview.push(json!({"serial":cert.serial_number.unwrap_or_default(),"name":cert.machine_name.or(cert.name).unwrap_or_else(||"Apple Development".into()),"platform":cert.certificate_platform.or_else(||cert.certificate_type.and_then(|kind|kind.platform)),"expires":cert.expiration_date.map(|d|d.to_xml_format()),"reusable":reusable}));
     }
     emit(json!({"event":"certificates","team_id":team.team_id,"team":team.name,"certificates":overview}));Ok(())
 }
@@ -133,7 +136,7 @@ async fn revoke_certificate(engine:&mut Engine,request:&Value)->Result<(),Report
     let team=engine.get_team().await?;
     if text(request,"team_id")?!=team.team_id {bail!("Developer-Team hat sich geändert. Zertifikate neu laden.");}
     let serial=text(request,"serial")?;
-    let existing=engine.get_dev_session().list_ios_certs(&team).await?;
+    let existing=engine.get_dev_session().list_all_development_certs(&team,isideload::dev::device_type::DeveloperDeviceType::Ios).await?;
     if !existing.iter().any(|cert|cert.serial_number.as_deref()==Some(serial)) {bail!("Zertifikat ist nicht mehr vorhanden. Liste neu laden.");}
     engine.get_dev_session().revoke_development_cert(&team,serial,isideload::dev::device_type::DeveloperDeviceType::Ios).await?;
     emit(json!({"event":"certificate_revoked","serial":serial,"team_id":team.team_id}));

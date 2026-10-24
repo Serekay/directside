@@ -20,6 +20,7 @@ ApplicationWindow {
     property int certificatePage: 0
     property bool certificateLimitShown: false
     onSChanged: {
+        if(certificatePage*3>=s.certificates.length) certificatePage=0
         if(s.certificateLimit && !certificateLimitShown) {certificateLimitShown=true;page="certificates";backend.loadCertificates()}
         if(!s.certificateLimit) certificateLimitShown=false
     }
@@ -32,7 +33,8 @@ ApplicationWindow {
     property color accent: "#36dbb1"
     property color ink: "#f4f5f7"
     property color muted: "#92979f"
-    property bool authenticating: (s.busy && !s.scanning) || s.authState==="signing_in"
+    property bool restoringSession: !s.loggedIn && s.authState==="checking"
+    property bool authenticating: restoringSession || s.authState==="signing_in"
     property string accountStatus: s.loggedIn ? t("Angemeldet") : s.authState==="checking" ? t("Sitzung prüfen …") : s.authState==="signing_in" ? t("Bei Apple anmelden …") : s.authState==="expired" ? t("Sitzung abgelaufen") : t("Nicht angemeldet")
     property bool quotaKnown: s.appIdsLimit>0 && s.appIdsAvailable>=0
     property string quotaText: quotaKnown ? "App IDs · "+Math.max(0,s.appIdsLimit-s.appIdsAvailable)+" / "+s.appIdsLimit+" "+t("verbraucht")+" · "+s.appIdsAvailable+" "+t("frei") : "App IDs · "+(s.loggedIn ? t("Nicht verfügbar") : t("Anmelden"))
@@ -127,12 +129,17 @@ ApplicationWindow {
                             Rectangle {width:38;height:38;radius:12;color:"#30343b";Label {anchors.centerIn:parent;text:"●";color:s.loggedIn?win.accent:"#b1b7c2";font.pixelSize:19}}
                             ColumnLayout {spacing:4;Layout.fillWidth:true
                                 Label {text:s.loggedIn ? s.team : "Apple-ID";font.weight:Font.DemiBold;Layout.fillWidth:true}
-                                Label {text:s.loggedIn ? s.email : win.t("Dein Account");color:win.muted;font.pixelSize:11;Layout.fillWidth:true}
+                                Label {text:s.loggedIn || win.restoringSession && s.email ? s.email : win.t("Dein Account");color:win.muted;font.pixelSize:11;Layout.fillWidth:true}
                             }
                         }
-                        Field {id:email;objectName:"emailField";visible:!s.loggedIn && !s.challenge;Layout.fillWidth:true;placeholderText:"Apple-ID";text:s.email;enabled:!win.authenticating;onTextEdited:backend.editEmail(text);onAccepted:password.forceActiveFocus()}
-                        Field {id:password;objectName:"passwordField";visible:!s.loggedIn && !s.challenge;Layout.fillWidth:true;placeholderText:win.t("Passwort");echoMode:TextInput.Password;enabled:!win.authenticating;onAccepted:loginButton.clicked()}
-                        Action {id:loginButton;objectName:"loginButton";visible:!s.loggedIn && !s.challenge;Layout.fillWidth:true;text:win.authenticating?win.t("Bitte warten …"):win.t("Anmelden");primary:true;enabled:!win.authenticating;onClicked:if(backend.login(email.text,password.text))password.clear()}
+                        RowLayout {objectName:"accountAuthProgress";visible:win.authenticating && !s.challenge;Layout.fillWidth:true;spacing:8
+                            BusyIndicator {running:parent.visible;implicitWidth:26;implicitHeight:26;palette.dark:win.accent}
+                            Label {objectName:"accountAuthProgressText";text:win.restoringSession?win.t("Automatisch anmelden …"):win.t("Bei Apple anmelden …");color:win.accent;font.pixelSize:12;Layout.fillWidth:true}
+                        }
+                        Badge {objectName:"accountSessionExpired";visible:!s.loggedIn && s.authState==="expired";text:win.t("Sitzung abgelaufen");tone:"warning"}
+                        Field {id:email;objectName:"emailField";visible:!s.loggedIn && !s.challenge && !win.restoringSession;Layout.fillWidth:true;placeholderText:"Apple-ID";text:s.email;enabled:!win.authenticating;onTextEdited:backend.editEmail(text);onAccepted:password.forceActiveFocus()}
+                        Field {id:password;objectName:"passwordField";visible:!s.loggedIn && !s.challenge && !win.restoringSession;Layout.fillWidth:true;placeholderText:win.t("Passwort");echoMode:TextInput.Password;enabled:!win.authenticating;onAccepted:loginButton.clicked()}
+                        Action {id:loginButton;objectName:"loginButton";visible:!s.loggedIn && !s.challenge && !win.restoringSession;Layout.fillWidth:true;text:win.authenticating?win.t("Bitte warten …"):win.t("Anmelden");primary:true;enabled:!win.authenticating && (!s.busy || s.scanning);onClicked:if(backend.login(email.text,password.text))password.clear()}
                         Action {visible:s.loggedIn && !s.challenge;Layout.fillWidth:true;text:win.t("Abmelden");enabled:!s.busy && !s.directsideInstalling;onClicked:backend.logout()}
                         ColumnLayout {
                             visible:s.challenge.length>0;Layout.fillWidth:true;spacing:10
@@ -323,14 +330,15 @@ ApplicationWindow {
                 Card {
                     visible:win.page==="certificates";Layout.fillWidth:true;Layout.fillHeight:true
                     ColumnLayout {anchors.fill:parent;anchors.margins:24;spacing:12
-                        RowLayout {Label {text:win.t("Developer-Team");Layout.fillWidth:true} Badge {text:s.certificatesLoaded?String(s.certificates.length):"?";tone:s.certificateLimit?"missing":"neutral"} IconButton {text:"↻";hint:win.t("Erneut prüfen");enabled:s.loggedIn && !s.busy;onClicked:backend.loadCertificates()}}
-                        Text {text:win.t("Zertifikate gelten für das Team, App-Plätze für jedes Gerät.");color:win.muted;font.pixelSize:12;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        RowLayout {Label {text:s.team;Layout.fillWidth:true} Badge {objectName:"certificateCountBadge";text:win.t("Zertifikate")+" · "+(s.certificatesLoaded?String(s.certificates.length):"?");tone:s.certificateLimit?"missing":"neutral"} IconButton {text:"↻";hint:win.t("Erneut prüfen");enabled:s.loggedIn && !s.busy;onClicked:backend.loadCertificates()}}
+                        Text {text:win.t("Ein Zertifikat kann mehrere Apps signieren.");color:win.muted;font.pixelSize:12;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Action {objectName:"manageDeviceAppsButton";text:win.t("Apps auf diesem Gerät")+" · "+(s.slotsUsed>=0?s.slotsUsed+" / 3":"?");enabled:s.devices.length>0 && !s.busy;onClicked:{win.page="apps";win.developerOnly=true;backend.inspectDevice()}}
                         Repeater {model:s.certificates.slice(win.certificatePage*3,win.certificatePage*3+3)
                             delegate:Rectangle {required property var modelData;Layout.fillWidth:true;implicitHeight:66;radius:12;color:"#25282e"
                                 RowLayout {anchors.fill:parent;anchors.margins:12;spacing:8
                                     ColumnLayout {Layout.fillWidth:true;spacing:4
                                         Label {text:modelData.name;Layout.fillWidth:true;font.weight:Font.DemiBold}
-                                        Label {text:win.t("Seriennummer · ")+(modelData.serial || "?").slice(-8);font.pixelSize:11;color:win.muted;Layout.fillWidth:true}
+                                        Label {text:win.t("Seriennummer · ")+(modelData.serial || "?").slice(-8)+(modelData.platform?" · "+modelData.platform:"");font.pixelSize:11;color:win.muted;Layout.fillWidth:true}
                                     }
                                     Badge {visible:modelData.reusable;text:win.t("Schlüssel vorhanden");tone:"ok"}
                                     IconButton {text:"⌫";hint:win.t("Zertifikat widerrufen");enabled:!s.busy && !s.updateBusy && !!modelData.serial;onClicked:{backend.requestCertificateRemoval(modelData.serial);if(backend.state.removal.kind)win.page="confirm"}}

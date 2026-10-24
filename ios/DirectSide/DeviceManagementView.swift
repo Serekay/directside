@@ -19,6 +19,7 @@ struct SigningCertificate:Decodable,Identifiable {
     let name:String
     let reusable:Bool
     let expires:String?
+    let platform:String?
 }
 
 struct DeviceManagementView:View {
@@ -60,15 +61,16 @@ struct CertificateManagementView:View {
     var body:some View {
         List {
             Section {
-                HStack {Text(engine.teamName);Spacer();Text("\(engine.signingCertificates.count)").foregroundStyle(.secondary)}
+                HStack {Text(engine.teamName);Spacer();Text("\(engine.signingCertificates.count) Zertifikate").foregroundStyle(.secondary)}
                 Button("Zertifikate aktualisieren"){engine.loadCertificates()}.disabled(engine.busy || !engine.loggedIn)
-            } footer:{Text("Zertifikate gelten für das Developer-Team. Die drei App-Plätze gelten pro Gerät.")}
+            } footer:{Text("Ein Zertifikat kann mehrere Apps signieren. Apps entfernen: Mediathek → Apps auf diesem Gerät verwalten.")}
             Section("Signierzertifikate") {
                 ForEach(engine.signingCertificates) {certificate in
                     HStack {
                         VStack(alignment:.leading,spacing:5) {
                             Text(certificate.name)
                             Text(String(certificate.serial.suffix(8))).font(.caption.monospaced()).foregroundStyle(.secondary)
+                            if let platform=certificate.platform {Text(platform).font(.caption).foregroundStyle(.secondary)}
                             if certificate.reusable {Label("Schlüssel vorhanden",systemImage:"checkmark.circle.fill").font(.caption).foregroundStyle(.green)}
                         }
                         Spacer()
