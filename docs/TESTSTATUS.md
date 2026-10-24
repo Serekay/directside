@@ -4,6 +4,23 @@ Entwicklungsstand, keine Release-Freigabe.
 
 ## Bestätigung vom Besitzer und neue Einrichtung
 
+Neubau auf ausdrückliches „bau“: Stand 847f4bf lokal als Windows-EXE gebaut;
+46 Python-/UI-Tests, fünf Rust-Tests und der echte gepackte Starttest mit lokaler
+Authentifizierung bestanden. Die EXE wurde nach Prozessprüfung und Hashvergleich
+nach `dist/DirectSide.exe` übernommen. Der Besitzer hat danach die vollständige
+Reparatur über die Oberfläche bestätigt: automatische USB-Kopplung, frische
+Verifikation, Vorbereitung der passenden Signieridentität sowie Übertragung und
+Rückleseprüfung. Damit ist nun auch der komplette PC-Transfer bestätigt. Import
+auf dem iPhone und anschließende LiveContainer-Installation bleiben zu prüfen.
+
+iPhone-Action 40106177179 erfolgreich. Quellen-/HTTP-/Übersetzungstests,
+Abbruchklassifizierung, Tagesgrenzen und der neue Regressionstest für fortgesetzte
+gemeinsame Quellenabfragen trotz abgebrochenem Ansichtswarter bestanden. Echte
+lokale TCI-Provisionierung, Wiederherstellung und wiederholte OTP-Erzeugung
+ebenfalls bestanden. `dist/DirectSide.ipa`: Version 0.1.0, Build 5, 10.216.181
+Bytes. Bundle-ID, HTTP-Konfiguration, 393 eingebettete Übersetzungen, CoreADI-Hash
+und Hashgleichheit zur heruntergeladenen IPA geprüft. Keine Veröffentlichung.
+
 Vor dem nächsten Build gesammelt: Quellenaktualisierung erhält einen eigenen,
 von Ansichten unabhängigen und zusammengeführten Task. Swift-CancellationError
 und URLSession-Abbruch werden nicht mehr als Serverausfall gespeichert. Der
