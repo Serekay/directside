@@ -11,11 +11,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Verified local Apple runtime
-        run: python3 scripts/prepare-anisette-runtime.py
+        run: |
+          brew install sevenzip cmake pkgconf xcodegen
+          python3 scripts/prepare-mac-runtime.py
+          mkdir -p ios/Resources/MacAnisetteRuntime
+          cp bin/apple/CoreADI.mac ios/Resources/MacAnisetteRuntime/
       - name: Rust
         run: |
           rustup toolchain install stable --profile minimal
           rustup target add aarch64-apple-ios
+      - name: Local Mac authentication interpreter (no JIT)
+        run: python3 scripts/build-ios-mac-auth.py
       - name: Native signing core
         run: cargo +stable build --locked --release --lib --target aarch64-apple-ios
       - name: Source format tests
@@ -24,7 +30,6 @@ jobs:
           /tmp/directside-source-tests
       - name: Xcode project
         run: |
-          brew install xcodegen
           cd ios
           xcodegen generate
       - name: iPhone application
@@ -37,7 +42,7 @@ jobs:
       - name: Local interpreter provisioning probe
         run: |
           xcodebuild -project ios/DirectSide.xcodeproj -scheme DirectSideAnisetteProbe -configuration Release -destination 'platform=macOS' -derivedDataPath build-probe CODE_SIGNING_ALLOWED=NO build
-          build-probe/Build/Products/Release/DirectSideAnisetteProbe "$PWD/ios/Resources/AnisetteRuntime"
+          build-probe/Build/Products/Release/DirectSideAnisetteProbe "$PWD/ios/Resources/MacAnisetteRuntime"
       - uses: actions/upload-artifact@v4
         with:
           name: DirectSide-iPhone-unsigned

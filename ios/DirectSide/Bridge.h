@@ -1,4 +1,5 @@
 #include <stdbool.h>
+#include "MacADI.h"
 typedef char *(*DSAnisetteGenerate)(void);
 typedef void (*DSAnisetteRelease)(char *);
 bool ds_set_anisette_callback(DSAnisetteGenerate generate, DSAnisetteRelease release);

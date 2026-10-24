@@ -17,3 +17,5 @@ __pycache__/
 
 bin/
 ios/Resources/AnisetteRuntime/
+ios/Resources/MacAnisetteRuntime/
+vendor/mac-adi-rust/target/
