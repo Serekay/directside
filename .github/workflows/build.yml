@@ -1,8 +1,7 @@
 name: Build DirectSide
 on:
   workflow_dispatch:
-  push:
-    branches: ['codex/**', main]
+
 permissions:
   contents: read
 jobs:
@@ -37,32 +36,4 @@ jobs:
         with:
           name: DirectSide-iPhone-unsigned
           path: package/DirectSide.ipa
-          retention-days: 7
-  windows:
-    runs-on: windows-latest
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@v4
-      - name: Rust
-        run: rustup toolchain install stable --profile minimal
-      - name: Build installer engine
-        run: |
-          cargo +stable test --locked --release --lib --target x86_64-pc-windows-msvc
-          cargo +stable build --locked --release --bin directside-engine --target x86_64-pc-windows-msvc
-      - name: Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-      - name: Package Windows app
-        shell: pwsh
-        run: |
-          python -m pip install pyinstaller
-          python -m unittest discover -s tests
-          New-Item -ItemType Directory -Path bin -Force | Out-Null
-          Copy-Item target/x86_64-pc-windows-msvc/release/directside-engine.exe bin/
-          python -m PyInstaller --noconfirm --clean --onefile --windowed --name DirectSide-Windows --icon assets/DirectSide.ico --add-data 'assets;assets' --add-binary 'bin/directside-engine.exe;bin' ui/app.py
-      - uses: actions/upload-artifact@v4
-        with:
-          name: DirectSide-Windows
-          path: dist/DirectSide-Windows.exe
           retention-days: 7

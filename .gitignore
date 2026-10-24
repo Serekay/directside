@@ -3,6 +3,7 @@ target/
 dist/
 build/
 *.spec
+!packaging/DirectSide.spec
 __pycache__/
 .cargo/config.toml
 *.ipa

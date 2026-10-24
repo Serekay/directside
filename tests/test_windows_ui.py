@@ -1,75 +1,49 @@
-"""UI state tests with fake protocol events; no Apple requests or credentials."""
+"""Qt UI tests use dummy protocol events and never contact Apple."""
 import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
-from tkinter import ttk
-
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'ui'))
-from app import DirectSide, Preferences
-
+from PySide6.QtCore import QUrl,Qt
+from PySide6.QtWidgets import QApplication
+from PySide6.QtQml import QQmlApplicationEngine
+from PySide6.QtQuickControls2 import QQuickStyle
+from desktop import DesktopBridge
+from common import Preferences,ROOT
+APP=QApplication.instance() or QApplication([])
+QQuickStyle.setStyle('Basic')
 class WindowsUIStateTests(unittest.TestCase):
-    def setUp(self):
-        self.folder=tempfile.TemporaryDirectory()
-        self.preferences=patch('app.Preferences', return_value=Preferences(Path(self.folder.name)/'preferences.json'))
-        self.preferences.start()
-        self.window=DirectSide()
-        self.window.withdraw()
-        self.sent=[]
-        self.window.send=self.sent.append
-
-    def tearDown(self):
-        self.window.progress.stop()
-        for callback in self.window.tk.call('after','info'):
-            self.window.tk.call('after','cancel',callback)
-        self.window.destroy()
-        self.preferences.stop()
-        self.folder.cleanup()
-
-    def test_code_stays_inline_and_invalid_input_is_not_sent(self):
-        self.window.two_factor({'numbers':[]})
-        self.assertEqual(self.window.challenge_kind,'two_factor')
-        self.assertFalse(any(child.winfo_class()=='Toplevel' for child in self.window.winfo_children()))
-        entry=next(child for child in self.window.challenge.winfo_children() if isinstance(child,ttk.Entry))
-        entry.insert(0,'123')
-        self.window.challenge_buttons[0].invoke()
-        self.assertEqual(self.sent,[])
-        self.assertTrue(self.window.challenge_hint.get())
-        entry.delete(0,'end');entry.insert(0,'012345')
-        self.window.challenge_buttons[0].invoke()
-        self.assertEqual(self.sent,[{'action':'code','code':'012345'}])
-        self.assertIsNone(self.window.challenge_kind)
-
-    def test_team_cancel_and_error_return_to_main_window(self):
-        self.window.select_team([{'id':'TEST','name':'Test team'}])
-        self.window.challenge_buttons[-1].invoke()
-        self.assertEqual(self.sent,[{'team_id':''}])
-        self.window.show_error('Test failure')
-        self.assertEqual(self.window.status.get(),'Test failure')
-        self.assertFalse(self.window.busy)
-
-    def test_restoring_session_does_not_queue_commands_ahead_of_challenge(self):
-        self.window.handle_event({'event':'ready'})
-        self.assertEqual(self.sent,[{'command':'restore'}])
-        self.window.handle_event({'event':'logged_out'})
-        self.assertEqual(self.sent[-1],{'command':'devices'})
-        self.assertTrue(self.window.busy)
-        self.window.handle_event({'event':'devices','devices':[]})
-        self.assertEqual(str(self.window.install_button['state']),'disabled')
-
-    def test_installation_success_has_inline_next_steps(self):
-        self.window.handle_event({'event':'installed'})
-        self.assertEqual(self.window.success.winfo_manager(),'pack')
-        self.assertEqual(self.window.progress['value'],100)
-
-    def test_restored_account_prefills_identity_and_collapses_password_fields(self):
-        self.window.initializing=False
-        self.window.handle_event({'event':'logged_in','team':'Test team','email':'person@example.com'})
-        self.assertEqual(self.window.email.get(),'person@example.com')
-        self.assertEqual(self.window.preferences.load()['email'],'person@example.com')
-        self.assertEqual(self.window.password_entry.winfo_manager(),'')
-        self.window.handle_event({'event':'logged_out'})
-        self.assertEqual(self.window.password_entry.winfo_manager(),'grid')
-
+ def setUp(self):
+  self.folder=tempfile.TemporaryDirectory()
+  self.bridge=DesktopBridge(start=False,preferences=Preferences(Path(self.folder.name)/'preferences.json'))
+  self.sent=[];self.bridge.send=self.sent.append
+ def tearDown(self):self.bridge.timer.stop();self.folder.cleanup()
+ def test_code_validation_and_cancel_stay_inline(self):
+  self.bridge.handle({'event':'two_factor'})
+  self.bridge.submitCode('123');self.assertEqual(self.sent,[])
+  self.assertTrue(self.bridge.data['challengeError'])
+  self.bridge.submitCode('012345')
+  self.assertEqual(self.sent,[{'action':'code','code':'012345'}])
+  self.assertEqual(self.bridge.data['challenge'],'')
+ def test_restore_serializes_commands_and_saves_identity(self):
+  self.bridge.handle({'event':'ready'})
+  self.assertEqual(self.sent,[{'command':'restore'}])
+  self.bridge.handle({'event':'logged_in','email':'person@example.com','team':'Test'})
+  self.assertEqual(self.sent[-1],{'command':'devices'})
+  self.assertEqual(self.bridge.preferences.load()['email'],'person@example.com')
+ def test_usb_selection_survives_reordering(self):
+  self.bridge.update(devices=[{'id':'A'},{'id':'B'}],deviceIndex=1)
+  self.bridge.handle({'event':'devices','devices':[{'id':'B'},{'id':'A'}]})
+  self.assertEqual(self.bridge.data['deviceIndex'],0)
+ def test_success_and_failure_are_inline(self):
+  self.bridge.handle({'event':'installed'});self.assertTrue(self.bridge.data['success'])
+  self.bridge.handle({'event':'error','message':'Test error'})
+  self.assertEqual(self.bridge.data['error'],'Test error');self.assertFalse(self.bridge.data['busy'])
+ def test_qml_loads_at_minimum_size_without_native_frame(self):
+  engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
+  engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')))
+  self.assertEqual(len(engine.rootObjects()),1)
+  root=engine.rootObjects()[0];root.setWidth(960);root.setHeight(680)
+  APP.processEvents();self.assertTrue(root.flags() & Qt.FramelessWindowHint)
+  root.close();engine.deleteLater();APP.processEvents()
 if __name__=='__main__':unittest.main()
