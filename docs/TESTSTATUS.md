@@ -2,6 +2,38 @@
 
 Entwicklungsstand, keine Release-Freigabe.
 
+## Bestätigung vom Besitzer und neue Einrichtung
+
+Der Besitzer hat nach dem Zertifikatswiderruf die erfolgreiche Installation und
+die lokale Apple-ID-Anmeldung in DirectSide auf dem echten iPhone bestätigt.
+Selbsterneuerung ist damit noch nicht bestätigt.
+
+Build 4 ergänzt englische/deutsche Sprache mit gespeicherter Auswahl, ein
+gegliedertes Einstellungsmenü, normale Installation oder LiveContainer aus
+Quellen sowie HTTP-Quellen einschließlich IPA und Bildern. Die offizielle
+LiveContainer-Standalone-IPA 3.8.0 wird vor lokaler Installation nach Größe und
+GitHub-SHA-256 geprüft. Die Zertifikatsübergabe kann lokal vorbereitet werden.
+Quelle für das verwendete URL-/Zertifikatprotokoll ist LiveContainer 3.8.0,
+Commit e370a92dfc03ce109ebce00ed4a7cfc64ad1c801.
+
+Windows erkennt DirectSide beim Installieren anhand der IPA selbst und führt
+das Pairing unabhängig vom Installationsknopf automatisch aus. Dateien werden
+zunächst temporär übertragen, zurückgelesen und vor Abschluss verglichen; die
+Bootstrap-Metadaten werden zuletzt übergeben. Eine zusätzliche lokale Kopplung
+in der iPhone-App ist als Reparaturweg eingebaut, nicht am Gerät bestätigt.
+
+Die Windows-Abfrage über AMFI hat am angeschlossenen iPhone den eingeschalteten
+Entwicklermodus tatsächlich erkannt. Aus/nicht lesbar und die Anleitung wurden
+mit simulierten Ereignissen geprüft; „Option auf dem Gerät anzeigen“ wurde
+nicht am Gerät ausgelöst. Die Anleitung folgt Apples Dokumentation:
+https://developer.apple.com/documentation/xcode/enabling-developer-mode-on-a-device
+44 Python-/UI-Tests, vier Rust-Tests und der gepackte Windows-Starttest bestanden.
+Die Anleitung wurde bei 960 × 680 mit synthetischen Daten geprüft.
+
+Noch am Gerät zu prüfen: vollständiger neuer automatischer Pairing-Transfer,
+HTTP-Katalog/IPA-Installation, Sprachwechsel, LiveContainer-Installation,
+Zertifikatsimport und Start einer Gast-App sowie Selbsterneuerung.
+
 ## Windows
 
 - Ergänzung Account-/Zertifikatsansicht: insgesamt 43 Python-Tests bestanden. Neue Tests prüfen die sichtbare automatische Anmeldung in der Account-Karte bis zur bestätigten Sitzung, die erneute Anmeldung nach Ablauf sowie getrennte Zertifikats-/App-Zähler und Seitenwechsel nach Entfernung. Die Verwaltung zeigt alle von Apples iOS-Zertifikatsabfrage gelieferten Einträge ohne zusätzlichen Plattformfilter; der Auswahlpfad zum Signieren bleibt unverändert. Ansichten mit synthetischen Daten bei 960 × 680 geprüft. Die tatsächliche Zertifikatszahl dieses Accounts ist damit noch nicht bestätigt.
