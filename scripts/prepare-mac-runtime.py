@@ -41,7 +41,7 @@ def main():
         with urllib.request.urlopen(URL,timeout=60) as response,dmg.open('wb') as stream:shutil.copyfileobj(response,stream)
     if digest(dmg)!=DMG_HASH:raise ValueError('Apple installer checksum mismatch')
     seven=cache/'7zip-build/7z.exe'
-    if not seven.is_file():seven=shutil.which('7z')
+    if not seven.is_file():seven=shutil.which('7z') or shutil.which('7zz')
     if not seven:raise RuntimeError('Build-time 7-Zip extractor is missing')
     unpack=cache/'mac-runtime-extract';unpack.mkdir(exist_ok=True)
     subprocess.run([str(seven),'x',str(dmg),'iTunes/Install iTunes.pkg','-o'+str(unpack),'-y'],check=True,stdout=subprocess.DEVNULL)

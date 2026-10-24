@@ -1,0 +1,20 @@
+[package]
+name = "directside-mac-adi"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[lib]
+name = "directside_mac_adi"
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+unicorn-engine = { git = "https://github.com/mahee96/unicorn.git", rev = "a53ddc9ac6d65b24936d4a37917333fcd816cfd0", default-features = false, features = ["arch_x86"] }
+sha2 = "0.10"
+getrandom = "0.3"
+
+[features]
+jni = []
+
+[profile.release]
+opt-level = 2
