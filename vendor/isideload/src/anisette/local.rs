@@ -8,16 +8,19 @@ use std::sync::Arc;
 mod windows;
 #[cfg(windows)]
 pub use windows::LocalAnisetteProvider;
+pub mod callback;
+#[cfg(target_os="ios")]
+pub use callback::LocalAnisetteProvider;
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows,target_os="ios")))]
 pub struct LocalAnisetteProvider;
-#[cfg(not(windows))]
+#[cfg(not(any(windows,target_os="ios")))]
 impl LocalAnisetteProvider {
     pub fn new() -> Result<Self,Report> {
         bail!("Die lokale Apple-Authentifizierung ist auf diesem System noch nicht implementiert. Fremde Anisette-Dienste sind deaktiviert.")
     }
 }
-#[cfg(not(windows))]
+#[cfg(not(any(windows,target_os="ios")))]
 #[async_trait::async_trait]
 impl AnisetteProvider for LocalAnisetteProvider {
     async fn get_anisette_data(&self)->Result<AnisetteDataResponse,Report> { bail!("Lokale Apple-Authentifizierung nicht verfügbar.") }
