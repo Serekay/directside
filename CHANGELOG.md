@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Aktuelle freigegebene DirectSide-IPA direkt aus GitHub laden; eigene IPA-Dateien bleiben auswählbar.
+- Ein Button „Install DirectSide“ lädt die aktuelle freigegebene IPA und installiert sie auf dem gewählten Gerät. Eigene IPAs bleiben getrennt auswählbar und installierbar. IPA-Versions-Badge am App-Kopf; Windows-Update-Schaltfläche nur im Header.
+- VPN-Karte passt den QR-Bereich an die verfügbare Höhe an; eigene IPA-Zeile bleibt vollständig innerhalb der Karte. Text: „Auf dem ausgewählten Gerät installieren“.
 - Windows-Updateprüfung beim Start, alle sechs Stunden und manuell; Update-Schaltfläche, Download mit GitHub-SHA-256-Prüfung und Neustart mit gesicherter vorheriger EXE.
 - Privater GitHub-Zugang in den Einstellungen, DPAPI-geschützt; vorhandene Projekt-GitHub-Anmeldung auf dem Entwicklungs-PC wiederverwendbar. Keine Veröffentlichungen ausgelöst.
 - Besitzer bestätigt erfolgreiche Apple-ID-Anmeldung mit dem neuen lokalen Windows-Mac-Provider.

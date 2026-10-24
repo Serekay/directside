@@ -196,5 +196,9 @@
   "Die IPA ist keine DirectSide-App.": "The IPA is not a DirectSide app.",
   "Die Datei ist keine Windows-Anwendung.": "The file is not a Windows application.",
   "Unerwarteter GitHub-Downloadserver.": "Unexpected GitHub download server.",
-  "Unerwartete GitHub-Adresse.": "Unexpected GitHub address."
+  "Unerwartete GitHub-Adresse.": "Unexpected GitHub address.",
+  "DirectSide installieren": "Install DirectSide",
+  "IPA installieren": "Install IPA",
+  "Zielgerät oder Anmeldung hat sich geändert. Installation erneut starten.": "Target device or sign-in changed. Start the installation again.",
+  "Auf dem ausgewählten Gerät installieren": "Install on the selected device"
 }

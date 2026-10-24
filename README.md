@@ -24,7 +24,7 @@ Sideload with your own Apple ID. DirectSide combines a Windows setup app with a 
 
 1. Once a version is approved, download **DirectSide.exe** from [Releases](https://github.com/Serekay/directside/releases). No release is available yet.
 2. Open DirectSide, connect and unlock your iPhone or iPad, then tap **Trust** on the device.
-3. Sign in with your Apple ID, choose the target device, select **DirectSide from GitHub**, then **Install on device**. **Other IPA** lets you install a local IPA instead.
+3. Sign in with your Apple ID, choose the target device, select **Install DirectSide**. It downloads the latest released IPA and installs it on the selected device. Use **Other IPA → Install IPA** for a local file.
 4. Install LocalDevVPN using the QR code if requested, then follow its setup instructions on your device.
 
 Need a hand? Open **? → Help**. Optional LiveContainer setup is under **Settings → LiveContainer**.

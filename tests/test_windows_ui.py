@@ -159,5 +159,52 @@ class WindowsUIStateTests(unittest.TestCase):
   root=engine.rootObjects()[0];root.setWidth(960);root.setHeight(680)
   root.setProperty('page','settings');root.setProperty('settingsSection','updates');APP.processEvents()
   self.assertEqual(root.property('settingsSection'),'updates')
+  self.assertEqual(root.findChild(QObject,'installDirectSideButton').property('text'),'Install DirectSide')
+  self.assertEqual(root.findChild(QObject,'ipaVersionBadge').property('text'),'v0.2.0')
+  self.assertEqual(len(root.findChildren(QObject,'windowsUpdateButton')),1)
+  root.close();engine.deleteLater();APP.processEvents()
+
+ def test_directside_one_click_install_waits_for_usb_scan_and_keeps_custom_ipa(self):
+  import plistlib,zipfile
+  ipa=Path(self.folder.name)/'DirectSide.ipa'
+  with zipfile.ZipFile(ipa,'w') as archive:archive.writestr('Payload/DirectSide.app/Info.plist',plistlib.dumps({'CFBundleIdentifier':'com.directside.app'}))
+  self.bridge.update(busy=True,scanning=True,loggedIn=True,devices=[{'id':'phone'}],directsideInstalling=True,customIPA='other.ipa',customIPAName='Other app')
+  self.bridge.onReleaseEvent({'type':'ipa','path':str(ipa),'version':'v0.2.0','install_device':'phone'})
+  self.assertEqual(self.sent,[])
+  self.assertIsNotNone(self.bridge.pendingReleaseInstall)
+  self.bridge.update(busy=False,scanning=False)
+  self.bridge.startPendingReleaseInstall();APP.processEvents()
+  self.assertEqual(len(self.sent),1)
+  self.assertEqual(self.sent[0]['command'],'install')
+  self.assertEqual(self.sent[0]['device_id'],'phone')
+  self.assertEqual(self.sent[0]['bundle_id'],'com.directside.app')
+  self.assertTrue(self.sent[0]['bootstrap'])
+  self.assertEqual(self.bridge.data['customIPA'],'other.ipa')
+
+ def test_directside_download_does_not_install_on_a_different_device(self):
+  self.bridge.update(busy=True,loggedIn=True,devices=[{'id':'tablet'}],directsideInstalling=True)
+  self.bridge.onReleaseEvent({'type':'ipa','path':'DirectSide.ipa','version':'v0.2.0','install_device':'phone'})
+  self.bridge.update(busy=False)
+  self.bridge.startPendingReleaseInstall();APP.processEvents()
+  self.assertEqual(self.sent,[])
+  self.assertFalse(self.bridge.data['directsideInstalling'])
+  self.assertTrue(self.bridge.data['error'])
+
+ def test_install_controls_stay_inside_card_at_minimum_size(self):
+  from PySide6.QtCore import QPointF
+  from PySide6.QtGui import QFont,QFontDatabase
+  QFontDatabase.addApplicationFont('C:/Windows/Fonts/segoeui.ttf')
+  self.bridge.update(busy=False,loggedIn=True,devices=[{'id':'phone','label':'iPhone'}],releaseIPA=True,releaseVersion='v0.2.0')
+  engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
+  engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')))
+  root=engine.rootObjects()[0];root.setProperty('font',QFont('Segoe UI',10));root.setWidth(960);root.setHeight(680)
+  card=root.findChild(QObject,'installCard');row=root.findChild(QObject,'customIPARow')
+  for language in ('en','de'):
+   for vpn in ('missing','installed'):
+    self.bridge.update(language=language,vpnState=vpn)
+    for _ in range(4):APP.processEvents()
+    top=card.mapToScene(QPointF(0,0));position=row.mapToScene(QPointF(0,0))
+    self.assertLessEqual(position.y()+row.height(),top.y()+card.height()-20)
+    self.assertLessEqual(position.x()+row.width(),top.x()+card.width()-20)
   root.close();engine.deleteLater();APP.processEvents()
 if __name__=='__main__':unittest.main()

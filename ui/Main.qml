@@ -26,7 +26,6 @@ ApplicationWindow {
     property color accent: "#36dbb1"
     property color ink: "#f4f5f7"
     property color muted: "#92979f"
-    property bool ready: s.loggedIn && s.devices.length > 0 && s.ipa.length > 0 && !s.busy && !s.updateBusy
     property bool authenticating: (s.busy && !s.scanning) || s.authState==="signing_in"
     property string accountStatus: s.loggedIn ? t("Angemeldet") : s.authState==="checking" ? t("Sitzung prüfen …") : s.authState==="signing_in" ? t("Bei Apple anmelden …") : s.authState==="expired" ? t("Sitzung abgelaufen") : t("Nicht angemeldet")
     property bool quotaKnown: s.appIdsLimit>0 && s.appIdsAvailable>=0
@@ -88,7 +87,7 @@ ApplicationWindow {
                 Badge {text:s.version}
                 Badge {text:s.devices.length?win.t("●  USB verbunden"):win.t("Nicht verbunden");tone:s.devices.length?"ok":"warning"}
                 Item {Layout.fillWidth:true}
-                Action {visible:s.windowsUpdate;text:win.t("Update");primary:true;implicitHeight:32;enabled:!s.updateBusy && (!s.busy || s.scanning);onClicked:backend.updateWindows();ToolTip.visible:hovered;ToolTip.text:s.releaseVersion}
+                Action {objectName:"windowsUpdateButton";visible:s.windowsUpdate;text:win.t("Update");primary:true;implicitHeight:32;enabled:!s.updateBusy && !s.directsideInstalling && (!s.busy || s.scanning);onClicked:backend.updateWindows();ToolTip.visible:hovered;ToolTip.text:s.releaseVersion}
                 IconButton {text:"⚙";hint:win.t("Einstellungen");onClicked:win.page=win.page==="settings" ? "install":"settings"}
                 IconButton {id:moreButton;text:"?";hint:win.t("Hilfe & Aktivität");onClicked:moreMenu.popup()
                     Menu {id:moreMenu;y:moreButton.height
@@ -127,7 +126,7 @@ ApplicationWindow {
                         Field {id:email;objectName:"emailField";visible:!s.loggedIn && !s.challenge;Layout.fillWidth:true;placeholderText:"Apple-ID";text:s.email;enabled:!win.authenticating;onTextEdited:backend.editEmail(text);onAccepted:password.forceActiveFocus()}
                         Field {id:password;objectName:"passwordField";visible:!s.loggedIn && !s.challenge;Layout.fillWidth:true;placeholderText:win.t("Passwort");echoMode:TextInput.Password;enabled:!win.authenticating;onAccepted:loginButton.clicked()}
                         Action {id:loginButton;objectName:"loginButton";visible:!s.loggedIn && !s.challenge;Layout.fillWidth:true;text:win.authenticating?win.t("Bitte warten …"):win.t("Anmelden");primary:true;enabled:!win.authenticating;onClicked:if(backend.login(email.text,password.text))password.clear()}
-                        Action {visible:s.loggedIn && !s.challenge;Layout.fillWidth:true;text:win.t("Abmelden");enabled:!s.busy;onClicked:backend.logout()}
+                        Action {visible:s.loggedIn && !s.challenge;Layout.fillWidth:true;text:win.t("Abmelden");enabled:!s.busy && !s.directsideInstalling;onClicked:backend.logout()}
                         ColumnLayout {
                             visible:s.challenge.length>0;Layout.fillWidth:true;spacing:10
                             Label {text:s.challenge==="team"?win.t("Team auswählen"):s.challenge==="pairing"?win.t("Pairing-Code"):win.t("Bestätigungscode");font.weight:Font.DemiBold}
@@ -178,38 +177,39 @@ ApplicationWindow {
                     }
                 }
                 Card {
-                    visible:win.page==="install";Layout.fillWidth:true;Layout.fillHeight:true;Layout.minimumHeight:272;border.color:s.vpnState==="missing"?"#805440":"#30333a"
+                    id:installCard;objectName:"installCard";visible:win.page==="install";Layout.fillWidth:true;Layout.fillHeight:true;Layout.minimumHeight:272;border.color:s.vpnState==="missing"?"#805440":"#30333a"
                     ColumnLayout {anchors.fill:parent;anchors.margins:24;spacing:12
                         RowLayout {visible:s.vpnState!=="missing";spacing:8
                             Image {source:s.icon;Layout.preferredWidth:56;Layout.preferredHeight:56;sourceSize.width:112;sourceSize.height:112}
                             ColumnLayout {spacing:6
-                                Label {text:win.t("DirectSide für iPhone");font.pixelSize:21;font.weight:Font.DemiBold;font.letterSpacing:-0.4}
+                                RowLayout {spacing:8
+                                    Label {text:win.t("DirectSide für iPhone");font.pixelSize:21;font.weight:Font.DemiBold;font.letterSpacing:-0.4}
+                                    Badge {objectName:"ipaVersionBadge";visible:s.releaseVersion.length>0;text:s.releaseVersion}
+                                }
                                 Label {text:"iOS 17+ · "+win.t("Pairing inklusive");font.pixelSize:12;color:win.muted}
                             }
                         }
                         RowLayout {visible:s.vpnState==="missing";Layout.fillWidth:true;spacing:20
-                            Rectangle {Layout.preferredWidth:156;Layout.preferredHeight:156;radius:12;color:"white"
+                            Rectangle {property real codeSize:Math.max(96,Math.min(156,installCard.height-180));Layout.preferredWidth:codeSize;Layout.preferredHeight:codeSize;radius:12;color:"white"
                                 Image {anchors.fill:parent;anchors.margins:6;source:s.vpnQr;fillMode:Image.PreserveAspectFit;smooth:false}
                             }
                             ColumnLayout {Layout.fillWidth:true;spacing:12
                                 Badge {text:win.t("LocalDevVPN fehlt");tone:"missing"}
-                                Text {text:win.t("Auf diesem Gerät installieren");font.pixelSize:18;font.weight:Font.DemiBold;color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                                Text {text:win.t("Auf dem ausgewählten Gerät installieren");font.pixelSize:18;font.weight:Font.DemiBold;color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                                 Text {text:win.t("Der Anleitung in der App folgen.");color:win.muted;font.pixelSize:13;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                             }
                         }
-                        RowLayout {Layout.fillWidth:true;spacing:8
-                            Action {text:win.t("DirectSide aus GitHub");primary:s.ipaSource==="github";enabled:!s.busy && !s.updateBusy && s.releaseIPA;onClicked:backend.downloadDirectSide()}
-                            Action {text:win.t("Eigene IPA");quiet:s.ipaSource!=="file";enabled:!s.busy && !s.updateBusy;onClicked:backend.chooseIPA()}
-                            Badge {visible:s.releaseVersion.length>0;text:s.releaseVersion}
-                        }
-                        Rectangle {visible:s.vpnState!=="missing";Layout.fillWidth:true;implicitHeight:44;radius:12;color:"#15171b";border.color:"#30343b"
+                        Action {objectName:"installDirectSideButton";text:s.directsideInstalling?win.t("Bitte warten …"):win.t("DirectSide installieren");primary:true;Layout.fillWidth:true;implicitHeight:48;enabled:s.loggedIn && s.devices.length>0 && (!s.busy || s.scanning) && !s.updateBusy && !s.directsideInstalling && s.releaseIPA;onClicked:backend.downloadDirectSide()}
+                        RowLayout {objectName:"customIPARow";Layout.fillWidth:true;spacing:8
+                        Rectangle {Layout.fillWidth:true;implicitHeight:44;radius:12;color:"#15171b";border.color:"#30343b"
                             RowLayout {anchors.fill:parent;anchors.leftMargin:15;anchors.rightMargin:8;spacing:12
                                 Label {text:"↳";color:win.muted;font.pixelSize:19}
-                                Label {text:s.ipaName || win.t("IPA auswählen");Layout.fillWidth:true;color:s.ipaName?win.ink:win.muted}
-                                IconButton {text:"…";hint:win.t("IPA auswählen");enabled:!s.busy && !s.updateBusy;onClicked:backend.chooseIPA()}
+                                Label {text:s.customIPAName || win.t("Eigene IPA");Layout.fillWidth:true;color:s.customIPAName?win.ink:win.muted}
+                                IconButton {text:"…";hint:win.t("IPA auswählen");enabled:!s.busy && !s.updateBusy && !s.directsideInstalling;onClicked:backend.chooseIPA()}
                             }
                         }
-                        Action {text:s.success?win.t("✓  Installiert"):s.busy && !s.scanning?win.t("Bitte warten …"):win.t("Auf Gerät installieren  →");primary:true;enabled:win.ready;Layout.fillWidth:true;implicitHeight:48;onClicked:backend.install()}
+                        Action {objectName:"installCustomIPAButton";text:win.t("IPA installieren");enabled:s.loggedIn && s.devices.length>0 && s.customIPA.length>0 && !s.busy && !s.updateBusy && !s.directsideInstalling;onClicked:backend.installCustomIPA()}
+                        }
                         Item {Layout.fillHeight:true}
                     }
                 }
@@ -246,7 +246,6 @@ ApplicationWindow {
                             RowLayout {Label {text:"DirectSide · "+s.version;Layout.fillWidth:true} Badge {text:s.updateBusy?win.t("Prüfen …"):s.updateState==="empty"?win.t("Noch kein Release"):s.updateState==="available"?s.releaseVersion:s.updateState==="current"?win.t("Aktuell"):win.t("Nicht geprüft");tone:s.updateState==="current"?"ok":s.updateState==="error"?"missing":"warning"}}
                             RowLayout {
                                 Action {text:win.t("Nach Updates suchen");enabled:!s.updateBusy;onClicked:backend.checkUpdates()}
-                                Action {visible:s.windowsUpdate;text:win.t("Aktualisieren & neu starten");primary:true;enabled:!s.updateBusy && (!s.busy || s.scanning);onClicked:backend.updateWindows()}
                             }
                             Label {text:win.t("GitHub · privates Repository");font.weight:Font.DemiBold;Layout.topMargin:8}
                             RowLayout {Layout.fillWidth:true
@@ -344,7 +343,6 @@ ApplicationWindow {
                     ToolTip.visible:quotaHover.hovered;ToolTip.text:win.t("Neue App-Kennungen pro Account innerhalb von 7 Tagen. Keine installierten Apps.")+(s.appIdsRegistered>=0?"\n"+s.appIdsRegistered+" "+win.t("registrierte Kennungen"):"");HoverHandler {id:quotaHover}
                 }
                 Badge {visible:win.page==="install" || win.page==="apps";text:s.slotsUsed>=0?"Apps · "+s.slotsUsed+" / 3 · "+win.t("Gerät"):win.t("App-Plätze nicht geprüft");tone:s.slotsUsed<0?"warning":s.slotsUsed>=3?"missing":s.slotsUsed===2?"warning":"ok"}
-                Badge {visible:win.page==="install" && !s.ipaName;text:win.t("IPA fehlt");tone:"missing"}
                 Badge {objectName:"sessionBadge";text:win.accountStatus;tone:s.loggedIn?"ok":s.authState==="expired" || s.authState==="rejected"?"missing":"warning"}
                 Badge {text:win.t("7 Tage")}
             }
