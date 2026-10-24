@@ -58,3 +58,13 @@ Erfolg nur für tatsächlich ausgeführte Tests dokumentieren. Keine Release-Fre
 ## Paketprüfung
 
 Die versionierte Konfiguration liegt in `packaging/DirectSide.spec`. Der lokale Build isoliert PATH von fremden Toolchains und nimmt keine fremde ICU-DLL mit auf. Nach dem Packen startet er die tatsächliche EXE mit `--smoke-test` und prüft Qt, QML, Fenster-Icon, Signierkern und tatsächliche lokale Anisette-Erzeugung. Der Bericht liegt unter `build/smoke-test.json`. Apple-Zugangsdaten werden nicht benötigt; eine unprovisionierte lokale Laufzeit kann Apples eigene Provisionierungsendpunkte kontaktieren.
+
+## GitHub release contract
+
+The updater reads `GET /repos/Serekay/directside/releases/latest`: published stable releases only, never drafts, Actions artifacts or source snapshots. Each approved tag must be a new `vMAJOR.MINOR.PATCH` version. Bump `ui/updates.py:VERSION`, Cargo and iOS app versions before building; never replace an existing version with different binaries.
+
+After the owner's explicit release approval, attach `DirectSide.exe` (built locally) and `DirectSide.ipa` (manually built on macOS) to the same tag. GitHub's API must expose a SHA-256 digest for each asset. The app verifies that digest and size before using the download, validates the IPA's main bundle ID, and strips Authorization before following signed asset-CDN redirects. Build artifacts are not releases and do not trigger updates. No Windows CI was added.
+
+For private access use Settings → Updates with a fine-grained token limited to this repository and Contents: Read. It is saved with user-scoped Windows DPAPI, never to preferences, logs or the repository. No GitHub account credential is sent to Apple or to the iPhone. On the development machine only, an existing project-local gh login can be read without adding a runtime dependency. Public access also works without a token if visibility is changed by the owner in the future.
+
+Windows updates stage in LocalAppData/DirectSide/updates. The staged EXE runs its own --apply-update entry point, waits for the original Qt process to stop and preserves DirectSide.previous.exe before replacing the original file. Short retries accommodate PyInstaller's outer process cleanup. If replacement or process launch fails, the previous EXE is retained/restored. Credentials and settings are not replaced. Authentication/install operations defer the restart. Locked files or an unwritable installation folder produce an update failure rather than elevation. A successful process launch is not a post-launch health guarantee. Actual release-to-release upgrades still require a hardware check after the first release is approved.

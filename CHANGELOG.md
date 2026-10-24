@@ -2,7 +2,12 @@
 
 ## Unreleased
 
-- Windows-Anisette durch eingebettete Mac-iTunes-CoreADI ersetzt: lokale Unicorn-Emulation, verschlüsselter Zustand, geprüfte TLS-Verbindung und interne Windows-Pipe statt Fremdserver oder zusätzlicher Installation. Tatsächliche lokale Provisionierung und OTP-Erzeugung auf Windows geprüft; Apple-ID-Login noch am Account zu bestätigen.
+- Aktuelle freigegebene DirectSide-IPA direkt aus GitHub laden; eigene IPA-Dateien bleiben auswählbar.
+- Windows-Updateprüfung beim Start, alle sechs Stunden und manuell; Update-Schaltfläche, Download mit GitHub-SHA-256-Prüfung und Neustart mit gesicherter vorheriger EXE.
+- Privater GitHub-Zugang in den Einstellungen, DPAPI-geschützt; vorhandene Projekt-GitHub-Anmeldung auf dem Entwicklungs-PC wiederverwendbar. Keine Veröffentlichungen ausgelöst.
+- Besitzer bestätigt erfolgreiche Apple-ID-Anmeldung mit dem neuen lokalen Windows-Mac-Provider.
+
+- Windows-Anisette durch eingebettete Mac-iTunes-CoreADI ersetzt: lokale Unicorn-Emulation, verschlüsselter Zustand, geprüfte TLS-Verbindung und interne Windows-Pipe statt Fremdserver oder zusätzlicher Installation. Tatsächliche lokale Provisionierung und OTP-Erzeugung auf Windows geprüft; Apple-ID-Login vom Besitzer bestätigt.
 - Getrennte akd-/Xcode-Identitäten für Anmeldung und Developer-API, frische OTP-Daten pro 30-Sekunden-Fenster und korrigierte Fortschrittsmeldung vor abgeschlossener Anmeldung.
 
 - Apple-ID-Eingabe bleibt bei automatischen Geräteabfragen erhalten. Anmeldeklicks während einer Abfrage werden anschließend ausgeführt; Passwort wird nur bei angenommener Anmeldung aus dem Eingabefeld entfernt.
@@ -10,7 +15,7 @@
 - USB-Badge neben der Version, Hilfe-Fragezeichen, größere unterschiedliche Vektor-Icons für Aktualisierung und App-Übersicht; ausgerichtete Überschriften, kompakter Installationsbereich und Statusleiste unten rechts.
 
 - Aktivität vollständig kopierbar: Textauswahl, Strg+C und Kopieren-Button; Fehlerdetails über die Fußleiste erreichbar.
-- Windows-Clientprofil an den lokalen iTunes-Anisette-Provider angepasst; Behebung von Apples Tokenfehler −80046 noch am Account zu prüfen.
+- Windows-Clientprofil an den lokalen iTunes-Anisette-Provider angepasst; Der nachfolgende Mac-CoreADI-Provider behebt den beobachteten Tokenfehler beim Account des Besitzers.
 - Lokale iOS-Anmeldung über AnisetteKit-TCI implementiert; ARM64-IPA gebaut und tatsächliche Provisionierung mit wiederholter OTP-Erzeugung auf macOS geprüft. Hardwareprüfung von Anmeldung und Selbsterneuerung ausstehend.
 - Vorhandene Windows-Signieridentität mit Schlüssel-/Zertifikatsprüfung auf iOS importierbar; integrierte SMS-Bestätigung auf iOS.
 

@@ -2,7 +2,7 @@
 
 Sideload with your own Apple ID. DirectSide combines a Windows setup app with a native iPhone app for browsing sources, installing apps and managing updates.
 
-**Development preview.** Windows now includes a local Mac-iTunes authentication runtime. Local provisioning and packaged startup pass; Apple-ID sign-in needs account validation. On-device sign-in, self-renewal and LiveContainer setup still need device testing.
+**Development preview.** Windows includes local Apple authentication; the owner has confirmed a successful Apple-ID sign-in. On-device sign-in, self-renewal and LiveContainer setup still need device testing.
 
 ## A clear view of your devices
 
@@ -11,6 +11,8 @@ Sideload with your own Apple ID. DirectSide combines a Windows setup app with a 
 - Set up missing components from the Windows app.
 - Import app sources by QR code or URL, with descriptions, screenshots and updates.
 - Choose English or German and keep your preference.
+- Load the latest released DirectSide IPA from GitHub, or choose your own IPA.
+- Get Windows update notifications and update with a restart from the app.
 
 | Windows setup | Installed apps |
 |:---:|:---:|
@@ -20,12 +22,14 @@ Sideload with your own Apple ID. DirectSide combines a Windows setup app with a 
 
 ## Get started
 
-1. Download **DirectSide.exe** and **DirectSide.ipa** from the same [release](https://github.com/Serekay/directside/releases). Keep both files in one folder.
+1. Once a version is approved, download **DirectSide.exe** from [Releases](https://github.com/Serekay/directside/releases). No release is available yet.
 2. Open DirectSide, connect and unlock your iPhone or iPad, then tap **Trust** on the device.
-3. Sign in with your Apple ID, choose the target device and select **Install on device**. Follow the prompts.
+3. Sign in with your Apple ID, choose the target device, select **DirectSide from GitHub**, then **Install on device**. **Other IPA** lets you install a local IPA instead.
 4. Install LocalDevVPN using the QR code if requested, then follow its setup instructions on your device.
 
-Need a hand? Open **⋯ → Help**. Optional LiveContainer setup is under **Settings → LiveContainer**.
+Need a hand? Open **? → Help**. Optional LiveContainer setup is under **Settings → LiveContainer**.
+
+DirectSide checks stable GitHub releases at startup and every six hours. **Update** downloads and verifies the new Windows app, then restarts it. While the repository is private, configure a fine-grained GitHub token with **Contents: Read** for this repository under **Settings → Updates**. It is encrypted for your Windows user; no shared token is included. The existing project-local GitHub CLI login can also be reused on the development PC.
 
 ## Before you start
 

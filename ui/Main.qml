@@ -26,7 +26,7 @@ ApplicationWindow {
     property color accent: "#36dbb1"
     property color ink: "#f4f5f7"
     property color muted: "#92979f"
-    property bool ready: s.loggedIn && s.devices.length > 0 && s.ipa.length > 0 && !s.busy
+    property bool ready: s.loggedIn && s.devices.length > 0 && s.ipa.length > 0 && !s.busy && !s.updateBusy
     property bool authenticating: (s.busy && !s.scanning) || s.authState==="signing_in"
     property string accountStatus: s.loggedIn ? t("Angemeldet") : s.authState==="checking" ? t("Sitzung prüfen …") : s.authState==="signing_in" ? t("Bei Apple anmelden …") : s.authState==="expired" ? t("Sitzung abgelaufen") : t("Nicht angemeldet")
     property bool quotaKnown: s.appIdsLimit>0 && s.appIdsAvailable>=0
@@ -85,14 +85,16 @@ ApplicationWindow {
                 anchors.fill:parent;anchors.leftMargin:26;anchors.rightMargin:16;spacing:12
                 Image {source:s.icon;Layout.preferredWidth:38;Layout.preferredHeight:38;sourceSize.width:76;sourceSize.height:76}
                 Label {text:"DirectSide";font.pixelSize:22;font.weight:Font.DemiBold;font.letterSpacing:-0.6}
-                Badge {text:"0.1.0"}
+                Badge {text:s.version}
                 Badge {text:s.devices.length?win.t("●  USB verbunden"):win.t("Nicht verbunden");tone:s.devices.length?"ok":"warning"}
                 Item {Layout.fillWidth:true}
+                Action {visible:s.windowsUpdate;text:win.t("Update");primary:true;implicitHeight:32;enabled:!s.updateBusy && (!s.busy || s.scanning);onClicked:backend.updateWindows();ToolTip.visible:hovered;ToolTip.text:s.releaseVersion}
                 IconButton {text:"⚙";hint:win.t("Einstellungen");onClicked:win.page=win.page==="settings" ? "install":"settings"}
                 IconButton {id:moreButton;text:"?";hint:win.t("Hilfe & Aktivität");onClicked:moreMenu.popup()
                     Menu {id:moreMenu;y:moreButton.height
                         MenuItem {text:win.t("Hilfe");onTriggered:win.page="help"}
                         MenuItem {text:win.t("Aktivität");onTriggered:win.page="activity"}
+                        MenuItem {text:win.t("Updates");onTriggered:{win.page="settings";win.settingsSection="updates";backend.checkUpdates()}}
                     }
                 }
                 Rectangle {width:1;height:20;color:"#34373e";Layout.leftMargin:6;Layout.rightMargin:6}
@@ -195,14 +197,18 @@ ApplicationWindow {
                                 Text {text:win.t("Der Anleitung in der App folgen.");color:win.muted;font.pixelSize:13;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                             }
                         }
-                        Rectangle {visible:s.vpnState!=="missing";Layout.fillWidth:true;implicitHeight:52;radius:12;color:"#15171b";border.color:"#30343b"
+                        RowLayout {Layout.fillWidth:true;spacing:8
+                            Action {text:win.t("DirectSide aus GitHub");primary:s.ipaSource==="github";enabled:!s.busy && !s.updateBusy && s.releaseIPA;onClicked:backend.downloadDirectSide()}
+                            Action {text:win.t("Eigene IPA");quiet:s.ipaSource!=="file";enabled:!s.busy && !s.updateBusy;onClicked:backend.chooseIPA()}
+                            Badge {visible:s.releaseVersion.length>0;text:s.releaseVersion}
+                        }
+                        Rectangle {visible:s.vpnState!=="missing";Layout.fillWidth:true;implicitHeight:44;radius:12;color:"#15171b";border.color:"#30343b"
                             RowLayout {anchors.fill:parent;anchors.leftMargin:15;anchors.rightMargin:8;spacing:12
                                 Label {text:"↳";color:win.muted;font.pixelSize:19}
                                 Label {text:s.ipaName || win.t("IPA auswählen");Layout.fillWidth:true;color:s.ipaName?win.ink:win.muted}
-                                IconButton {text:"…";hint:win.t("IPA auswählen");enabled:!s.busy;onClicked:backend.chooseIPA()}
+                                IconButton {text:"…";hint:win.t("IPA auswählen");enabled:!s.busy && !s.updateBusy;onClicked:backend.chooseIPA()}
                             }
                         }
-                        Action {visible:s.vpnState==="missing" && !s.ipaName;text:win.t("IPA auswählen");enabled:!s.busy;onClicked:backend.chooseIPA()}
                         Action {text:s.success?win.t("✓  Installiert"):s.busy && !s.scanning?win.t("Bitte warten …"):win.t("Auf Gerät installieren  →");primary:true;enabled:win.ready;Layout.fillWidth:true;implicitHeight:48;onClicked:backend.install()}
                         Item {Layout.fillHeight:true}
                     }
@@ -214,6 +220,7 @@ ApplicationWindow {
                             Action {text:win.t("Komponenten");quiet:win.settingsSection!=="system";onClicked:win.settingsSection="system"}
                             Action {text:"LiveContainer";quiet:win.settingsSection!=="livecontainer";onClicked:win.settingsSection="livecontainer"}
                             Action {text:win.t("Sprache");quiet:win.settingsSection!=="language";onClicked:win.settingsSection="language"}
+                            Action {text:win.t("Updates");quiet:win.settingsSection!=="updates";onClicked:win.settingsSection="updates"}
                         }
                         ColumnLayout {visible:win.settingsSection==="system";Layout.fillWidth:true;spacing:16
                         RowLayout {Label {text:win.t("Apple USB-Treiber");Layout.fillWidth:true} Badge {text:s.usbState==="ready"?win.t("Installiert"):s.usbState==="stopped"?win.t("Gestoppt"):s.usbState==="missing"?win.t("Fehlt"):win.t("Nicht geprüft");tone:s.usbState==="ready"?"ok":s.usbState==="missing"?"missing":"warning"}}
@@ -234,6 +241,21 @@ ApplicationWindow {
                         RowLayout {visible:win.settingsSection==="language";Layout.fillWidth:true
                             Label {text:win.t("Sprache");Layout.fillWidth:true}
                             ComboBox {model:["English","Deutsch"];currentIndex:s.language==="de"?1:0;onActivated:index=>backend.setLanguage(index===1?"de":"en")}
+                        }
+                        ColumnLayout {visible:win.settingsSection==="updates";Layout.fillWidth:true;spacing:12
+                            RowLayout {Label {text:"DirectSide · "+s.version;Layout.fillWidth:true} Badge {text:s.updateBusy?win.t("Prüfen …"):s.updateState==="empty"?win.t("Noch kein Release"):s.updateState==="available"?s.releaseVersion:s.updateState==="current"?win.t("Aktuell"):win.t("Nicht geprüft");tone:s.updateState==="current"?"ok":s.updateState==="error"?"missing":"warning"}}
+                            RowLayout {
+                                Action {text:win.t("Nach Updates suchen");enabled:!s.updateBusy;onClicked:backend.checkUpdates()}
+                                Action {visible:s.windowsUpdate;text:win.t("Aktualisieren & neu starten");primary:true;enabled:!s.updateBusy && (!s.busy || s.scanning);onClicked:backend.updateWindows()}
+                            }
+                            Label {text:win.t("GitHub · privates Repository");font.weight:Font.DemiBold;Layout.topMargin:8}
+                            RowLayout {Layout.fillWidth:true
+                                Field {id:githubToken;Layout.fillWidth:true;placeholderText:win.t("GitHub-Token · Contents: Read");echoMode:TextInput.Password;enabled:!s.updateBusy}
+                                Action {text:win.t("Speichern");enabled:githubToken.text.length>0 && !s.updateBusy;onClicked:{backend.saveGitHub(githubToken.text);githubToken.clear()}}
+                                IconButton {visible:s.githubSaved;text:"×";hint:win.t("GitHub-Zugang entfernen");enabled:!s.updateBusy;onClicked:backend.forgetGitHub()}
+                            }
+                            Text {text:win.t("Zugriff nur für Serekay/directside. Verschlüsselt für deinen Windows-Benutzer gespeichert.");color:win.muted;font.pixelSize:12;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                            Label {text:win.t("Automatische Prüfung beim Start und alle 6 Stunden.");color:win.muted;font.pixelSize:12;Layout.fillWidth:true}
                         }
                         Item {Layout.fillHeight:true}
                     }
@@ -304,6 +326,7 @@ ApplicationWindow {
             ColumnLayout {anchors.fill:parent;anchors.leftMargin:24;anchors.rightMargin:24;anchors.topMargin:8;anchors.bottomMargin:12;spacing:4
             RowLayout {Layout.fillWidth:true;spacing:8
                 Item {Layout.fillWidth:true}
+                Label {visible:s.updateBusy || s.updateMessage.length>0;text:s.updateBusy?win.t("GitHub …")+(s.updateProgress>0?" "+s.updateProgress+"%":""):win.t(s.updateMessage);font.pixelSize:12;color:s.updateState==="error"?"#ffb49a":win.muted;Layout.maximumWidth:parent.width*0.55;horizontalAlignment:Text.AlignRight}
                 Label {visible:!!s.error || (s.busy && !s.scanning) || s.lcPrepared || s.success;text:(s.error || (s.busy && !s.scanning?s.status:s.lcPrepared?win.t("Zertifikat übertragen · auf dem iPhone fortfahren"):s.success?win.t("Installiert"):"")).split("\n")[0];font.pixelSize:12;color:s.error?"#ffb49a":win.muted;Layout.maximumWidth:parent.width-150;horizontalAlignment:Text.AlignRight}
                 IconButton {visible:s.error.length>0;text:"≡";hint:win.t("Aktivität");onClicked:win.page="activity"}
                 ProgressBar {visible:s.busy && !s.scanning;Layout.preferredWidth:100;from:0;to:100;value:s.progress;indeterminate:s.progress<=0
@@ -314,8 +337,9 @@ ApplicationWindow {
             }
             RowLayout {Layout.fillWidth:true;spacing:8
                 Item {Layout.fillWidth:true}
-                Badge {visible:win.page==="settings" && s.email.length>0 && s.email===s.savedEmail;text:win.t("Apple-ID gespeichert")}
-                Badge {visible:win.page==="settings";text:win.t("Windows-Schlüsselbund")}
+                Badge {visible:win.page==="settings" && win.settingsSection!=="updates" && s.email.length>0 && s.email===s.savedEmail;text:win.t("Apple-ID gespeichert")}
+                Badge {visible:win.page==="settings" && win.settingsSection!=="updates";text:win.t("Windows-Schlüsselbund")}
+                Badge {visible:win.page==="settings" && win.settingsSection==="updates" && s.githubSaved;text:win.t("GitHub gespeichert");tone:"ok"}
                 Badge {id:quotaBadge;objectName:"quotaBadge";text:win.quotaText;tone:!win.quotaKnown?"warning":s.appIdsAvailable===0?"missing":s.appIdsAvailable<=3?"warning":"ok"
                     ToolTip.visible:quotaHover.hovered;ToolTip.text:win.t("Neue App-Kennungen pro Account innerhalb von 7 Tagen. Keine installierten Apps.")+(s.appIdsRegistered>=0?"\n"+s.appIdsRegistered+" "+win.t("registrierte Kennungen"):"");HoverHandler {id:quotaHover}
                 }
