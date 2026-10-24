@@ -65,6 +65,7 @@ targets:
     settings:
       base:
         PRODUCT_NAME: DirectSideAnisetteProbe
+        ONLY_ACTIVE_ARCH: YES
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGNING_ALLOWED: NO
         SWIFT_OBJC_BRIDGING_HEADER: DirectSide/MacADI.h

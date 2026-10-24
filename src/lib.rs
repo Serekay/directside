@@ -14,6 +14,11 @@ pub extern "C" fn ds_set_anisette_callback(generate:Option<isideload::anisette::
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn ds_set_anisette_resync_callback(resync:Option<isideload::anisette::local::callback::Resync>)->bool {
+    resync.is_some_and(isideload::anisette::local::callback::register_resync)
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn ds_start() {
     BRIDGE.get_or_init(|| {
         let (input,receiver)=mpsc::channel();
@@ -59,9 +64,14 @@ mod tests {
         CString::new(r#"{"headers":{"X-Apple-I-MD":"otp-fixture","X-Apple-I-MD-M":"mid-fixture","X-Mme-Device-Id":"device-fixture","X-Apple-I-MD-LU":"user-fixture","X-Apple-I-MD-RINFO":"17106176"},"client_info":"client-fixture","user_agent":"agent-fixture"}"#).unwrap().into_raw()
     }
     unsafe extern "C" fn release(pointer:*mut c_char){drop(unsafe{CString::from_raw(pointer)});}
+    unsafe extern "C" fn sync_fixture(sim:*const c_char)->*mut c_char {
+        assert_eq!(unsafe{CStr::from_ptr(sim)}.to_str().unwrap(),"c3luYw==");
+        unsafe{fixture()}
+    }
     #[tokio::test]
     async fn callback_initializes_once_then_refreshes_without_ui_events() {
         assert!(ds_set_anisette_callback(Some(fixture),Some(release)));
+        assert!(ds_set_anisette_resync_callback(Some(sync_fixture)));
         let provider=isideload::anisette::local::callback::LocalAnisetteProvider::new().unwrap();
         assert_eq!(provider.get_client_info().await.unwrap().client_info,"client-fixture");
         let AnisetteDataResponse::Data(data)=provider.get_anisette_data().await.unwrap() else {panic!("Expected local headers")};
@@ -69,5 +79,8 @@ mod tests {
         assert_eq!(CALLS.load(Ordering::SeqCst),1);
         provider.get_anisette_data().await.unwrap();
         assert_eq!(CALLS.load(Ordering::SeqCst),2);
+        let AnisetteDataResponse::Data(data)=provider.resync("c3luYw==").await.unwrap() else {panic!("Expected synchronized data")};
+        assert_eq!(data.get_headers()["X-Apple-I-MD"],"otp-fixture");
+        assert_eq!(CALLS.load(Ordering::SeqCst),3);
     }
 }
