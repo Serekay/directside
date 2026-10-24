@@ -132,4 +132,32 @@ class WindowsUIStateTests(unittest.TestCase):
   self.assertEqual(self.bridge.data['authState'],'rejected')
   self.assertEqual(self.bridge.data['error'],'Apple rejected local sign-in (−80046).')
   self.assertIn(message,self.bridge.data['logs'])
+
+ def test_release_state_preserves_own_ipa_and_does_not_claim_unreleased_update(self):
+  self.bridge.update(ipa='custom.ipa',ipaName='Custom app',ipaSource='file')
+  self.bridge.onReleaseEvent({'type':'release','release':None})
+  self.assertEqual(self.bridge.data['updateState'],'empty')
+  self.assertFalse(self.bridge.data['windowsUpdate'])
+  self.assertEqual(self.bridge.data['ipa'],'custom.ipa')
+  self.bridge.onReleaseEvent({'type':'release','release':{'tag_name':'v0.2.0','assets':[{'name':'DirectSide.exe'},{'name':'DirectSide.ipa'}]}})
+  self.assertTrue(self.bridge.data['windowsUpdate']);self.assertTrue(self.bridge.data['releaseIPA'])
+  self.assertEqual(self.bridge.data['ipa'],'custom.ipa')
+  self.bridge.onReleaseEvent({'type':'ipa','path':'download.ipa','version':'v0.2.0'})
+  self.assertEqual(self.bridge.data['ipaSource'],'github')
+  self.assertEqual(self.bridge.data['ipa'],'download.ipa')
+
+ def test_restart_is_deferred_if_authentication_started_while_downloading(self):
+  self.bridge.update(busy=True,scanning=False,updateBusy=True)
+  self.bridge.onReleaseEvent({'type':'windows','path':'must-not-run.exe','digest':'fake'})
+  self.assertFalse(self.bridge.data['updateBusy'])
+  self.assertIn('Update bereit',self.bridge.data['updateMessage'])
+
+ def test_github_and_other_ipa_controls_fit_update_settings_at_minimum_size(self):
+  self.bridge.update(busy=False,updateState='available',windowsUpdate=True,releaseVersion='v0.2.0',releaseIPA=True)
+  engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
+  engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')))
+  root=engine.rootObjects()[0];root.setWidth(960);root.setHeight(680)
+  root.setProperty('page','settings');root.setProperty('settingsSection','updates');APP.processEvents()
+  self.assertEqual(root.property('settingsSection'),'updates')
+  root.close();engine.deleteLater();APP.processEvents()
 if __name__=='__main__':unittest.main()

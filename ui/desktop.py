@@ -5,6 +5,23 @@ import sys
 if '--local-anisette' in sys.argv:
     from local_mac_auth import main as local_auth_main
     sys.exit(local_auth_main())
+if '--apply-update' in sys.argv:
+    from updates import apply_update
+    sys.exit(apply_update(sys.argv[sys.argv.index('--apply-update')+1:]))
+if '--release-probe' in sys.argv:
+    from pathlib import Path
+    from updates import ReleaseClient
+    from common import HOME, ROOT
+    output=Path(sys.argv[sys.argv.index('--release-probe')+1])
+    try:
+        client=ReleaseClient(HOME if getattr(sys,'frozen',False) else ROOT)
+        authenticated=bool(client.token())
+        release=client.latest()
+        result={'ok':True,'authenticated':authenticated,'latest':release['tag_name'] if release else None}
+    except Exception:
+        result={'ok':False}
+    output.write_text(json.dumps(result),encoding='utf-8')
+    sys.exit(0 if result['ok'] else 1)
 import threading
 import time
 from pathlib import Path
@@ -17,11 +34,13 @@ from PySide6.QtQuickControls2 import QQuickStyle
 from common import ROOT, HOME, Preferences, ipa_identity, valid_code, clean_error
 from components import usb_status, setup_apple, download_livecontainer
 from i18n import ENGLISH, translate
+from updates import ReleaseClient, VERSION, version, digest, CACHE, UpdateError
 
 
 class DesktopBridge(QObject):
     changed = Signal()
     setupEvent = Signal(dict)
+    releaseEvent = Signal(dict)
 
     def __init__(self, start=True, preferences=None):
         super().__init__()
@@ -35,6 +54,9 @@ class DesktopBridge(QObject):
         for path in [HOME/'DirectSide.ipa',ROOT/'dist'/'DirectSide.ipa']:
             if path.is_file(): self.data.update(ipa=str(path),ipaName=path.name);break
         self.data.update(language=language,savedEmail=saved.get('email',''),translations=ENGLISH,status=translate(self.data['status'],language))
+        self.data.update(version=VERSION,updateBusy=False,updateProgress=0,updateState='unchecked',updateMessage='',releaseVersion='',windowsUpdate=False,releaseIPA=False,ipaSource='file',githubSaved=(CACHE/'github.dpapi').is_file())
+        self.releaseClient=ReleaseClient(HOME if getattr(sys,'frozen',False) else ROOT)
+        self.release=None
         self.buffer=bytearray()
         self.initializing=True
         self.installing=False
@@ -47,7 +69,20 @@ class DesktopBridge(QObject):
         self.process.errorOccurred.connect(lambda _:self.fail('Signierkern konnte nicht gestartet werden.'))
         self.timer=QTimer(self);self.timer.setInterval(3000);self.timer.timeout.connect(self.auto_refresh)
         self.setupEvent.connect(self.onSetupEvent)
-        if start: QTimer.singleShot(0,self.start)
+        self.releaseEvent.connect(self.onReleaseEvent)
+        self.updateTimer=QTimer(self);self.updateTimer.setInterval(6*60*60*1000);self.updateTimer.timeout.connect(self.checkUpdates)
+        if start:
+            QTimer.singleShot(0,self.start)
+            QTimer.singleShot(2500,self.checkUpdates)
+            self.updateTimer.start()
+            report=CACHE/'last-update.json'
+            if report.is_file():
+                try:
+                    outcome=json.loads(report.read_text(encoding='utf-8'))
+                    self.data['updateMessage']=outcome.get('message','Windows-Update installiert.')
+                    self.data['updateState']='current' if outcome.get('ok') else 'error'
+                    report.unlink()
+                except (OSError,ValueError):pass
 
     @Property('QVariantMap',notify=changed)
     def state(self):return self.data
@@ -259,11 +294,95 @@ class DesktopBridge(QObject):
     def chooseIPA(self):
         if self.data['busy']:return
         path,_=QFileDialog.getOpenFileName(None,translate('IPA auswählen',self.data['language']),str(HOME),'iPhone app (*.ipa)')
-        if path:self.update(ipa=path,ipaName=Path(path).name,success=False,error='')
+        if path:self.update(ipa=path,ipaName=Path(path).name,ipaSource='file',success=False,error='')
+
+    def releaseWorker(self,operation):
+        self.update(updateBusy=True,updateProgress=0,updateMessage='')
+        def work():
+            try:operation()
+            except Exception as error:
+                # No URL, signed CDN query, token or network response enters Activity.
+                message=str(error) if isinstance(error,UpdateError) else 'GitHub-Anfrage fehlgeschlagen. Erneut versuchen.'
+                self.releaseEvent.emit({'type':'error','message':message})
+        threading.Thread(target=work,daemon=True).start()
+
+    @Slot()
+    def checkUpdates(self):
+        if self.data['updateBusy']:return
+        def work():
+            release=self.releaseClient.latest()
+            self.releaseEvent.emit({'type':'release','release':release})
+        self.releaseWorker(work)
+
+    @Slot(str)
+    def saveGitHub(self,token):
+        if self.data['updateBusy']:return
+        try:self.releaseClient.save_token(token.strip())
+        except Exception:self.update(updateState='error',updateMessage='GitHub-Zugang konnte nicht gespeichert werden.');return
+        self.update(githubSaved=True)
+        self.checkUpdates()
+
+    @Slot()
+    def forgetGitHub(self):
+        if self.data['updateBusy']:return
+        try:self.releaseClient.forget_token()
+        except OSError:self.update(updateState='error',updateMessage='GitHub-Zugang konnte nicht entfernt werden.');return
+        self.release=None
+        self.update(githubSaved=False,windowsUpdate=False,releaseIPA=False,releaseVersion='',updateState='unchecked',updateMessage='')
+
+    @Slot()
+    def downloadDirectSide(self):
+        if self.data['updateBusy'] or self.data['busy'] or not self.release or not self.data['releaseIPA']:return
+        def work():
+            release=self.releaseClient.latest()
+            if release is None:
+                self.releaseEvent.emit({'type':'release','release':None});return
+            path=self.releaseClient.download(release,'DirectSide.ipa',lambda value:self.releaseEvent.emit({'type':'progress','value':value}))
+            self.releaseEvent.emit({'type':'release','release':release,'downloading':True})
+            self.releaseEvent.emit({'type':'ipa','path':str(path),'version':release['tag_name']})
+        self.releaseWorker(work)
+
+    @Slot()
+    def updateWindows(self):
+        if self.data['updateBusy'] or (self.data['busy'] and not self.data['scanning']) or self.pendingLogin or not self.release or not self.data['windowsUpdate']:return
+        if not getattr(sys,'frozen',False):
+            self.update(updateState='error',updateMessage='Windows-Updates sind in der gepackten EXE verfügbar.');return
+        def work():
+            release=self.releaseClient.latest()
+            if release is None or version(release['tag_name'])<=version(VERSION):
+                self.releaseEvent.emit({'type':'release','release':release});return
+            path=self.releaseClient.download(release,'DirectSide.exe',lambda value:self.releaseEvent.emit({'type':'progress','value':value}))
+            self.releaseEvent.emit({'type':'windows','path':str(path),'digest':digest(path)})
+        self.releaseWorker(work)
+
+    @Slot(dict)
+    def onReleaseEvent(self,event):
+        kind=event['type']
+        if kind=='progress':self.update(updateProgress=event['value']);return
+        if kind=='release':
+            self.release=event['release']
+            if not self.release:
+                self.update(updateBusy=False,updateState='empty',updateMessage='Noch keine Version freigegeben.',releaseVersion='',windowsUpdate=False,releaseIPA=False);return
+            assets={a.get('name') for a in self.release.get('assets',[])}
+            newer=version(self.release['tag_name'])>version(VERSION)
+            self.update(updateBusy=event.get('downloading',False),updateState='available' if newer else 'current',updateMessage='',releaseVersion=self.release['tag_name'],windowsUpdate=newer and 'DirectSide.exe' in assets,releaseIPA='DirectSide.ipa' in assets)
+        elif kind=='ipa':
+            self.update(updateBusy=False,ipa=event['path'],ipaName='DirectSide · '+event['version'],ipaSource='github',success=False,error='',updateMessage='DirectSide-IPA bereit.')
+        elif kind=='error':self.update(updateBusy=False,updateState='error',updateMessage=event['message'])
+        elif kind=='windows':
+            # A login or installation may have started during the download. Defer restart.
+            if (self.data['busy'] and not self.data['scanning']) or self.pendingLogin:
+                self.update(updateBusy=False,updateMessage='Update bereit. Nach dem aktuellen Vorgang erneut auf Aktualisieren klicken.');return
+            try:
+                import subprocess
+                subprocess.Popen([event['path'],'--apply-update',str(os.getpid()),sys.executable,event['digest']],close_fds=True,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+            except OSError:
+                self.update(updateBusy=False,updateState='error',updateMessage='Windows-Updater konnte nicht gestartet werden.');return
+            QApplication.instance().quit()
 
     @Slot()
     def install(self):
-        if self.data['busy'] or not self.data['loggedIn'] or not self.data['devices']:return
+        if self.data['busy'] or self.data['updateBusy'] or not self.data['loggedIn'] or not self.data['devices']:return
         path=Path(self.data['ipa'])
         try:bundle=ipa_identity(path)
         except Exception:self.fail('Keine gültige IPA ausgewählt.');return
@@ -313,6 +432,7 @@ class DesktopBridge(QObject):
     def close(self):
         self.pendingLogin=None
         self.timer.stop()
+        self.updateTimer.stop()
         if self.process.state()!=QProcess.NotRunning:self.process.terminate();self.process.waitForFinished(1500)
 
 
