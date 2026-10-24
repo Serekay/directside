@@ -47,8 +47,6 @@ Passwörter werden nicht in Dateien oder Git gespeichert und nicht als Prozessar
 
 ## Entwicklung und Freigabe
 
-Siehe [DEVELOPMENT.md](DEVELOPMENT.md), [ARCHITECTURE.md](ARCHITECTURE.md) und [CHANGELOG.md](CHANGELOG.md).
-
 Das GitHub-Repository bleibt privat. **Öffentliche Veröffentlichung, Sichtbarkeitsänderungen und Releases erfolgen nur nach ausdrücklicher Freigabe des Eigentümers, wenn Design und Gerätefunktionen geprüft sind.**
 
 ## Abhängigkeiten und Icon
