@@ -55,7 +55,7 @@ class DesktopBridge(QObject):
             if path.is_file(): self.data.update(ipa=str(path),ipaName=path.name);break
         self.data.update(language=language,savedEmail=saved.get('email',''),translations=ENGLISH,status=translate(self.data['status'],language))
         self.data.update(version=VERSION,updateBusy=False,updateProgress=0,updateState='unchecked',updateMessage='',releaseVersion='',windowsUpdate=False,releaseIPA=False,directsideInstalling=False,customIPA='',customIPAName='',ipaSource='file',githubSaved=(CACHE/'github.dpapi').is_file())
-        self.data.update(certificates=[],certificatesLoaded=False,certificateTeam='',certificateLimit=False,removal={})
+        self.data.update(certificates=[],certificatesLoaded=False,certificateTeam='',certificateLimit=False,removal={},developerMode='unknown')
         self.releaseClient=ReleaseClient(HOME if getattr(sys,'frozen',False) else ROOT)
         self.release=None
         self.buffer=bytearray()
@@ -164,6 +164,7 @@ class DesktopBridge(QObject):
             self.update(appIdsLimit=event.get('limit') if event.get('limit') is not None else -1,appIdsAvailable=event.get('available') if event.get('available') is not None else -1,appIdsRegistered=event.get('registered',-1))
         elif kind=='certificates':self.update(certificates=event.get('certificates',[]),certificatesLoaded=True,certificateTeam=event.get('team_id',''),busy=False,scanning=False)
         elif kind=='certificate_revoked':self.update(removal={},certificateLimit=False,status='Zertifikat widerrufen. Zugehörige Apps erneut installieren.')
+        elif kind=='developer_mode_revealed':self.update(busy=False,status='Entwicklermodus in den iPhone-Einstellungen aktivieren.')
         elif kind=='app_removed':
             self.update(busy=False,scanning=False,removal={},status='App entfernt.',success=False)
             self.componentDevice=None;self.inspectDevice()
@@ -173,19 +174,20 @@ class DesktopBridge(QObject):
             devices=event.get('devices',[])
             for device in devices:device['label']=device.get('name','Apple-Gerät')+' · '+device['id'][-4:]
             index=next((i for i,d in enumerate(devices) if d.get('id')==selected),0)
-            if devices and devices[index]['id']!=selected:self.update(installedApps=[],slotsUsed=-1,developerApps=[],lcPrepared=False)
+            if devices and devices[index]['id']!=selected:self.update(installedApps=[],slotsUsed=-1,developerApps=[],lcPrepared=False,developerMode='unknown')
             self.update(devices=devices,deviceIndex=index,busy=False,scanning=False)
             if devices:
                 if devices[index]['id']!=self.componentDevice or time.monotonic()-self.componentTime>30:self.inspectDevice()
             else:
                 self.componentDevice=None
-                self.update(vpnState='unknown',lcState='unknown',directsidePresent=False,lcPrepared=False,slotsUsed=-1,developerApps=[],installedApps=[])
+                self.update(vpnState='unknown',lcState='unknown',directsidePresent=False,lcPrepared=False,slotsUsed=-1,developerApps=[],installedApps=[],developerMode='unknown')
         elif kind=='device_components':
             if self.data['devices'] and event.get('device_id')==self.data['devices'][self.data['deviceIndex']]['id']:
                 self.componentDevice=event['device_id'];self.componentTime=time.monotonic()
                 cached={app['id']:app for app in self.data['installedApps']}
                 apps=[dict(app,icon=cached.get(app['id'],{}).get('icon',''),iconChecked=cached.get(app['id'],{}).get('iconChecked',False)) for app in event.get('apps',[])]
-                self.update(vpnState='installed' if event.get('localdevvpn') else 'missing',lcState='installed' if event.get('livecontainer') else 'missing',directsidePresent=bool(event.get('directside')),slotsUsed=event.get('slots_used',-1),developerApps=event.get('developer_apps',[]),installedApps=apps,busy=False,scanning=False)
+                mode=event.get('developer_mode')
+                self.update(developerMode='enabled' if mode is True else 'disabled' if mode is False else 'unknown',vpnState='installed' if event.get('localdevvpn') else 'missing',lcState='installed' if event.get('livecontainer') else 'missing',directsidePresent=bool(event.get('directside')),slotsUsed=event.get('slots_used',-1),developerApps=event.get('developer_apps',[]),installedApps=apps,busy=False,scanning=False)
         elif kind=='app_icons':
             if self.data['devices'] and event.get('device_id')==self.data['devices'][self.data['deviceIndex']]['id']:
                 icons={icon['id']:icon.get('png','') for icon in event.get('icons',[])}
@@ -247,7 +249,7 @@ class DesktopBridge(QObject):
 
     @Slot(int)
     def selectDevice(self,index):
-        if not self.data['busy'] and 0<=index<len(self.data['devices']):self.update(deviceIndex=index,lcPrepared=False,installedApps=[],removal={});self.inspectDevice()
+        if not self.data['busy'] and 0<=index<len(self.data['devices']):self.update(deviceIndex=index,lcPrepared=False,installedApps=[],removal={},developerMode='unknown');self.inspectDevice()
 
     @Slot()
     def loadCertificates(self):
@@ -297,6 +299,12 @@ class DesktopBridge(QObject):
         if self.data['busy'] or self.pendingLogin is not None or not self.data['devices']:return
         self.update(busy=True,scanning=True,vpnState='unknown',lcState='unknown',directsidePresent=False,slotsUsed=-1,developerApps=[])
         self.send({'command':'device_components','device_id':self.data['devices'][self.data['deviceIndex']]['id']})
+
+    @Slot()
+    def revealDeveloperMode(self):
+        if self.data['busy'] or not self.data['devices']:return
+        self.update(busy=True,error='')
+        self.send({'command':'reveal_developer_mode','device_id':self.data['devices'][self.data['deviceIndex']]['id']})
 
     @Slot()
     def installLiveContainer(self):

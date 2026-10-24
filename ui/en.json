@@ -219,5 +219,15 @@
   "Signierzertifikatlimit erreicht. Zertifikate verwalten.": "Signing certificate limit reached. Manage certificates.",
   "Automatisch anmelden …": "Signing in automatically …",
   "Ein Zertifikat kann mehrere Apps signieren.": "One certificate can sign multiple apps.",
-  "Apps auf diesem Gerät": "Apps on this device"
+  "Apps auf diesem Gerät": "Apps on this device",
+  "Entwicklermodus": "Developer Mode",
+  "Aktiv": "Enabled",
+  "Aus": "Off",
+  "Damit DirectSide auf deinem iPhone oder iPad starten kann.": "Required to run DirectSide on your iPhone or iPad.",
+  "1. Auf dem Gerät: Einstellungen → Datenschutz & Sicherheit → Entwicklermodus einschalten.": "1. On the device: Settings → Privacy & Security → turn on Developer Mode.",
+  "2. Gerät neu starten. Danach entsperren und Aktivieren bestätigen.": "2. Restart the device. Unlock it and confirm Turn On.",
+  "3. Falls iOS fragt: Einstellungen → Allgemein → VPN & Geräteverwaltung → deinem Entwicklerprofil vertrauen.": "3. If iOS asks: Settings → General → VPN & Device Management → trust your developer profile.",
+  "Option auf dem Gerät anzeigen": "Show option on device",
+  "Weiter zur Installation": "Continue to installation",
+  "Entwicklermodus in den iPhone-Einstellungen aktivieren.": "Enable Developer Mode in the iPhone settings."
 }

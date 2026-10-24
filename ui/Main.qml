@@ -19,7 +19,9 @@ ApplicationWindow {
     property int appPage: 0
     property int certificatePage: 0
     property bool certificateLimitShown: false
+    property string developerHelpDevice: ""
     onSChanged: {
+        if(s.developerMode==="disabled" && !s.busy && s.devices.length && page==="install" && developerHelpDevice!==s.devices[s.deviceIndex].id) {developerHelpDevice=s.devices[s.deviceIndex].id;page="developer"}
         if(certificatePage*3>=s.certificates.length) certificatePage=0
         if(s.certificateLimit && !certificateLimitShown) {certificateLimitShown=true;page="certificates";backend.loadCertificates()}
         if(!s.certificateLimit) certificateLimitShown=false
@@ -100,6 +102,7 @@ ApplicationWindow {
                 IconButton {id:moreButton;text:"?";hint:win.t("Hilfe & Aktivität");onClicked:moreMenu.popup()
                     Menu {id:moreMenu;y:moreButton.height
                         MenuItem {text:win.t("Hilfe");onTriggered:win.page="help"}
+                        MenuItem {text:win.t("Entwicklermodus");onTriggered:win.page="developer"}
                         MenuItem {text:win.t("Aktivität");onTriggered:win.page="activity"}
                         MenuItem {text:win.t("Updates");onTriggered:{win.page="settings";win.settingsSection="updates";backend.checkUpdates()}}
                         MenuItem {text:win.t("Zertifikate");enabled:s.loggedIn;onTriggered:{win.page="certificates";backend.loadCertificates()}}
@@ -170,7 +173,7 @@ ApplicationWindow {
                 Layout.fillWidth:true;Layout.fillHeight:true;spacing:16
                 RowLayout {Layout.preferredHeight:30
                     IconButton {visible:win.page!=="install";text:"‹";hint:win.t("Zurück");onClicked:win.page="install"}
-                    Label {text:win.page==="certificates"?win.t("Zertifikate"):win.page==="confirm"?win.t("Entfernen bestätigen"):win.page==="settings"?win.t("Einstellungen"):win.page==="activity"?win.t("Aktivität"):win.page==="help"?win.t("Hilfe"):win.page==="apps"?win.t("Installierte Apps"):win.t("DEIN GERÄT");font.pixelSize:win.page==="install"?10:17;font.letterSpacing:win.page==="install"?1.6:0;color:win.page==="install"?win.muted:win.ink;font.weight:Font.DemiBold}
+                    Label {text:win.page==="developer"?win.t("Entwicklermodus"):win.page==="certificates"?win.t("Zertifikate"):win.page==="confirm"?win.t("Entfernen bestätigen"):win.page==="settings"?win.t("Einstellungen"):win.page==="activity"?win.t("Aktivität"):win.page==="help"?win.t("Hilfe"):win.page==="apps"?win.t("Installierte Apps"):win.t("DEIN GERÄT");font.pixelSize:win.page==="install"?10:17;font.letterSpacing:win.page==="install"?1.6:0;color:win.page==="install"?win.muted:win.ink;font.weight:Font.DemiBold}
                     Item {Layout.fillWidth:true}
                     Action {visible:win.page==="activity";text:win.t("Kopieren");enabled:s.logs.length>0;onClicked:backend.copyActivity()}
                 }
@@ -186,8 +189,22 @@ ApplicationWindow {
                             Label {text:s.devices.length ? s.devices[s.deviceIndex].name:win.t("iPhone verbinden");font.pixelSize:19;font.weight:Font.DemiBold;Layout.fillWidth:true}
                         }
                         ComboBox {visible:s.devices.length>1;model:s.devices;textRole:"label";currentIndex:s.deviceIndex;enabled:!s.busy;onActivated:index=>backend.selectDevice(index);Layout.maximumWidth:210}
+                        Badge {visible:s.devices.length>0;text:s.developerMode==="enabled"?"Dev ✓":s.developerMode==="disabled"?"Dev ✕":"Dev ?";tone:s.developerMode==="enabled"?"ok":s.developerMode==="disabled"?"missing":"warning";MouseArea {anchors.fill:parent;cursorShape:Qt.PointingHandCursor;onClicked:win.page="developer"}}
                         IconButton {text:"↻";implicitWidth:44;implicitHeight:44;hint:win.t("Geräte aktualisieren");enabled:!s.busy;onClicked:backend.refresh()}
                         IconButton {text:"▦";implicitWidth:44;implicitHeight:44;hint:win.t("Installierte Apps");enabled:s.devices.length>0;onClicked:{win.appPage=0;win.page="apps"}}
+                    }
+                }
+                Card {
+                    objectName:"developerModeGuide";visible:win.page==="developer";Layout.fillWidth:true;Layout.fillHeight:true
+                    ColumnLayout {anchors.fill:parent;anchors.margins:24;spacing:18
+                        RowLayout {Label {text:win.t("Entwicklermodus");font.pixelSize:20;font.weight:Font.DemiBold;Layout.fillWidth:true} Badge {text:s.developerMode==="enabled"?win.t("Aktiv"):s.developerMode==="disabled"?win.t("Aus"):win.t("Nicht geprüft");tone:s.developerMode==="enabled"?"ok":s.developerMode==="disabled"?"missing":"warning"}}
+                        Text {text:win.t("Damit DirectSide auf deinem iPhone oder iPad starten kann.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Text {text:win.t("1. Auf dem Gerät: Einstellungen → Datenschutz & Sicherheit → Entwicklermodus einschalten.");color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Text {text:win.t("2. Gerät neu starten. Danach entsperren und Aktivieren bestätigen.");color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Text {text:win.t("3. Falls iOS fragt: Einstellungen → Allgemein → VPN & Geräteverwaltung → deinem Entwicklerprofil vertrauen.");color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        RowLayout {Action {text:win.t("Option auf dem Gerät anzeigen");enabled:s.devices.length>0 && !s.busy;onClicked:backend.revealDeveloperMode()} Action {text:win.t("Erneut prüfen");enabled:s.devices.length>0 && !s.busy;onClicked:backend.inspectDevice()}}
+                        Item {Layout.fillHeight:true}
+                        Action {text:win.t("Weiter zur Installation");primary:true;onClicked:win.page="install"}
                     }
                 }
                 Card {

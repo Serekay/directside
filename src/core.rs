@@ -73,8 +73,21 @@ async fn device_components(request:&Value)->Result<(),Report> {
         Some(json!({"id":bundle,"name":info.get("CFBundleDisplayName").or_else(||info.get("CFBundleName")).and_then(plist::Value::as_string).unwrap_or(bundle),"developer":developer.iter().any(|app|app["id"].as_str()==Some(bundle.as_str()))}))
     }).collect();
     overview.sort_by_key(|app|(!app["developer"].as_bool().unwrap_or(false),app["name"].as_str().unwrap_or("").to_lowercase()));
-    emit(json!({"event":"device_components","device_id":id,"localdevvpn":app_present(&apps,"com.jkcoxson.LocalDevVPN",false),"livecontainer":app_present(&apps,"com.kdt.livecontainer",true),"directside":app_present(&apps,"com.directside.app",true),"slots_used":developer.len(),"developer_apps":developer,"apps":overview}));
+    let developer_mode=tokio::time::timeout(Duration::from_secs(3),async {
+        idevice::amfi::AmfiClient::connect(&provider).await?.get_developer_mode_status().await
+    }).await.ok().and_then(Result::ok);
+    emit(json!({"event":"device_components","device_id":id,"developer_mode":developer_mode,"localdevvpn":app_present(&apps,"com.jkcoxson.LocalDevVPN",false),"livecontainer":app_present(&apps,"com.kdt.livecontainer",true),"directside":app_present(&apps,"com.directside.app",true),"slots_used":developer.len(),"developer_apps":developer,"apps":overview}));
     Ok(())
+}
+
+async fn reveal_developer_mode(request:&Value)->Result<(),Report> {
+    let id=text(request,"device_id")?;
+    let mut mux=UsbmuxdConnection::default().await?;
+    let device=mux.get_devices().await?.into_iter().find(|d|d.udid==id).ok_or_else(||report!("iPhone nicht mehr verbunden."))?;
+    let provider=device.to_provider(UsbmuxdAddr::from_env_var()?,"DirectSide");
+    let mut amfi=idevice::amfi::AmfiClient::connect(&provider).await?;
+    amfi.reveal_developer_mode_option_in_ui().await?;
+    emit(json!({"event":"developer_mode_revealed","device_id":id}));Ok(())
 }
 
 async fn app_icons(request:&Value)->Result<(),Report> {
@@ -495,6 +508,7 @@ pub async fn run() {
             "prepare_livecontainer" => match engine.as_mut() {Some(e)=>prepare_livecontainer(e,&request).await,None=>Err(report!("Bitte zuerst anmelden."))},
             "export_livecontainer"=>match engine.as_mut() {Some(e)=>export_livecontainer(e,&request).await,None=>Err(report!("Bitte zuerst anmelden."))},
             "pair_local"=>pair_local(&request).await,
+            "reveal_developer_mode"=>reveal_developer_mode(&request).await,
             "restore" => {
                 match tokio::time::timeout(Duration::from_secs(45),restore()).await {
                     Ok(Ok(Some(e)))=>{engine=Some(e);Ok(())},
