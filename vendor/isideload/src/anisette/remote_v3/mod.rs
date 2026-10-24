@@ -195,6 +195,7 @@ impl RemoteV3AnisetteProvider {
                 device_unique_identifier: state.get_device_id(),
                 _local_user_id: hex::encode(state.get_md_lu()),
                 generated_at: SystemTime::now(),
+                extra_headers: Default::default(),
             })),
             AnisetteHeaders::GetHeadersError { message } => {
                 if message.contains("-45061") {

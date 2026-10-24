@@ -84,6 +84,13 @@ impl DeveloperSession {
             HeaderValue::from_str(&self.token.token)?,
         );
         headers.insert("X-Apple-I-Identity-Id", HeaderValue::from_str(&self.adsid)?);
+        // Developer services require the Xcode identity; GrandSlam itself uses akd.
+        // Verified protocol reference: sacca97/os-findmy-e tools/machoadi/dev_check.py.
+        let developer_info=self.client.client_info.client_info.replace("com.apple.akd/1.0","com.apple.dt.Xcode/3594.4.19");
+        headers.insert("X-Mme-Client-Info",HeaderValue::from_str(&developer_info)?);
+        headers.insert("User-Agent",HeaderValue::from_static("Xcode"));
+        headers.insert("X-Xcode-Version",HeaderValue::from_static("11.2 (11B41)"));
+        headers.insert("X-Apple-I-Locale",HeaderValue::from_static("en_US"));
 
         Ok(headers)
     }

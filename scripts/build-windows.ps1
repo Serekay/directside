@@ -1,4 +1,4 @@
-param([switch]$ReuseEngine)
+param([switch]$ReuseEngine, [string]$OutputDirectory = 'dist')
 $ErrorActionPreference = 'Stop'
 $project = Split-Path $PSScriptRoot -Parent
 Push-Location $project
@@ -27,24 +27,21 @@ try {
     }
     & $python -m pip install -r ui/requirements.txt
     if ($LASTEXITCODE) { throw 'Dependencies failed.' }
+    & $python scripts/prepare-mac-runtime.py
+    if ($LASTEXITCODE) { throw 'Local Mac authentication runtime preparation failed.' }
+    & $python scripts/prepare-windows-bootloader.py
+    if ($LASTEXITCODE) { throw 'Local emulator bootloader preparation failed.' }
     & $python -m unittest discover -s tests
     if ($LASTEXITCODE) { throw 'UI tests failed.' }
-    # Local-only Apple runtime for this private desktop package. Never uploaded to Git.
-    $appleRuntime = Join-Path ${env:ProgramFiles} 'iTunes\CoreADI64.dll'
-    if (!(Test-Path 'bin\apple\CoreADI64.dll')) {
-        if (!(Test-Path $appleRuntime)) { throw 'Local Apple CoreADI runtime unavailable; no remote fallback is allowed.' }
-        New-Item -ItemType Directory -Path bin\apple -Force | Out-Null
-        Copy-Item -LiteralPath $appleRuntime -Destination bin\apple\CoreADI64.dll
-    }
     $originalPath = $env:PATH
     try {
         $pythonDirectory = Split-Path (& $python -c 'import sys; print(sys.executable)') -Parent
         $env:PATH = "$pythonDirectory;$env:SystemRoot\System32;$env:SystemRoot"
-        & $python -m PyInstaller --noconfirm --clean --distpath dist --workpath build\pyinstaller packaging\DirectSide.spec
+        & $python -m PyInstaller --noconfirm --clean --distpath $OutputDirectory --workpath build\pyinstaller packaging\DirectSide.spec
         if ($LASTEXITCODE) { throw 'Windows packaging failed.' }
         $report = Join-Path $project 'build\smoke-test.json'
         if (Test-Path $report) { Remove-Item -LiteralPath $report }
-        $application = Start-Process -FilePath (Join-Path $project 'dist\DirectSide.exe') -ArgumentList ('--smoke-test "{0}"' -f $report) -WindowStyle Hidden -PassThru
+        $application = Start-Process -FilePath (Join-Path (Join-Path $project $OutputDirectory) 'DirectSide.exe') -ArgumentList ('--smoke-test "{0}"' -f $report) -WindowStyle Hidden -PassThru
         if (!$application.WaitForExit(30000)) { $application.Kill(); throw 'Packaged application startup timed out.' }
         if (!(Test-Path $report)) { throw 'Packaged application failed before producing a startup report.' }
         $result = Get-Content $report -Raw | ConvertFrom-Json

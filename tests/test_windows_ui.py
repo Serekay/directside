@@ -124,4 +124,12 @@ class WindowsUIStateTests(unittest.TestCase):
   self.bridge.handle({'event':'logged_out'});APP.processEvents()
   self.assertEqual(self.bridge.data['appIdsAvailable'],-1)
   root.close();engine.deleteLater();APP.processEvents()
+ def test_rejected_token_does_not_claim_successful_sign_in(self):
+  self.bridge.update(authState='signing_in',busy=True)
+  message='Failed to get xcode token\nAuth error -80046: This action cannot be completed at this time.'
+  self.bridge.handle({'event':'error','command':'login','message':message})
+  self.assertFalse(self.bridge.data['loggedIn']);self.assertFalse(self.bridge.data['busy'])
+  self.assertEqual(self.bridge.data['authState'],'rejected')
+  self.assertEqual(self.bridge.data['error'],'Apple rejected local sign-in (−80046).')
+  self.assertIn(message,self.bridge.data['logs'])
 if __name__=='__main__':unittest.main()
