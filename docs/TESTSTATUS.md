@@ -1,6 +1,12 @@
 # Teststand vom 24. Oktober 2026
 
-Entwicklungsstand, keine Release-Freigabe.
+Release 0.1.0 vom Besitzer am 24. Oktober 2026 ausdrücklich freigegeben.
+Repository bleibt privat. EXE und IPA stammen unverändert aus dem geprüften
+Build 847f4bf; die Freigabe ersetzt keine noch ausstehenden Gerätetests.
+
+LiveContainer wurde inzwischen vom Besitzer geöffnet und fordert die Einrichtung
+des JIT-less-Modus an. Diagnose und Start einer Gast-App sind noch nicht bestätigt.
+Die folgenden Einträge dokumentieren auch frühere Entwicklungsstände.
 
 ## Bestätigung vom Besitzer und neue Einrichtung
 

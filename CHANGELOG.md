@@ -1,6 +1,18 @@
 # Änderungen
 
-## Unreleased
+## 0.1.0 - 2026-10-24
+
+- First release: Windows app and iPhone IPA (build 5).
+- Local Apple authentication, automatic USB setup and device management.
+- App sources over HTTP/HTTPS, IPA import, signature management and optional LiveContainer integration.
+- Saved English/German preferences and Windows release updates.
+- Source refresh cancellation fixes, swipe-to-remove sources and signature expiry badges.
+- Hardware-confirmed sign-in and setup transfer. Self-renewal and the LiveContainer JIT-less diagnostic still require device verification.
+
+## Development history (before 0.1.0)
+
+The notes below record earlier implementation stages; current verification is documented in [Test status](docs/TESTSTATUS.md).
+
 
 - iOS auf dieselbe Mac-CoreADI wie Windows umgestellt: lokaler x86-64-TCI-Interpreter ohne JIT, Schlüsselbundzustand und Neusynchronisierung. Echte Apple-Provisionierung samt neuem Interpreter und wiederholter OTP-Erzeugung im Build geprüft; iPhone-Anmeldung und Selbsterneuerung noch am Gerät zu bestätigen.
 - App-Entfernung auf PC und iPhone für alle gelesenen Benutzer-Apps, unabhängig vom ursprünglichen Installer; bestätigte Zertifikatverwaltung mit Team-Zuordnung und Erkennung vorhandener Signierschlüssel. Kein automatischer Widerruf bei Fehler 7460.
