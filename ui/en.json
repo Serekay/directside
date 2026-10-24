@@ -139,5 +139,6 @@
   "Die drei Plätze für selbst signierte Apps sind belegt. Updates und Erneuerungen bestehender Apps bleiben möglich. Für weitere kompatible Apps kannst du LiveContainer verwenden.": "All three developer app slots are used on this device. Existing apps can still be updated or renewed. LiveContainer can run additional compatible apps.",
   "Apple-Installer-Prüfsumme stimmt nicht. Installation gestoppt.": "Apple installer checksum mismatch. Installation stopped.",
   "LiveContainer-Prüfsumme stimmt nicht.": "LiveContainer checksum mismatch.",
-  "Unerwartete LiveContainer-Bundle-ID.": "Unexpected LiveContainer bundle ID."
+  "Unerwartete LiveContainer-Bundle-ID.": "Unexpected LiveContainer bundle ID.",
+  "Kopieren": "Copy"
 }

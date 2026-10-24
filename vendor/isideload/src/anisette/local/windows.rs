@@ -8,7 +8,9 @@ use std::{ffi::{CStr,OsStr},os::windows::ffi::OsStrExt,path::{Path,PathBuf},ptr:
 use windows_sys::Win32::{Foundation::FreeLibrary,System::{LibraryLoader::{LoadLibraryExW,GetProcAddress,LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR},Registry::*,WindowsProgramming::{GetComputerNameW,GetCurrentHwProfileW,HW_PROFILE_INFOW}},Storage::FileSystem::GetVolumeInformationW,NetworkManagement::IpHelper::{GetAdaptersAddresses,GAA_FLAG_INCLUDE_ALL_INTERFACES,IP_ADAPTER_ADDRESSES_LH}};
 
 const DSID:i64=-2;
-const CLIENT:&str="<PC> <Windows;6.2(0,0);9200> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
+// Match the Windows/iTunes profile used by the native CoreADI provider.
+// Reference: altstoreio/AltStore#1828 (Windows CoreADI client configuration).
+const CLIENT:&str="<PC> <Windows;6.2(0,0);9200> <com.apple.AuthKit/1 (com.apple.iTunes/12.12.4.1)>";
 #[repr(C)]
 struct Parameters { data:*mut u8,input:u32,output:u32,flags:u32 }
 struct Native {module:usize,dispatch:unsafe extern "C" fn(u32,*const Parameters)->i32}
@@ -106,7 +108,7 @@ impl LocalAnisetteProvider {
 
 #[async_trait::async_trait]
 impl AnisetteProvider for LocalAnisetteProvider {
-    async fn get_client_info(&self)->Result<AnisetteClientInfo,Report> {Ok(AnisetteClientInfo{client_info:CLIENT.into(),user_agent:"akd/1.0 CFNetwork/1408.0.4".into()})}
+    async fn get_client_info(&self)->Result<AnisetteClientInfo,Report> {Ok(AnisetteClientInfo{client_info:CLIENT.into(),user_agent:"akd/1.0 CFNetwork/808.1.4".into()})}
     async fn get_anisette_data(&self)->Result<AnisetteDataResponse,Report> {
         let native=self.lock()?;if !native.provisioned()? {return Ok(AnisetteDataResponse::NeedsProvisioning);}let(mid,otp)=native.otp()?;
         Ok(AnisetteDataResponse::Data(AnisetteData{machine_id:B64.encode(mid),one_time_password:B64.encode(otp),routing_info:native.routing().to_string(),_device_description:CLIENT.into(),device_unique_identifier:self.device.clone(),_local_user_id:B64.encode(self.device.as_bytes()),generated_at:web_time::SystemTime::now()}))

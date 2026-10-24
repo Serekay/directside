@@ -26,6 +26,7 @@ Windows-Lokalisierung: `ui/en.json` und `ui/i18n.py`, QML verwendet `win.t(...)`
 
 ```sh
 rustup target add aarch64-apple-ios
+python3 scripts/prepare-anisette-runtime.py
 cargo build --locked --release --lib --target aarch64-apple-ios
 cd ios
 xcodegen generate
@@ -37,7 +38,7 @@ cd package
 ditto -c -k --sequesterRsrc --keepParent Payload DirectSide.ipa
 ```
 
-Der private GitHub-Actions-Workflow führt nur diese iPhone-Schritte aus, ausschließlich nach manuellem Start, und legt kurzlebige Artefakte ab. Windows wird dort nicht gebaut. Das ist kein GitHub-Release und keine Veröffentlichung im App Store.
+Der private GitHub-Actions-Workflow führt nur diese iPhone-Schritte aus, ausschließlich nach manuellem Start, und legt kurzlebige Artefakte ab. Zusätzlich prüft DirectSideAnisetteProbe auf macOS die lokale TCI-Provisionierung und wiederholte OTP-Erzeugung ohne Apple-ID. Das Vorbereitungsskript prüft den Apple-Download und beide Bibliotheken per SHA-256. AnisetteKit ist auf eine Revision festgelegt; Herkunft und Lizenz stehen in THIRD_PARTY.md. Windows wird dort nicht gebaut. Das ist kein GitHub-Release und keine Veröffentlichung im App Store.
 
 ## Tests vor Freigabe
 

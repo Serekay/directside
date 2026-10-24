@@ -8,7 +8,7 @@ Unter Windows kommuniziert die Oberfläche über JSON-Zeilen in anonymen Prozess
 
 ## iPhone-Transport
 
-Windows generiert Anisette im eigenen Prozess über CoreADI64.dll. Provisionierung und Synchronisation kontaktieren Apple direkt; es gibt keinen automatischen Remote-Anisette-Fallback. Der lokale Provider existiert derzeit nur für Windows. Unter iOS schlägt er ausdrücklich fehl. Die unten beschriebene Erneuerung ist deshalb noch kein funktionierender Gesamtprozess.
+Windows generiert Anisette im eigenen Prozess über CoreADI64.dll. iOS verwendet AnisetteKit mit einem TCI-Interpreter und eingebetteten, hashgeprüften Apple-ARM64-Bibliotheken. Swift übergibt die Daten über einen registrierten C-Callback direkt an den Rust-Worker. Provisionierung kontaktiert Apple direkt; es gibt keinen Fremd-Anisette-Fallback. Identität und Provisionierungszustand liegen im Geräteschlüsselbund. Erfolgreiche lokale Provisionierung und OTP-Erzeugung wurden auf dem macOS-Buildrechner geprüft; Anmeldung und Erneuerung auf einem echten iPhone stehen aus.
 
 1. LocalDevVPN stellt den lokalen Netzwerkweg bereit.
 2. Bonjour ermittelt den Remote-Pairing-Port.
@@ -32,6 +32,8 @@ Der PC überträgt die ursprüngliche DirectSide-IPA. Die iPhone-App signiert di
 
 ## Keine Geheimnisse in der Build-Umgebung
 
-Die optionale LiveContainer-Einrichtung verwendet die offizielle Standalone-IPA mit Hashprüfung. Das vorhandene Signierzertifikat wird verschlüsselt als PKCS#12 direkt über USB an DirectSides Documents-Bereich übertragen, ohne Ausgabe im JSON-Ereignisprotokoll. iOS validiert das Archiv, speichert es im Geräteschlüsselbund und entfernt die Übertragungsdatei. Erst „LiveContainer einrichten“ übergibt die Identität über LiveContainers lokales certificate-URL-Protokoll. Ein erfolgreicher URL-Aufruf bestätigt keine funktionierende Gast-Signierung. Diese neuen iOS-Pfade sind noch nicht gebaut beziehungsweise am Gerät getestet.
+Die optionale LiveContainer-Einrichtung verwendet die offizielle Standalone-IPA mit Hashprüfung. Das vorhandene Signierzertifikat wird verschlüsselt als PKCS#12 direkt über USB an DirectSides Documents-Bereich übertragen, ohne Ausgabe im JSON-Ereignisprotokoll. iOS validiert das Archiv, speichert es im Geräteschlüsselbund und entfernt die Übertragungsdatei. Erst „LiveContainer einrichten“ übergibt die Identität über LiveContainers lokales certificate-URL-Protokoll. Ein erfolgreicher URL-Aufruf bestätigt keine funktionierende Gast-Signierung. Diese iOS-Pfade wurden gebaut, jedoch noch nicht am Gerät getestet.
+
+Für DirectSides eigene Signierung überträgt Windows die vorhandene Identität direkt über USB. Der iOS-Kern prüft, ob privater Schlüssel und Zertifikat zusammenpassen, importiert sie in den Schlüsselbund und entfernt die geschützte Übergabedatei. Dadurch kann dasselbe Zertifikat auf PC und iPhone genutzt werden.
 
 GitHub erstellt nur den unsignierten Programmcode. Apple-ID-Anmeldung und die gerätespezifische Signierung laufen erst lokal beim Benutzer. Das Repository und seine Artefakte enthalten keine Pairingdateien, persönlichen Profile oder Zertifikate.

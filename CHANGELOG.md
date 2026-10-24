@@ -2,10 +2,15 @@
 
 ## Unreleased
 
+- Aktivität vollständig kopierbar: Textauswahl, Strg+C und Kopieren-Button; Fehlerdetails über die Fußleiste erreichbar.
+- Windows-Clientprofil an den lokalen iTunes-Anisette-Provider angepasst; Behebung von Apples Tokenfehler −80046 noch am Account zu prüfen.
+- Lokale iOS-Anmeldung über AnisetteKit-TCI implementiert; ARM64-IPA gebaut und tatsächliche Provisionierung mit wiederholter OTP-Erzeugung auf macOS geprüft. Hardwareprüfung von Anmeldung und Selbsterneuerung ausstehend.
+- Vorhandene Windows-Signieridentität mit Schlüssel-/Zertifikatsprüfung auf iOS importierbar; integrierte SMS-Bestätigung auf iOS.
+
 - Automatische USB-Erkennung, App-Belegung und VPN-Prüfung pro Gerät. Benutzer-Apps als Kacheln mit echten Geräte-Icons und Seitenwechsel ohne Scrollbar.
 - Kurze LocalDevVPN-Karte mit lokalem App-Store-QR-Code; rote, gelbe und grüne Status-Badges.
 - Hilfe im ⋯-Menü und gespeicherte Sprachwahl Englisch/Deutsch; Standard Englisch.
-- Optionale LiveContainer-Standalone-Installation mit Hashprüfung und lokaler Zertifikatsübertragung. Neue iOS-Übergabe im Quellcode; Hardwaretest und neuer iPhone-Build ausstehend.
+- Optionale LiveContainer-Standalone-Installation mit Hashprüfung und lokaler Zertifikatsübertragung. iOS-Übergabe gebaut; Hardwaretest ausstehend.
 
 - Windows-Anisette lokal über CoreADI im eigenen Prozess; kein automatischer Fremdserver-Fallback und keine Serveradresse in den Einstellungen.
 - Komponentenprüfung mit Fehlend-/Gestoppt-/Installiert-Badges und integrierter Einrichtung der Apple-USB-Unterstützung; Apple-Download mit SHA-256-Prüfung und regulärer Windows-Administratorbestätigung.

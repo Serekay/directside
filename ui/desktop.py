@@ -82,6 +82,10 @@ class DesktopBridge(QObject):
     def append_log(self,value):
         if value.strip():self.update(logs=(self.data['logs']+[translate(clean_error(value),self.data['language'])])[-150:])
 
+    @Slot()
+    def copyActivity(self):
+        QApplication.clipboard().setText('\n\n'.join(self.data['logs']))
+
     def fail(self,message):
         self.installing=False
         self.update(error=clean_error(message),busy=False,scanning=False,challenge='',status='Fehlgeschlagen')
