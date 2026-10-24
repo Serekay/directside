@@ -114,6 +114,10 @@ impl CoreAdi {
     /// provisioning (`provisioning_start` then `provisioning_end`, which must share a session).
     /// This replaces the heap management a long-lived library would need: nothing accumulates.
     pub fn begin_session(&mut self) -> Result<Reply, Error> {
+        // Match a fresh Windows helper: the version-1 legacy file is never
+        // restored alongside the modern per-user store. Keeping it across a
+        // virtual process reset makes CoreADI reject its own provisioned store.
+        self.vm.files_mut().remove(&format!("{STORE_DIR}/adi.pb"));
         self.vm.reset_session()?;
         self.initialize()
     }

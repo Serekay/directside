@@ -38,10 +38,19 @@ actor LocalAnisetteService {
         return configuration
     }(),delegate:AppleProvisioningTransport(),delegateQueue:nil)
 
-    init(runtime:URL?=nil,support:URL?=nil,persistent:Bool=true) {
+    init(runtime:URL?=nil,persistent:Bool=true) {
         runtimeOverride=runtime;self.persistent=persistent
     }
     deinit {if let handle {adi_close(handle)}}
+
+    /// Exercise the exact exported-store path used after a real application restart.
+    func reloadInterpreter() throws {
+        guard inFlight==nil else {throw LocalAnisetteError.message("Local authentication is still running.")}
+        try persist()
+        if let handle {adi_close(handle)}
+        handle=nil
+        try prepare()
+    }
 
     func generate() async throws -> LocalAnisettePayload {
         if let inFlight {return try await inFlight.value}
