@@ -22,6 +22,8 @@ struct ContentView:View {
             NavigationStack{account}.tabItem{Label("Konto",systemImage:"person.crop.circle")}.tag(3)
         }.tint(Style.accent)
         .task {connection.discover();await engine.refreshSources()}
+        .onAppear {if email.isEmpty {email=engine.accountEmail}}
+        .onChange(of:engine.accountEmail){_,value in if email.isEmpty {email=value}}
         .onChange(of:phase){_,value in if value == .active {engine.refreshBootstrap()}}
         .onChange(of:engine.needsCode){_,value in if value {sheet = .code}}
         .onChange(of:engine.pendingSource?.id){_,value in if value != nil {sheet = .preview}}
@@ -79,7 +81,17 @@ struct ContentView:View {
         case .preview:
             if let source=engine.pendingSource {Form {Section {HStack(spacing:14){Artwork(url:source.iconURL,size:60,fallback:"square.stack.3d.up.fill");VStack(alignment:.leading,spacing:5){Text(source.name).font(.headline);Text(source.sourceURL?.host ?? "").font(.caption).foregroundStyle(.secondary)}};Text("\(source.apps.count) Apps");if let description=source.description ?? source.subtitle {Text(description).font(.subheadline).foregroundStyle(.secondary)}};Button("Quelle hinzufügen"){engine.acceptSource();sheet=nil};Button("Abbrechen",role:.cancel){engine.pendingSource=nil;sheet=nil}}.navigationTitle("Quelle prüfen")}
         case .code:
-            Form {Text("Bestätige die Apple-Anmeldung auf deinem vertrauenswürdigen Gerät und gib den sechsstelligen Code ein.");TextField("Bestätigungscode",text:$code).keyboardType(.numberPad).textContentType(.oneTimeCode);Button("Code bestätigen"){engine.submitCode(code);code="";if !engine.needsCode {sheet=nil}};Button("An vertrauenswürdige Geräte senden"){engine.needsCode=false;engine.send(["action":"devices"]);sheet=nil};Button("Abbrechen",role:.cancel){engine.cancelCode();sheet=nil}}.navigationTitle("Apple-Bestätigung")
+            Form {
+                Text("Bestätige die Anmeldung und gib den sechsstelligen Code ein.")
+                if !engine.codeError.isEmpty {Text(engine.codeError).foregroundStyle(.red)}
+                TextField("Bestätigungscode",text:$code).keyboardType(.numberPad).textContentType(.oneTimeCode)
+                Button("Code bestätigen"){engine.submitCode(code);code="";if !engine.needsCode {sheet=nil}}
+                Button("An vertrauenswürdige Geräte senden"){engine.requestCode("devices");sheet=nil}
+                ForEach(Array(engine.codeNumbers.enumerated()),id:\.offset){_,number in
+                    Button("SMS an \(number["numberWithDialCode"] as? String ?? "Telefonnummer")"){engine.requestCode("sms",number:number["id"] as? Int ?? 0);sheet=nil}
+                }
+                Button("Abbrechen",role:.cancel){engine.cancelCode();sheet=nil}
+            }.navigationTitle("Apple-Bestätigung")
         case .team:
             List {ForEach(engine.teams,id:\.self){team in Button(team["name"] ?? "Developer-Team"){engine.chooseTeam(team["id"] ?? "");sheet=nil}};Button("Abbrechen",role:.cancel){engine.chooseTeam("");sheet=nil}}.navigationTitle("Developer-Team")
         }

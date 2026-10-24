@@ -30,6 +30,29 @@ use crate::{
 pub const APPLE_ROOT: &[u8] = include_bytes!("../assets/apple_root.cer");
 pub const APPLE_WWDR_G3_CERTIFICATE_DER: &[u8] = include_bytes!("../assets/AppleWWDRCAG3.cer");
 
+#[cfg(test)]
+mod local_tests {
+    use super::*;
+    use crate::util::storage::InMemoryStorage;
+    #[test]
+    fn local_bootstrap_reuses_the_key_and_rejects_mismatched_certificates() {
+        let original=RsaPrivateKey::new(&mut rand::thread_rng(),2048).unwrap();
+        let pair=KeyPair::from_pkcs8_pem_and_sign_algo(&original.to_pkcs8_pem(LineEnding::LF).unwrap(),&PKCS_RSA_SHA256).unwrap();
+        let certificate=CertificateParams::new(vec![]).unwrap().self_signed(&pair).unwrap();
+        let original_der=original.to_pkcs8_der().unwrap();
+        let mut transfer=serde_json::json!({"email":"fixture@example.invalid","machine_name":"DirectSide fixture","private_key":original_der.as_bytes(),"certificate":certificate.der().to_vec()});
+        let storage=InMemoryStorage::new();
+        assert_eq!(CertificateIdentity::import_bootstrap(&serde_json::to_vec(&transfer).unwrap(),&storage).unwrap(),"fixture@example.invalid");
+        assert_eq!(CertificateIdentity::stored_machine_name("fixture@example.invalid",&storage).unwrap().as_deref(),Some("DirectSide fixture"));
+        let key=format!("{}/key",CertificateIdentity::account_key("fixture@example.invalid"));
+        assert_eq!(storage.retrieve_data(&key).unwrap().unwrap(),original_der.as_bytes());
+        let other=RsaPrivateKey::new(&mut rand::thread_rng(),2048).unwrap();
+        transfer["private_key"]=serde_json::json!(other.to_pkcs8_der().unwrap().as_bytes());
+        assert!(CertificateIdentity::import_bootstrap(&serde_json::to_vec(&transfer).unwrap(),&storage).is_err());
+        assert_eq!(storage.retrieve_data(&key).unwrap().unwrap(),original_der.as_bytes());
+    }
+}
+
 pub struct CertificateIdentity {
     pub machine_id: String,
     pub machine_name: String,
@@ -38,6 +61,27 @@ pub struct CertificateIdentity {
 }
 
 impl CertificateIdentity {
+    fn account_key(email:&str)->String {hex::encode(Sha256::digest(email.as_bytes()))}
+    pub fn stored_machine_name(email:&str,storage:&dyn SideloadingStorage)->Result<Option<String>,Report> {
+        storage.retrieve(&format!("{}/machine-name",Self::account_key(email)))
+    }
+    /// Import only a matching key/certificate pair, directly into the OS credential store.
+    pub fn import_bootstrap(bytes:&[u8],storage:&dyn SideloadingStorage)->Result<String,Report> {
+        #[derive(serde::Deserialize)]
+        struct Transfer {email:String,machine_name:String,private_key:Vec<u8>,certificate:Vec<u8>}
+        if bytes.len()>65536 {bail!("Signing identity transfer is too large.");}
+        let transfer:Transfer=serde_json::from_slice(bytes).map_err(|_|report!("Invalid signing identity transfer."))?;
+        if !transfer.email.contains('@') || transfer.email.len()>254 || transfer.machine_name.is_empty() || transfer.machine_name.len()>128 {bail!("Invalid signing identity metadata.");}
+        let private=RsaPrivateKey::from_pkcs8_der(&transfer.private_key).map_err(|_|report!("Invalid transferred signing key."))?;
+        let certificate=Certificate::from_der(&transfer.certificate).map_err(|_|report!("Invalid transferred signing certificate."))?;
+        let public=private.to_public_key().to_pkcs1_der()?;
+        if certificate.tbs_certificate.subject_public_key_info.subject_public_key.as_bytes()!=Some(public.as_bytes()) {bail!("The transferred key does not match its certificate.");}
+        let prefix=Self::account_key(&transfer.email);
+        storage.store_data(&format!("{prefix}/key"),&transfer.private_key)?;
+        storage.store(&format!("{prefix}/machine-name"),&transfer.machine_name)?;
+        Ok(transfer.email)
+    }
+
     // This implementation was mostly borrowed from Impactor (https://github.com/khcrysalis/Impactor/blob/main/crates/plume_core/src/utils/certificate.rs)
     /// Exports the certificate and private key as a PKCS#12 archive
     /// If you plan to import into SideStore/AltStore, use the machine id as the password

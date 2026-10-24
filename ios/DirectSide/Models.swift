@@ -136,8 +136,9 @@ enum Paths {
     static var pairing: URL { support.appendingPathComponent("pairing.plist") }
     static var bootstrap: URL { support.appendingPathComponent("bootstrap.json") }
     static var original: URL { support.appendingPathComponent("DirectSide-original.ipa") }
+    static var signing: URL { support.appendingPathComponent("signing-import.json") }
     static func importBootstrap() throws {
-        for (source, target) in [("DirectSide-pairing.plist",pairing),("DirectSide-bootstrap.json",bootstrap),("DirectSide-original.ipa",original)] {
+        for (source, target) in [("DirectSide-pairing.plist",pairing),("DirectSide-bootstrap.json",bootstrap),("DirectSide-original.ipa",original),("DirectSide-signing.json",signing)] {
             let from = documents.appendingPathComponent(source)
             guard FileManager.default.fileExists(atPath: from.path) else { continue }
             let bytes = try Data(contentsOf: from)

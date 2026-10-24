@@ -10,6 +10,9 @@ import SwiftUI
     @Published var teamName = "Nicht angemeldet"
     @Published var progress = 0.0
     @Published var needsCode = false
+    @Published var accountEmail=UserDefaults.standard.string(forKey:"accountEmail") ?? ""
+    @Published var codeNumbers:[[String:Any]]=[]
+    @Published var codeError=""
     @Published var teams: [[String: String]] = []
     @Published var managed: [ManagedApp] = []
     @Published var sources: [SourceCatalog] = []
@@ -17,6 +20,8 @@ import SwiftUI
     @Published var pairingReady = false
     @Published var liveContainerCertificateReady = false
     private var timer: Timer?
+    private var coreStarted=false
+    private var signingImportPending=false
     private var pendingApp: ManagedApp?
     private var bootstrap: Bootstrap?
     private var installContinuation: CheckedContinuation<Void,Error>?
@@ -58,6 +63,8 @@ import SwiftUI
         refreshBootstrap()
         guard ds_set_anisette_callback(ds_swift_anisette_generate,ds_swift_anisette_release) else {self.error="Could not connect the local authentication runtime.";return}
         ds_start()
+        coreStarted=true
+        importSigningIfNeeded()
         timer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.poll() }
         }
@@ -71,7 +78,12 @@ import SwiftUI
             liveContainerCertificateReady=LiveContainerBridge.certificateReady
             bootstrap = try? JSONDecoder().decode(Bootstrap.self, from: Data(contentsOf: Paths.bootstrap))
             pairingReady = bootstrap != nil && FileManager.default.fileExists(atPath: Paths.pairing.path)
+            importSigningIfNeeded()
         } catch { self.error = error.localizedDescription }
+    }
+    private func importSigningIfNeeded() {
+        guard coreStarted,!signingImportPending,FileManager.default.fileExists(atPath:Paths.signing.path) else {return}
+        signingImportPending=true;send(["command":"import_signing","path":Paths.signing.path])
     }
     func send(_ request: [String: Any]) {
         guard let data = try? JSONSerialization.data(withJSONObject: request), let command = String(data: data, encoding: .utf8) else { return }
@@ -88,6 +100,7 @@ import SwiftUI
         send(["action":"code", "code":code])
     }
     func cancelCode() { needsCode = false; send(["action":"cancel"]) }
+    func requestCode(_ action:String,number:Int=0) {needsCode=false;send(["action":action,"number_id":number])}
     func chooseTeam(_ id: String) { teams=[]; send(["team_id":id]) }
     func logout() { guard !busy else { return }; send(["command":"logout"]); loggedIn=false; teamName="Nicht angemeldet" }
     private func poll() {
@@ -99,11 +112,12 @@ import SwiftUI
             switch type {
             case "status": message = event["message"] as? String ?? message
             case "progress": progress = (event["value"] as? Double ?? 0)/100
-            case "logged_in": busy=false; loggedIn=true; teamName=event["team"] as? String ?? "Developer-Team"; message="Angemeldet"
+            case "logged_in": busy=false; loggedIn=true; teamName=event["team"] as? String ?? "Developer-Team"; message="Angemeldet";if let email=event["email"] as? String {accountEmail=email;UserDefaults.standard.set(email,forKey:"accountEmail")}
+            case "signing_imported": signingImportPending=false;if let email=event["email"] as? String {accountEmail=email;UserDefaults.standard.set(email,forKey:"accountEmail")}
             case "profile": if let raw=event["expires_at"] as? String {selfExpiration=ISO8601DateFormatter().date(from:raw)}
             case "slots": slotsUsed=event["used"] as? Int;developerApps=(event["apps"] as? [[String:String]] ?? []).compactMap{$0["name"]}
             case "logged_out": loggedIn=false; busy=false
-            case "two_factor": needsCode=true; message="Apple-Bestätigung erforderlich"
+            case "two_factor": codeNumbers=event["numbers"] as? [[String:Any]] ?? [];codeError=event["last_error"] == nil || event["last_error"] is NSNull ? "":"Code nicht akzeptiert. Bitte erneut versuchen.";needsCode=true;message="Apple-Bestätigung erforderlich"
             case "choose_team": teams=(event["teams"] as? [[String:Any]] ?? []).map { ["id":$0["id"] as? String ?? "", "name":$0["name"] as? String ?? "Developer-Team"] }
             case "installed":
                 busy=false; progress=1; message="Installation abgeschlossen"
@@ -115,7 +129,7 @@ import SwiftUI
                 }
                 pendingApp=nil
                 let continuation=installContinuation; installContinuation=nil; continuation?.resume()
-            case "error": fail(event["message"] as? String ?? "Unbekannter Fehler")
+            case "error": if event["command"] as? String == "import_signing" {signingImportPending=false};fail(event["message"] as? String ?? "Unbekannter Fehler")
             default: break
             }
         }

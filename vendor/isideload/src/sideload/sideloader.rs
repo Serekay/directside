@@ -41,6 +41,14 @@ pub struct Sideloader<C: MaxCertsCallback, E: ExtensionsBehaviorCallback> {
 }
 
 impl<C: MaxCertsCallback, E: ExtensionsBehaviorCallback> Sideloader<C, E> {
+    /// Reuse the bootstrap certificate on iPhone instead of allocating another Apple certificate.
+    pub async fn bootstrap_signing_identity(&mut self)->Result<Vec<u8>,Report> {
+        use rsa::pkcs8::EncodePrivateKey;
+        use x509_cert::der::Encode;
+        let team=self.get_team().await?;
+        let cert=CertificateIdentity::retrieve(&self.machine_name,&self.apple_email,&mut self.dev_session,&team,self.storage.as_ref(),&self.max_certs_behavior).await?;
+        Ok(serde_json::to_vec(&serde_json::json!({"email":self.apple_email,"machine_name":cert.machine_name,"private_key":cert.private_key.to_pkcs8_der()?.as_bytes(),"certificate":cert.certificate.to_der()?}))?)
+    }
     /// Prepare an encrypted certificate archive for explicit local transfer to DirectSide on iOS.
     /// Never emit this payload through status events or logs.
     pub async fn livecontainer_certificate(&mut self)->Result<Vec<u8>,Report> {

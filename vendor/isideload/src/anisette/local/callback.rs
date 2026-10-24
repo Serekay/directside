@@ -73,7 +73,7 @@ impl AnisetteProvider for LocalAnisetteProvider {
 mod tests {
     use super::*;
     #[test]
-    fn validates_required_headers_without_exposing_secrets() {
+    fn local_payload_validates_required_headers_without_exposing_secrets() {
         let mut value=serde_json::json!({"headers":{"X-Apple-I-MD":"otp-fixture","X-Apple-I-MD-M":"mid-fixture","X-Mme-Device-Id":"uuid-fixture","X-Apple-I-MD-LU":"user-fixture","X-Apple-I-MD-RINFO":"17106176"},"client_info":"client-fixture","user_agent":"agent-fixture"});
         assert!(Payload::decode(&serde_json::to_vec(&value).unwrap()).is_ok());
         value["headers"]["X-Apple-I-MD"]=serde_json::json!("");
