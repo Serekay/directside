@@ -33,6 +33,8 @@ targets:
         CFBundleDisplayName: DirectSide
         NSCameraUsageDescription: QR-Codes zum Hinzufügen deiner App-Quellen scannen.
         NSLocalNetworkUsageDescription: Apps über LocalDevVPN auf deinem eigenen Gerät installieren.
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
         NSBonjourServices: ['_remotepairing._tcp']
         LSApplicationQueriesSchemes: [livecontainer, localdevvpn]
         CFBundleDocumentTypes:
@@ -56,7 +58,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.directside.app
         PRODUCT_NAME: DirectSide
         MARKETING_VERSION: '0.1.0'
-        CURRENT_PROJECT_VERSION: '3'
+        CURRENT_PROJECT_VERSION: '4'
         GENERATE_INFOPLIST_FILE: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_CFBundleDisplayName: DirectSide

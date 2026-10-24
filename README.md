@@ -2,14 +2,14 @@
 
 Sideload with your own Apple ID. DirectSide combines a Windows setup app with a native iPhone app for browsing sources, installing apps and managing updates.
 
-**Development preview.** Windows includes local Apple authentication; the owner has confirmed a successful Apple-ID sign-in. On-device sign-in, self-renewal and LiveContainer setup still need device testing.
+**Development preview.** The owner has confirmed installation and local Apple-ID sign-in on Windows and iPhone. Self-renewal and the new LiveContainer flow still need device testing.
 
 ## A clear view of your devices
 
 - Automatically detect connected iPhones and iPads.
 - Browse installed apps with icons and app-slot counts for each device; remove apps from Windows or the iPhone.
 - Set up missing components from the Windows app.
-- Import app sources by QR code or URL, with descriptions, screenshots and updates.
+- Import HTTP or HTTPS app sources by QR code or URL, with descriptions, screenshots and updates. Choose installation on the device or in LiveContainer.
 - Import an IPA directly on the iPhone, sign it and install through LocalDevVPN.
 - Manage signing certificates in both apps. A persistent iPhone VPN indicator links to LocalDevVPN.
 - Choose English or German and keep your preference.
@@ -26,10 +26,10 @@ Sideload with your own Apple ID. DirectSide combines a Windows setup app with a 
 
 1. Once a version is approved, download **DirectSide.exe** from [Releases](https://github.com/Serekay/directside/releases). No release is available yet.
 2. Open DirectSide, connect and unlock your iPhone or iPad, then tap **Trust** on the device.
-3. Sign in with your Apple ID, choose the target device, select **Install DirectSide**. It downloads the latest released IPA and installs it on the selected device. Use **Other IPA → Install IPA** for a local file.
+3. Sign in with your Apple ID, choose the target device, select **Install DirectSide**. It downloads the latest released IPA, installs it and automatically prepares device pairing. Confirm an iOS pairing code if requested. Use **Other IPA → Install IPA** for a local file; DirectSide setup also runs automatically there.
 4. Install LocalDevVPN using the QR code if requested, then follow its setup instructions on your device.
 
-Need a hand? Open **? → Help**. Optional LiveContainer setup is under **Settings → LiveContainer**.
+Need a hand? Open **? → Help**. On iPhone, **Settings** contains your Apple account, connection, certificates, language and optional LiveContainer installation with a short guide.
 
 DirectSide checks stable GitHub releases at startup and every six hours. **Update** downloads and verifies the new Windows app, then restarts it. While the repository is private, configure a fine-grained GitHub token with **Contents: Read** for this repository under **Settings → Updates**. It is encrypted for your Windows user; no shared token is included. The existing project-local GitHub CLI login can also be reused on the development PC.
 

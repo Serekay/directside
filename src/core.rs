@@ -286,6 +286,8 @@ async fn install(engine: &mut Engine, request: &Value) -> Result<(), Report> {
     let id = text(request,"device_id")?;
     let path = PathBuf::from(text(request,"path")?);
     if !path.is_file() || !path.extension().is_some_and(|x|x.eq_ignore_ascii_case("ipa")) { bail!("Bitte eine vorhandene IPA-Datei auswählen."); }
+    let info=isideload::sideload::application::inspect_ipa(&path)?;
+    let directside=info.get("CFBundleIdentifier").and_then(plist::Value::as_string).is_some_and(|id|id=="com.directside.app" || id.starts_with("com.directside.app."));
     let mut mux = UsbmuxdConnection::default().await?;
     let dev = mux.get_devices().await?.into_iter().find(|d|d.udid == id)
         .ok_or_else(||report!("Das ausgewählte Gerät ist nicht mehr verbunden. Bitte neu verbinden und Geräte aktualisieren."))?;
@@ -299,10 +301,10 @@ async fn install(engine: &mut Engine, request: &Value) -> Result<(), Report> {
     engine.install_app(&provider,path.clone(),false,Some(|p:f32| async move {
         emit(json!({"event":"progress","value":(p*85.0).clamp(0.0,85.0)}));
     }),None).await?;
-    if request.get("bootstrap").and_then(Value::as_bool)==Some(true) {
+    if directside {
         bootstrap(engine,&provider,&path).await?;
     }
-    emit(json!({"event":"installed","path":request["path"],"device_id":id}));
+    emit(json!({"event":"installed","path":request["path"],"device_id":id,"bootstrap_ready":directside}));
     Ok(())
 }
 
@@ -319,17 +321,24 @@ async fn bootstrap(engine: &mut Engine, provider: &impl idevice::provider::Idevi
     }).await?;
     let team=engine.get_team().await?;
     let bundle=format!("com.directside.app.{}",team.team_id);
-    let mut afc=HouseArrestClient::connect(provider).await?.vend_container(bundle).await?;
+    let mut afc=HouseArrestClient::connect(provider).await?.vend_documents(bundle).await?;
     let signing=engine.bootstrap_signing_identity().await?;
     for (name,data) in [
         ("DirectSide-pairing.plist",pairing.to_bytes()),
-        ("DirectSide-bootstrap.json",serde_json::to_vec(&json!({"udid":info.udid,"name":info.name}))?),
         ("DirectSide-original.ipa",std::fs::read(ipa)?),
         ("DirectSide-signing.json",signing),
+        // The metadata is the final commit marker, after all required files.
+        ("DirectSide-bootstrap.json",serde_json::to_vec(&json!({"udid":info.udid,"name":info.name}))?),
     ] {
-        let mut f=afc.open(format!("/Documents/{name}"),idevice::afc::opcode::AfcFopenMode::WrOnly).await?;
+        let temporary=format!("/Documents/{name}.pending");
+        let destination=format!("/Documents/{name}");
+        let mut f=afc.open(&temporary,idevice::afc::opcode::AfcFopenMode::WrOnly).await?;
         for chunk in data.chunks(512*1024) {f.write_entire(chunk).await?;}
         f.close().await?;
+        let mut check=afc.open(&temporary,idevice::afc::opcode::AfcFopenMode::RdOnly).await?;
+        let transferred=check.read_entire().await?;check.close().await?;
+        if transferred!=data {bail!("Pairing-Übertragung unvollständig. DirectSide erneut installieren.");}
+        afc.rename(temporary,destination).await?;
     }
     emit(json!({"event":"status","message":"DirectSide ist installiert. Pairing und Original-IPA wurden übertragen."}));
     Ok(())
@@ -357,6 +366,40 @@ async fn connect_local(request: &Value) -> Result<(idevice::tcp::handle::Adapter
     let mut handle=adapter.to_async_handle();
     let rsd=RsdHandshake::new(handle.connect(rsd_port).await?).await?;
     Ok((handle,rsd))
+}
+
+async fn pair_local(request:&Value)->Result<(),Report> {
+    use idevice::remote_pairing::{RemotePairingClient,RpPairingFile,RpPairingSocket};
+    let peer=text(request,"peer")?;
+    let port=request.get("port").and_then(Value::as_u64).filter(|p|*p>0 && *p<=65535).ok_or_else(||report!("Remote-Pairing-Port fehlt. Verbindung in den Einstellungen prüfen."))? as u16;
+    let destination=PathBuf::from(text(request,"pairing_path")?);
+    let temporary=destination.with_extension("pending");
+    let mut record=RpPairingFile::generate("DirectSide iPhone");
+    let stream=tokio::time::timeout(Duration::from_secs(10),tokio::net::TcpStream::connect((peer,port))).await??;
+    let mut client=RemotePairingClient::new(RpPairingSocket::new(stream),"DirectSide iPhone");
+    client.connect(&mut record,||async {
+        emit(json!({"event":"pairing_pin"}));
+        read().ok().and_then(|r|r.get("code").and_then(Value::as_str).map(str::to_string)).unwrap_or_default()
+    }).await?;
+    std::fs::write(&temporary,record.to_bytes())?;
+    let result:Result<(),Report>=async {
+        let mut verify=request.clone();verify["pairing_path"]=json!(temporary.to_string_lossy());
+        let (_handle,rsd)=connect_local(&verify).await?;
+        let udid=rsd.properties.get("UniqueDeviceID").and_then(plist::Value::as_string).ok_or_else(||report!("Gerätekennung konnte nicht gelesen werden."))?;
+        let name=rsd.properties.get("DeviceName").and_then(plist::Value::as_string).unwrap_or("iPhone");
+        // Identity comes from the verified tunnel, never a guessed profile/device ID.
+        std::fs::write(text(request,"bootstrap_path")?,serde_json::to_vec(&json!({"udid":udid,"name":name}))?)?;
+        std::fs::rename(&temporary,&destination)?;
+        emit(json!({"event":"paired_local"}));Ok(())
+    }.await;
+    if result.is_err() {let _=std::fs::remove_file(&temporary);}
+    result
+}
+
+async fn export_livecontainer(engine:&mut Engine,request:&Value)->Result<(),Report> {
+    let bytes=engine.livecontainer_certificate().await?;
+    std::fs::write(text(request,"path")?,bytes)?;
+    emit(json!({"event":"livecontainer_exported"}));Ok(())
 }
 
 fn developer_apps(installed:&std::collections::HashMap<String,plist::Value>)->Vec<Value> {
@@ -450,6 +493,8 @@ pub async fn run() {
             "certificates"=>match engine.as_mut() {Some(e)=>certificates(e).await,None=>Err(report!("Bitte zuerst anmelden."))},
             "revoke_certificate"=>match engine.as_mut() {Some(e)=>revoke_certificate(e,&request).await,None=>Err(report!("Bitte zuerst anmelden."))},
             "prepare_livecontainer" => match engine.as_mut() {Some(e)=>prepare_livecontainer(e,&request).await,None=>Err(report!("Bitte zuerst anmelden."))},
+            "export_livecontainer"=>match engine.as_mut() {Some(e)=>export_livecontainer(e,&request).await,None=>Err(report!("Bitte zuerst anmelden."))},
+            "pair_local"=>pair_local(&request).await,
             "restore" => {
                 match tokio::time::timeout(Duration::from_secs(45),restore()).await {
                     Ok(Ok(Some(e)))=>{engine=Some(e);Ok(())},
