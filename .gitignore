@@ -14,3 +14,4 @@ __pycache__/
 *bootstrap*.json
 !tests/fixtures/**
 
+bin/
