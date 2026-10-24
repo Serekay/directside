@@ -4,8 +4,8 @@ Entwicklungsstand, keine Release-Freigabe.
 
 ## Windows
 
-- Rust-Kern lokal kompiliert. Drei Tests prüfen das Drei-App-Limit samt Erneuerung bestehender Apps, die Erkennung anhand korrekter Bundle-IDs und den lokalen Anisette-Callback. Zwei zusätzliche Vendor-Tests prüfen Callback-Payloads sowie passenden und unpassenden Schlüssel-/Zertifikatsimport.
-- 38 Python-Tests bestanden: IPA-Auswahl, Voreinstellungen ohne Passwort, lokale Anmeldung, Komponentenprüfung, Hashprüfung, integrierte Bestätigungen, automatisches Gerätescannen, getrennte Gerätezustände, Icon-Cache und gespeicherte Sprachwahl. QML-Regressionstests prüfen Eingabeerhalt, Anmeldeklick und App-ID-Kontingente. Weitere Tests prüfen den abgelehnten Token, DPAPI-Schutz samt Manipulationserkennung und die Beschränkung der Provisionierung auf Apple-HTTPS-Endpunkte.
+- Rust-Kern lokal kompiliert. Vier Tests prüfen das Drei-App-Limit samt Erneuerung bestehender Apps, die Erkennung anhand korrekter Bundle-IDs den lokalen Anisette-Callback samt Neusynchronisierung sowie die ausdrückliche Bestätigung vor Löschvorgängen. Zwei zusätzliche Vendor-Tests prüfen Callback-Payloads, passenden und unpassenden Schlüssel-/Zertifikatsimport sowie die Erkennung vorhandener privater Schlüssel.
+- 41 Python-Tests bestanden: IPA-Auswahl, Voreinstellungen ohne Passwort, lokale Anmeldung, Komponentenprüfung, Hashprüfung, integrierte Bestätigungen, automatisches Gerätescannen, getrennte Gerätezustände, Icon-Cache und gespeicherte Sprachwahl. QML-Regressionstests prüfen Eingabeerhalt, Anmeldeklick und App-ID-Kontingente. Weitere Tests prüfen den abgelehnten Token, DPAPI-Schutz samt Manipulationserkennung und die Beschränkung der Provisionierung auf Apple-HTTPS-Endpunkte.
 - Die echte gepackte EXE wurde mit --smoke-test gestartet: Qt, QML, Fenster-Icon, eigene Titelleiste, Signierkern und tatsächliche lokale Anisette-Erzeugung erfolgreich. Bericht: build/smoke-test.json.
 - Die frühere native Windows-CoreADI bestand OTP-Tests, scheiterte beim echten Xcode-Token aber weiterhin mit −80046, auch nach Anpassung des Clientprofils. Die alte Sitzung wurde mit Fehler 1100 zurückgewiesen. Diese Tests bestätigten keine erfolgreiche Anmeldung.
 - Neuer Windows-Provider: Apples Mac-CoreADI aus iTunes 12.8.3 unter lokalem Unicorn. Tatsächliche Provisionierung bei Apple mit geprüfter TLS-Verbindung, lokale OTP-Erzeugung und Wiederverwendung des DPAPI-geschützten Zustands erfolgreich. Derselbe Weg wurde in der fertig gepackten EXE einschließlich Rust-Kern und besitzergeschützter Windows-Pipe erfolgreich geprüft. Keine Apple-ID bei diesen Tests verwendet. Der Besitzer hat die erfolgreiche Apple-ID-Anmeldung in der neuen gepackten Windows-App am 24. Oktober ausdrücklich bestätigt.
@@ -27,18 +27,61 @@ Der frühere QtCore-DLL-Fehler kam von einer fremden ICU-DLL im Build-PATH. Der 
 
 ## iPhone und LiveContainer
 
-Die aktuelle unsignierte IPA für Commit 1d9b5af wurde mit Xcode erstellt und auf Archivstruktur, ARM64-Programm und eingebettete Anisette-Runtime geprüft. Privater Build: https://github.com/Serekay/directside/actions/runs/40083954661 .
+Aktuelle IPA: Quellstand `53be0e7`, Version 0.1.0, Build 2. Privater manueller Build:
+https://github.com/Serekay/directside/actions/runs/40094299353 . Die IPA wurde nach
+`dist/DirectSide.ipa` übernommen und auf Bundle-ID, Buildnummer, eingebetteten
+Mac-Runtime-Hash, fehlende Android-Bibliotheken, IPA-Dokumenttyp, VPN-URL-Schema
+und Lizenzdateien geprüft.
 
-Lokale iOS-Authentifizierung ist über Swift-AnisetteKit-TCI und den Rust-C-Callback implementiert. Auf dem macOS-Buildrechner bestanden echte Apple-Provisionierung und wiederholte OTP-Erzeugung ohne Apple-ID. Das bestätigt den lokalen Anisette-Weg, jedoch keine Apple-ID-Anmeldung oder Selbsterneuerung auf dem iPhone. Kein Fremdserver-Fallback. Der neue lokale Windows-Mac-Provider ist kein iOS-Provider. Die aktuelle IPA enthält weiterhin den zuvor gebauten ARM64-AnisetteKit-Weg; Änderungen am gemeinsamen Quellcode seit Commit 1d9b5af wurden noch nicht erneut für iOS gebaut.
+Die lokale iOS-Anmeldung verwendet jetzt dieselbe echte Mac-CoreADI wie Windows,
+mit x86-64-Gastemulation unter TCI und ausschließlich les-/schreibbarem
+Interpreter-Speicher. Rust-Mac-Adapter, Swift-Provisionierung, iOS-C-Callbacks samt
+Neusynchronisierung und Signierkern wurden gemeinsam mit Xcode kompiliert. Die
+frühere ARM64/AnisetteKit-Abhängigkeit ist entfernt.
 
-Die optionale Windows-Einrichtung für LiveContainer und der Quellcode für die lokale Zertifikatsübergabe sind vorhanden. Standalone-Installation, Übertragung, iOS-Schlüsselbundimport, Übergabe an LiveContainer und dessen JIT-less-Test sind noch gemeinsam am Gerät zu prüfen. Ein integriertes LiveContainer-Laufzeitsystem ist nicht umgesetzt.
+Auf dem Buildrechner bestanden tatsächliche Apple-Provisionierung, Export des
+modernen Provisionierungszustands, Laden in einen neu erzeugten Interpreter und
+wiederholte OTP-Erzeugung. Keine Apple-ID oder Anmeldedaten wurden dabei verwendet
+oder in Actions gespeichert. Der beim Portieren gefundene Verlust des Zustands
+nach einem virtuellen Prozessneustart wurde durch Ausschließen der veralteten
+adi.pb bei Sitzungsneustarts behoben. Beide erfolgreichen neuen Builds führten
+diese Probe mit dem Software-Interpreter aus, nicht mit JIT.
+
+Der Geräte-Installationsversuch des Besitzers scheiterte noch vor der eigentlichen
+Installation mit Apple-Fehler 7460 (Zertifikatlimit). Deshalb ist eine erfolgreiche
+Anmeldung oder Selbst-Erneuerung auf dem echten iPhone weiterhin nicht bestätigt.
+Das iPhone wurde per USB erkannt. Die neue Windows-EXE und die neue IPA enthalten
+nun ausdrücklich bestätigte App-Entfernung sowie Zertifikatverwaltung. Es wurde
+kein Zertifikat automatisch widerrufen und keine Benutzer-App für einen Test
+gelöscht. Der nächste Hardwaretest erfolgt über diese Oberfläche.
+
+Direkter IPA-Import über Dateien und „Öffnen in“, Vorschau der Haupt-App und
+Weitergabe an den vorhandenen lokalen Signier-/Installationspfad sind kompiliert.
+Der native Inspector akzeptierte die echte DirectSide-IPA und lehnte ein
+Testarchiv mit zwei Haupt-Apps ab. Der vollständige Import mit anschließender
+Geräteinstallation bleibt noch am iPhone zu prüfen.
+
+Die VPN-Leiste ist auf allen Tabs und in den modalen Ansichten eingebaut. Sie
+prüft im Vordergrund alle fünf Sekunden die tatsächliche TCP-Erreichbarkeit des
+lokalen Remote-Pairing-Ports. Das ist ein Erreichbarkeitstest, keine Abfrage des
+privaten Prozesszustands von LocalDevVPN und kein Ersatz für die kryptografische
+Pairingprüfung. Das offizielle Schema `localdevvpn://enable?scheme=directside`
+öffnet/aktiviert die VPN-App und führt zu DirectSide zurück. Diese Übergabe und
+die Statusänderung beim Abschalten sind noch am Gerät zu prüfen.
+
+Die optionale LiveContainer-Installation und lokale Zertifikatsübergabe bleiben
+gebaut, jedoch noch nicht am Gerät getestet. Ein eingebettetes LiveContainer-
+Laufzeitsystem ist nicht umgesetzt.
 
 ## Vor einer Freigabe offen
 
 - Frische lokale Windows-Anmeldung vom Besitzer bestätigt; weitere Varianten der Zwei-Faktor-Bestätigung separat prüfen.
-- Signierung und Erstinstallation der eigenen IPA samt Remote-Pairing.
+- Zertifikatlimit über die neue Oberfläche lösen; Signierung und Erstinstallation der eigenen IPA samt Remote-Pairing.
 - Lokale iOS-Authentifizierung am echten Gerät einschließlich 2FA und Wiederherstellung der Sitzung prüfen.
-- App-Installation, Update mit Datenerhalt und Selbsterneuerung über LocalDevVPN.
+- App-Installation aus Quelle und direkter IPA, Update mit Datenerhalt und Selbsterneuerung über LocalDevVPN.
+- Bestätigtes Entfernen fremd installierter Apps und Widerrufen eines ausgewählten Zertifikats auf PC und iPhone.
+- VPN-App-Übergabe, Rückkehr und sichtbarer Status bei ausgeschaltetem Tunnel.
+- Wiederherstellung einer abgelaufenen Xcode-Sitzung aus dem neuen, im Schlüsselbund gespeicherten Refresh-Kontext. Dieser neue Kontext enthält kein Passwort; bestehende alte Sitzungen benötigen einmalig eine neue Anmeldung.
 - Gleichzeitiger Hardwaretest mit mehreren Geräten; bisherige Trennungsprüfungen verwenden simulierte Ereignisse.
 - LiveContainer-Installation, Zertifikatseinrichtung und Start einer Gast-App.
 

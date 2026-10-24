@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- iOS auf dieselbe Mac-CoreADI wie Windows umgestellt: lokaler x86-64-TCI-Interpreter ohne JIT, Schlüsselbundzustand und Neusynchronisierung. Echte Apple-Provisionierung samt neuem Interpreter und wiederholter OTP-Erzeugung im Build geprüft; iPhone-Anmeldung und Selbsterneuerung noch am Gerät zu bestätigen.
+- App-Entfernung auf PC und iPhone für alle gelesenen Benutzer-Apps, unabhängig vom ursprünglichen Installer; bestätigte Zertifikatverwaltung mit Team-Zuordnung und Erkennung vorhandener Signierschlüssel. Kein automatischer Widerruf bei Fehler 7460.
+- iPhone importiert IPA-Dateien aus Dateien/„Öffnen in“, prüft die Haupt-App und verwendet den lokalen Signierpfad. Dauerhafte VPN-Anzeige, regelmäßiger Erreichbarkeitstest und offizieller LocalDevVPN-Link mit Rückkehr.
+- Xcode-Token kann nach neuer Anmeldung aus einem passwortfreien, im OS-Schlüsselbund gespeicherten Refresh-Kontext erneuert werden. Hardwaretest der Token-Erneuerung ausstehend.
+
+
 - Ein Button „Install DirectSide“ lädt die aktuelle freigegebene IPA und installiert sie auf dem gewählten Gerät. Eigene IPAs bleiben getrennt auswählbar und installierbar. IPA-Versions-Badge am App-Kopf; Windows-Update-Schaltfläche nur im Header.
 - VPN-Karte passt den QR-Bereich an die verfügbare Höhe an; eigene IPA-Zeile bleibt vollständig innerhalb der Karte. Text: „Auf dem ausgewählten Gerät installieren“.
 - Windows-Updateprüfung beim Start, alle sechs Stunden und manuell; Update-Schaltfläche, Download mit GitHub-SHA-256-Prüfung und Neustart mit gesicherter vorheriger EXE.

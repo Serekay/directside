@@ -7,9 +7,11 @@ Sideload with your own Apple ID. DirectSide combines a Windows setup app with a 
 ## A clear view of your devices
 
 - Automatically detect connected iPhones and iPads.
-- Browse installed apps with their icons and separate app-slot counts for each device.
+- Browse installed apps with icons and app-slot counts for each device; remove apps from Windows or the iPhone.
 - Set up missing components from the Windows app.
 - Import app sources by QR code or URL, with descriptions, screenshots and updates.
+- Import an IPA directly on the iPhone, sign it and install through LocalDevVPN.
+- Manage signing certificates in both apps. A persistent iPhone VPN indicator links to LocalDevVPN.
 - Choose English or German and keep your preference.
 - Load the latest released DirectSide IPA from GitHub, or choose your own IPA.
 - Get Windows update notifications and update with a restart from the app.
