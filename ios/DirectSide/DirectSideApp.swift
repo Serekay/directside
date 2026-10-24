@@ -5,7 +5,11 @@ import SwiftUI
     var body: some Scene {
         WindowGroup {
             ContentView().environmentObject(engine).tint(.cyan)
-                .onOpenURL { url in Task { await engine.previewSource(url.absoluteString) } }
+                .onOpenURL { url in Task {
+                    if url.isFileURL && url.pathExtension.lowercased()=="ipa" {await engine.importIPA(url)}
+                    else if url.scheme=="directside" && (url.host ?? "").isEmpty && url.query==nil {return}
+                    else {await engine.previewSource(url.absoluteString)}
+                } }
         }
     }
 }

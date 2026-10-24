@@ -44,6 +44,8 @@ mod local_tests {
         let storage=InMemoryStorage::new();
         assert_eq!(CertificateIdentity::import_bootstrap(&serde_json::to_vec(&transfer).unwrap(),&storage).unwrap(),"fixture@example.invalid");
         assert_eq!(CertificateIdentity::stored_machine_name("fixture@example.invalid",&storage).unwrap().as_deref(),Some("DirectSide fixture"));
+        assert!(CertificateIdentity::stored_key_matches("fixture@example.invalid",&storage,certificate.der()).unwrap());
+        assert!(!CertificateIdentity::stored_key_matches("other@example.invalid",&storage,certificate.der()).unwrap());
         let key=format!("{}/key",CertificateIdentity::account_key("fixture@example.invalid"));
         assert_eq!(storage.retrieve_data(&key).unwrap().unwrap(),original_der.as_bytes());
         let other=RsaPrivateKey::new(&mut rand::thread_rng(),2048).unwrap();
@@ -64,6 +66,12 @@ impl CertificateIdentity {
     fn account_key(email:&str)->String {hex::encode(Sha256::digest(email.as_bytes()))}
     pub fn stored_machine_name(email:&str,storage:&dyn SideloadingStorage)->Result<Option<String>,Report> {
         storage.retrieve(&format!("{}/machine-name",Self::account_key(email)))
+    }
+    pub fn stored_key_matches(email:&str,storage:&dyn SideloadingStorage,certificate:&[u8])->Result<bool,Report> {
+        let Some(bytes)=storage.retrieve_data(&format!("{}/key",Self::account_key(email)))? else {return Ok(false)};
+        let key=RsaPrivateKey::from_pkcs8_der(&bytes)?;
+        let certificate=Certificate::from_der(certificate)?;
+        Ok(certificate.tbs_certificate.subject_public_key_info.subject_public_key.as_bytes()==Some(key.to_public_key().to_pkcs1_der()?.as_bytes()))
     }
     /// Import only a matching key/certificate pair, directly into the OS credential store.
     pub fn import_bootstrap(bytes:&[u8],storage:&dyn SideloadingStorage)->Result<String,Report> {
@@ -163,8 +171,8 @@ impl CertificateIdentity {
     ) -> Result<Self, Report> {
         let pr = Self::retrieve_private_key(apple_email, storage).await?;
 
-        let found = Self::find_matching(&pr, machine_name, developer_session, team).await;
-        if let Ok(Some((cert, x509_cert))) = found {
+        let found = Self::find_matching(&pr, machine_name, developer_session, team).await?;
+        if let Some((cert, x509_cert)) = found {
             info!("Found matching certificate");
             return Ok(Self {
                 machine_id: cert.machine_id.clone().unwrap_or_default(),
@@ -174,9 +182,6 @@ impl CertificateIdentity {
             });
         }
 
-        if let Err(e) = found {
-            error!("Failed to check for matching certificate: {:?}", e);
-        }
         info!("Requesting new certificate");
         let (cert, x509_cert) = Self::request_certificate(
             &pr,
@@ -292,7 +297,7 @@ impl CertificateIdentity {
 
     async fn find_matching(
         private_key: &RsaPrivateKey,
-        machine_name: &str,
+        _machine_name: &str,
         developer_session: &mut DeveloperSession,
         team: &DeveloperTeam,
     ) -> Result<Option<(DevelopmentCertificate, Certificate)>, Report> {
@@ -307,8 +312,6 @@ impl CertificateIdentity {
             .iter()
             .filter(|c| {
                 c.cert_content.is_some()
-                    && c.machine_name.as_deref().unwrap_or("") == machine_name
-                    && c.machine_id.is_some()
             })
         {
             let x509_cert =

@@ -207,4 +207,28 @@ class WindowsUIStateTests(unittest.TestCase):
     self.assertLessEqual(position.y()+row.height(),top.y()+card.height()-20)
     self.assertLessEqual(position.x()+row.width(),top.x()+card.width()-20)
   root.close();engine.deleteLater();APP.processEvents()
+
+ def test_app_removal_needs_confirmation_and_remains_device_scoped(self):
+  self.bridge.update(busy=False,devices=[{'id':'phone'},{'id':'tablet'}],installedApps=[{'id':'third.party.app','name':'Other installer app'}])
+  self.bridge.requestAppRemoval('third.party.app');self.assertEqual(self.sent,[])
+  self.bridge.update(deviceIndex=1)
+  self.bridge.confirmRemoval();self.assertEqual(self.sent,[])
+  self.bridge.update(deviceIndex=0)
+  self.bridge.requestAppRemoval('third.party.app');self.bridge.confirmRemoval()
+  self.assertEqual(self.sent,[{'command':'remove_app','device_id':'phone','bundle_id':'third.party.app','confirmed':True}])
+
+ def test_certificate_removal_is_explicit_and_not_app_slot_removal(self):
+  self.bridge.update(busy=False,loggedIn=True)
+  self.bridge.handle({'event':'certificates','team_id':'personal-team','certificates':[{'serial':'ABC','name':'Old installer','reusable':False}]})
+  self.bridge.requestCertificateRemoval('ABC');self.assertEqual(self.sent,[])
+  self.bridge.cancelRemoval();self.bridge.confirmRemoval();self.assertEqual(self.sent,[])
+  self.bridge.requestCertificateRemoval('ABC');self.bridge.confirmRemoval()
+  self.assertEqual(self.sent,[{'command':'revoke_certificate','serial':'ABC','team_id':'personal-team','confirmed':True}])
+
+ def test_7460_opens_certificate_management_and_never_revokes_automatically(self):
+  self.bridge.update(busy=True,loggedIn=True)
+  self.bridge.handle({'event':'error','command':'install','message':'Developer error 7460: Maximum number of certificates reached'})
+  self.assertTrue(self.bridge.data['certificateLimit'])
+  self.assertEqual(self.sent,[])
+  self.assertIn('Signing certificate limit',self.bridge.data['error'])
 if __name__=='__main__':unittest.main()

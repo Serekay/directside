@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 enum Style {
     static let accent=Color(red:0.08,green:0.72,blue:0.56)
@@ -160,9 +161,11 @@ struct AppDetailView: View {
 struct LibraryView: View {
     @EnvironmentObject var engine:Engine
     @ObservedObject var connection:Connection
+    @State private var showIPAImporter=false
     var body: some View {
         ScrollView {VStack(alignment:.leading,spacing:18) {
             Text("Meine Apps").font(.largeTitle.bold()).tracking(-1).padding(.top,10)
+            Button {showIPAImporter=true} label:{Label("IPA importieren",systemImage:"square.and.arrow.down").font(.subheadline.bold())}.disabled(engine.busy)
             HStack {Label(engine.slotsText,systemImage:"square.grid.3x1").font(.caption).foregroundStyle(.secondary);Spacer();Button("Prüfen"){engine.inspectConnection(peer:connection.peer,port:connection.port)}.font(.caption)}
             VStack(alignment:.leading,spacing:16) {
                 HStack {VStack(alignment:.leading,spacing:5) {Text("Deine Apps bleiben bereit").font(.headline);Text("DirectSide und \(engine.managed.filter{$0.id != "com.directside.app"}.count) weitere Apps").font(.caption).foregroundStyle(.secondary)};Spacer();if let days=engine.remainingDays {Text("\(days)").font(.largeTitle.bold())+Text(" Tage").font(.caption)}}
@@ -171,10 +174,17 @@ struct LibraryView: View {
             SectionTitle(title:"Updates \(engine.updates.isEmpty ? "":"\(engine.updates.count)")",action:engine.updates.isEmpty ? nil:"Alle aktualisieren",onAction:{Task {await engine.updateAll(peer:connection.peer,port:connection.port)}})
             if engine.updates.isEmpty {Label("Alles auf dem neuesten Stand",systemImage:"checkmark.circle").font(.subheadline).foregroundStyle(.secondary).padding(.vertical,12)}
             ForEach(engine.updates.map{CatalogEntry(app:$0.app,source:$0.source)}) {entry in VStack(alignment:.leading,spacing:10) {CatalogRow(app:entry.app,source:entry.source,connection:connection);if let notes=entry.app.latest?.localizedDescription {Text(notes).font(.caption).foregroundStyle(.secondary).lineLimit(4)};Label(entry.source.name,systemImage:"square.stack.3d.up").font(.caption2).foregroundStyle(.secondary)}.padding(16).background(Style.surface,in:RoundedRectangle(cornerRadius:21))}
-            SectionTitle(title:"Installiert",action:"Prüfen",onAction:{Task {await engine.refreshSources()}})
+            SectionTitle(title:"Installiert")
+            NavigationLink {DeviceManagementView(connection:connection)} label:{Label("Apps auf diesem Gerät verwalten",systemImage:"trash").font(.subheadline)}
             HStack(spacing:12) {BrandIcon();VStack(alignment:.leading,spacing:4){Text("DirectSide").font(.subheadline.bold());Text(engine.selfExpirationText).font(.caption).foregroundStyle(.secondary)};Spacer();Button("Erneuern"){engine.refreshSelf(peer:connection.peer,port:connection.port)}.font(.caption.bold()).buttonStyle(.bordered).buttonBorderShape(.capsule).disabled(engine.busy || !engine.loggedIn || !engine.pairingReady)}.padding(.vertical,8)
             ForEach(engine.managed.filter{$0.id != "com.directside.app"}) {app in HStack(spacing:12) {Artwork(url:app.iconURL);VStack(alignment:.leading,spacing:4){Text(app.name).font(.subheadline.bold());Text(engine.expirationText(app)).font(.caption).foregroundStyle(.secondary)};Spacer();Menu {Button("Signatur erneuern"){engine.refresh(app,peer:connection.peer,port:connection.port)}} label:{Image(systemName:"ellipsis").padding(12)}}.padding(.vertical,8)}
         }.padding(21)}.background(Style.background).toolbar(.hidden,for:.navigationBar).refreshable{await engine.refreshSources()}.safeAreaInset(edge:.bottom){EngineProgress()}
+        .fileImporter(isPresented:$showIPAImporter,allowedContentTypes:[UTType(filenameExtension:"ipa") ?? .data],allowsMultipleSelection:false) {result in
+            switch result {
+            case .success(let files):if let file=files.first {Task{await engine.importIPA(file)}}
+            case .failure(let error):engine.fail(error.localizedDescription)
+            }
+        }
     }
 }
 

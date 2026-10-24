@@ -21,6 +21,10 @@ targets:
         buildPhase: resources
       - path: ../licenses/Unicorn-GPL-2.0.txt
         buildPhase: resources
+      - path: ../licenses/Unicorn-LGPL-2.1.txt
+        buildPhase: resources
+      - path: ../vendor/mac-adi-rust/LICENSE
+        buildPhase: resources
       - path: ../THIRD_PARTY.md
         buildPhase: resources
     info:
@@ -30,7 +34,18 @@ targets:
         NSCameraUsageDescription: QR-Codes zum Hinzufügen deiner App-Quellen scannen.
         NSLocalNetworkUsageDescription: Apps über LocalDevVPN auf deinem eigenen Gerät installieren.
         NSBonjourServices: ['_remotepairing._tcp']
-        LSApplicationQueriesSchemes: [livecontainer]
+        LSApplicationQueriesSchemes: [livecontainer, localdevvpn]
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: iOS application
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [com.directside.ipa]
+        UTImportedTypeDeclarations:
+          - UTTypeIdentifier: com.directside.ipa
+            UTTypeDescription: iOS application archive
+            UTTypeConformsTo: [public.zip-archive]
+            UTTypeTagSpecification:
+              public.filename-extension: [ipa]
         CFBundleURLTypes:
           - CFBundleURLName: DirectSide Sources
             CFBundleURLSchemes: [directside]
@@ -41,7 +56,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.directside.app
         PRODUCT_NAME: DirectSide
         MARKETING_VERSION: '0.1.0'
-        CURRENT_PROJECT_VERSION: '1'
+        CURRENT_PROJECT_VERSION: '2'
         GENERATE_INFOPLIST_FILE: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_CFBundleDisplayName: DirectSide

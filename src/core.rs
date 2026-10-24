@@ -3,12 +3,13 @@ use idevice::{IdeviceService, lockdown::LockdownClient, usbmuxd::{UsbmuxdAddr, U
 use isideload::{
     anisette::{local::LocalAnisetteProvider, AnisetteProvider, AnisetteDataResponse},
     auth::apple_account::{AppleAccount, AppToken, TwoFactorCallbackParams, TwoFactorCallbackResponse},
-    dev::{developer_session::DeveloperSession, teams::DeveloperTeam, app_ids::{AppIdsApi,ListAppIdsResponse}},
+    dev::{developer_session::DeveloperSession, teams::DeveloperTeam, app_ids::{AppIdsApi,ListAppIdsResponse},certificates::CertificatesApi},
     sideload::{SideloaderBuilder, TeamSelection, builder::MaxCertsBehavior, sideloader::Sideloader},
     util::{callbacks::{ExtensionsBehaviorCallbackBox, MaxCertsCallbackBox}, keyring_storage::KeyringStorage, storage::SideloadingStorage},
 };
 use rootcause::prelude::*;
 use serde_json::{Value, json};
+use base64::Engine as _;
 
 type Engine = Sideloader<MaxCertsCallbackBox, ExtensionsBehaviorCallbackBox>;
 
@@ -97,6 +98,48 @@ async fn app_icons(request:&Value)->Result<(),Report> {
     emit(json!({"event":"app_icons","device_id":id,"icons":icons}));Ok(())
 }
 
+async fn remove_device_app(request:&Value)->Result<(),Report> {
+    require_confirmation(request)?;
+    let id=text(request,"device_id")?;let bundle=text(request,"bundle_id")?;
+    let mut mux=UsbmuxdConnection::default().await?;
+    let device=mux.get_devices().await?.into_iter().find(|d|d.udid==id).ok_or_else(||report!("Gerät nicht verbunden."))?;
+    let provider=device.to_provider(UsbmuxdAddr::from_env_var()?,"DirectSide");
+    let mut proxy=idevice::installation_proxy::InstallationProxyClient::connect(&provider).await?;
+    if !proxy.get_apps(Some("User"),None).await?.contains_key(bundle) {bail!("Diese App ist auf dem ausgewählten Gerät nicht installiert.");}
+    proxy.uninstall(bundle,None).await?;
+    emit(json!({"event":"app_removed","device_id":id,"bundle_id":bundle}));Ok(())
+}
+
+fn require_confirmation(request:&Value)->Result<(),Report> {
+    if request.get("confirmed").and_then(Value::as_bool)!=Some(true) {bail!("Entfernen wurde nicht bestätigt.");}
+    Ok(())
+}
+
+async fn certificates(engine:&mut Engine)->Result<(),Report> {
+    use isideload::sideload::cert_identity::CertificateIdentity;
+    let team=engine.get_team().await?;
+    let records=engine.get_dev_session().list_ios_certs(&team).await?;
+    let storage=KeyringStorage::new("DirectSide.signing".to_string());
+    let mut overview=Vec::new();
+    for cert in records {
+        let reusable=match &cert.cert_content {Some(bytes)=>CertificateIdentity::stored_key_matches(engine.get_email(),&storage,bytes.as_ref()).unwrap_or(false),None=>false};
+        overview.push(json!({"serial":cert.serial_number.unwrap_or_default(),"name":cert.machine_name.or(cert.name).unwrap_or_else(||"Apple Development".into()),"expires":cert.expiration_date.map(|d|d.to_xml_format()),"reusable":reusable}));
+    }
+    emit(json!({"event":"certificates","team_id":team.team_id,"team":team.name,"certificates":overview}));Ok(())
+}
+
+async fn revoke_certificate(engine:&mut Engine,request:&Value)->Result<(),Report> {
+    require_confirmation(request)?;
+    let team=engine.get_team().await?;
+    if text(request,"team_id")?!=team.team_id {bail!("Developer-Team hat sich geändert. Zertifikate neu laden.");}
+    let serial=text(request,"serial")?;
+    let existing=engine.get_dev_session().list_ios_certs(&team).await?;
+    if !existing.iter().any(|cert|cert.serial_number.as_deref()==Some(serial)) {bail!("Zertifikat ist nicht mehr vorhanden. Liste neu laden.");}
+    engine.get_dev_session().revoke_development_cert(&team,serial,isideload::dev::device_type::DeveloperDeviceType::Ios).await?;
+    emit(json!({"event":"certificate_revoked","serial":serial,"team_id":team.team_id}));
+    certificates(engine).await
+}
+
 async fn prepare_livecontainer(engine:&mut Engine,request:&Value)->Result<(),Report> {
     let id=text(request,"device_id")?;
     let mut mux=UsbmuxdConnection::default().await?;
@@ -145,11 +188,22 @@ async fn login(request: &Value) -> Result<Engine, Report> {
         .login(password, second_factor).await?;
     emit(json!({"event":"status","message":"Anmeldung bestätigt. Developer-Team wird geladen …"}));
     let session = DeveloperSession::from_account(&mut account).await?;
+    save_session(&session,email,account.spd.as_ref())?;
+    make_engine(session,email).await
+}
+
+fn save_session(session:&DeveloperSession,email:&str,spd:Option<&plist::Dictionary>)->Result<(),Report> {
     let (token,adsid)=session.session_credentials();
-    let secret=json!({"email":email,"auth":"local","token":token.token,"adsid":adsid,"duration":token.duration,"expiry":token.expiry});
+    let mut secret=json!({"email":email,"auth":"local","token":token.token,"adsid":adsid,"duration":token.duration,"expiry":token.expiry});
+    if let Some(spd)=spd {
+        let refresh:plist::Dictionary=["adsid","GsIdmsToken","sk","c"].iter().filter_map(|key|spd.get(*key).map(|value|((*key).to_string(),value.clone()))).collect();
+        if refresh.len()==4 {
+            let mut bytes=Vec::new();plist::to_writer_binary(&mut bytes,&refresh)?;secret["refresh"]=json!(base64::prelude::BASE64_STANDARD.encode(bytes));
+        }
+    }
     // Session tokens, not passwords; stored only in the OS credential store.
     KeyringStorage::new("DirectSide.session".to_string()).store_data("active",&serde_json::to_vec(&secret)?)?;
-    make_engine(session,email).await
+    Ok(())
 }
 
 async fn make_engine(session:DeveloperSession,email:&str)->Result<Engine,Report> {
@@ -186,10 +240,23 @@ async fn restore()->Result<Option<Engine>,Report> {
     let saved:Value=serde_json::from_slice(&bytes)?;
     let email=text(&saved,"email")?;
     let provider=LocalAnisetteProvider::new()?;
-    let account=AppleAccount::builder(email).anisette_provider(provider).err_429_retries(Some(1)).build().await?;
+    let mut account=AppleAccount::builder(email).anisette_provider(provider).err_429_retries(Some(1)).build().await?;
     let token=AppToken {token:text(&saved,"token")?.to_string(),duration:saved["duration"].as_u64().unwrap_or(0),expiry:saved["expiry"].as_u64().unwrap_or(0)};
-    let session=DeveloperSession::new(token,text(&saved,"adsid")?.to_string(),account.grandslam_client,account.anisette_generator);
-    Ok(Some(make_engine(session,email).await?))
+    let session=DeveloperSession::new(token,text(&saved,"adsid")?.to_string(),account.grandslam_client.clone(),account.anisette_generator.clone());
+    match make_engine(session,email).await {
+        Ok(engine)=>Ok(Some(engine)),
+        Err(error) if error.to_string().contains("1100") && saved.get("refresh").is_some()=>{
+            let bytes=base64::prelude::BASE64_STANDARD.decode(text(&saved,"refresh")?)?;
+            if bytes.len()>65536 {bail!("Gespeicherte Sitzung ist ungültig.");}
+            let spd:plist::Dictionary=plist::from_bytes(&bytes)?;
+            if spd.get("adsid").and_then(plist::Value::as_string)!=saved.get("adsid").and_then(Value::as_str) {bail!("Gespeicherte Sitzung gehört zu einem anderen Account.");}
+            account.spd=Some(spd);
+            let fresh=DeveloperSession::from_account(&mut account).await?;
+            save_session(&fresh,email,account.spd.as_ref())?;
+            Ok(Some(make_engine(fresh,email).await?))
+        },
+        Err(error)=>Err(error),
+    }
 }
 
 async fn probe_local_auth()->Result<(),Report> {
@@ -313,7 +380,25 @@ async fn inspect_local(request:&Value)->Result<(),Report> {
     use idevice::RsdService;
     let(mut handle,mut rsd)=connect_local(request).await?;
     let mut proxy=idevice::installation_proxy::InstallationProxyClient::connect_rsd(&mut handle,&mut rsd).await?;
-    check_slots(&proxy.get_apps(Some("User"),None).await?,None)
+    let apps=proxy.get_apps(Some("User"),None).await?;
+    check_slots(&apps,None)?;
+    let developer=developer_apps(&apps);
+    let overview:Vec<Value>=apps.iter().filter_map(|(id,value)|{
+        let info=value.as_dictionary()?;
+        Some(json!({"id":id,"name":info.get("CFBundleDisplayName").or_else(||info.get("CFBundleName")).and_then(plist::Value::as_string).unwrap_or(id),"developer":developer.iter().any(|app|app["id"].as_str()==Some(id.as_str()))}))
+    }).collect();
+    emit(json!({"event":"local_apps","apps":overview}));Ok(())
+}
+
+async fn remove_local_app(request:&Value)->Result<(),Report> {
+    use idevice::RsdService;
+    require_confirmation(request)?;
+    let bundle=text(request,"bundle_id")?;
+    let (mut handle,mut rsd)=connect_local(request).await?;
+    let mut proxy=idevice::installation_proxy::InstallationProxyClient::connect_rsd(&mut handle,&mut rsd).await?;
+    if !proxy.get_apps(Some("User"),None).await?.contains_key(bundle) {bail!("Diese App ist auf dem verbundenen Gerät nicht installiert.");}
+    proxy.uninstall(bundle,None).await?;
+    emit(json!({"event":"app_removed","bundle_id":bundle}));Ok(())
 }
 
 async fn install_local(engine: &mut Engine, request: &Value) -> Result<(),Report> {
@@ -357,6 +442,10 @@ pub async fn run() {
             "local_auth_probe" => match tokio::time::timeout(Duration::from_secs(45),probe_local_auth()).await {Ok(r)=>r,Err(_)=>Err(report!("Lokale Apple-Einrichtung hat zu lange gedauert."))},
             "device_components" => match tokio::time::timeout(Duration::from_secs(20),device_components(&request)).await {Ok(r)=>r,Err(_)=>Err(report!("App-Prüfung nicht möglich. iPhone entsperren und Vertrauen bestätigen."))},
             "app_icons" => match tokio::time::timeout(Duration::from_secs(25),app_icons(&request)).await {Ok(r)=>r,Err(_)=>Err(report!("Icons konnten nicht geladen werden."))},
+            "remove_app"=>match tokio::time::timeout(Duration::from_secs(45),remove_device_app(&request)).await {Ok(r)=>r,Err(_)=>Err(report!("App konnte nicht rechtzeitig entfernt werden. Gerät erneut prüfen."))},
+            "remove_local_app"=>match tokio::time::timeout(Duration::from_secs(45),remove_local_app(&request)).await {Ok(r)=>r,Err(_)=>Err(report!("App konnte nicht rechtzeitig entfernt werden. Verbindung erneut prüfen."))},
+            "certificates"=>match engine.as_mut() {Some(e)=>certificates(e).await,None=>Err(report!("Bitte zuerst anmelden."))},
+            "revoke_certificate"=>match engine.as_mut() {Some(e)=>revoke_certificate(e,&request).await,None=>Err(report!("Bitte zuerst anmelden."))},
             "prepare_livecontainer" => match engine.as_mut() {Some(e)=>prepare_livecontainer(e,&request).await,None=>Err(report!("Bitte zuerst anmelden."))},
             "restore" => {
                 match tokio::time::timeout(Duration::from_secs(45),restore()).await {
@@ -366,6 +455,13 @@ pub async fn run() {
                 }
             },
             "profile"=>{emit(json!({"event":"profile","expires_at":profile_expiry(std::path::Path::new(text(&request,"path").unwrap_or("")))}));Ok(())},
+            "inspect_ipa"=>(||->Result<(),Report>{
+                let path=text(&request,"path")?;
+                match isideload::sideload::application::inspect_ipa(std::path::Path::new(path)) {
+                    Ok(info)=>{emit(json!({"event":"ipa_inspected","path":path,"bundle_id":info.get("CFBundleIdentifier").and_then(plist::Value::as_string),"name":info.get("CFBundleDisplayName").or_else(||info.get("CFBundleName")).and_then(plist::Value::as_string).unwrap_or("Imported app"),"version":info.get("CFBundleShortVersionString").and_then(plist::Value::as_string)}));Ok(())},
+                    Err(error)=>Err(error),
+                }
+            })(),
             "import_signing"=>{
                 let result=(||->Result<(),Report>{
                     let path=PathBuf::from(text(&request,"path")?);
@@ -406,6 +502,11 @@ pub async fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn removal_requires_an_explicit_boolean_confirmation() {
+        for request in [json!({}),json!({"confirmed":false}),json!({"confirmed":"true"})] {assert!(require_confirmation(&request).is_err());}
+        assert!(require_confirmation(&json!({"confirmed":true})).is_ok());
+    }
     #[test]
     fn component_detection_accepts_team_suffix_but_not_similar_app_names() {
         let mut apps=std::collections::HashMap::new();
