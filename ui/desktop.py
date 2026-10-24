@@ -25,15 +25,16 @@ class DesktopBridge(QObject):
         saved=self.preferences.load()
         language=saved.get('language','en')
         self.data=dict(email=saved.get('email',''),authLocal=False,usbState=usb_status(),setupBusy=False,vpnState='unknown',lcState='unknown',directsidePresent=False,lcPrepared=False,slotsUsed=-1,developerApps=[],installedApps=[],
-            loggedIn=False,busy=True,scanning=False,team='',devices=[],deviceIndex=0,ipa='',ipaName='',
+            loggedIn=False,authState='checking',appIdsLimit=-1,appIdsAvailable=-1,appIdsRegistered=-1,busy=True,scanning=False,team='',devices=[],deviceIndex=0,ipa='',ipaName='',
             status='Sitzung prüfen …',error='',progress=0,challenge='',numbers=[],teams=[],
             challengeError='',success=False,logs=[],icon=QUrl.fromLocalFile(str(ROOT/'assets'/'brand-128.png')).toString(),vpnQr=QUrl.fromLocalFile(str(ROOT/'assets'/'localdevvpn-qr.png')).toString())
         for path in [HOME/'DirectSide.ipa',ROOT/'dist'/'DirectSide.ipa']:
             if path.is_file(): self.data.update(ipa=str(path),ipaName=path.name);break
-        self.data.update(language=language,translations=ENGLISH,status=translate(self.data['status'],language))
+        self.data.update(language=language,savedEmail=saved.get('email',''),translations=ENGLISH,status=translate(self.data['status'],language))
         self.buffer=bytearray()
         self.initializing=True
         self.installing=False
+        self.pendingLogin=None
         self.componentDevice=None;self.componentTime=0
         self.process=QProcess(self)
         self.process.readyReadStandardOutput.connect(self.read_events)
@@ -52,6 +53,17 @@ class DesktopBridge(QObject):
         for key in ('status','error','challengeError'):
             if key in values:values[key]=translate(values[key],language)
         self.data.update(values);self.changed.emit()
+        if not self.data['busy'] and self.pendingLogin is not None:QTimer.singleShot(0,self.startPendingLogin)
+
+    @Slot(str)
+    def editEmail(self,value):
+        # Keep the draft in state so unrelated USB updates cannot restore an old value.
+        self.data['email']=value
+
+    def startPendingLogin(self):
+        if self.pendingLogin is None or self.data['busy']:return
+        email,password=self.pendingLogin;self.pendingLogin=None
+        self.login(email,password)
 
     @Slot(str)
     def setLanguage(self,language):
@@ -88,6 +100,8 @@ class DesktopBridge(QObject):
 
     def fail(self,message):
         self.installing=False
+        self.pendingLogin=None
+        if not self.data['loggedIn']:self.data['authState']='signed_out'
         self.update(error=clean_error(message),busy=False,scanning=False,challenge='',status='Fehlgeschlagen')
         self.append_log(message)
 
@@ -98,9 +112,12 @@ class DesktopBridge(QObject):
         elif kind in ('logged_in','logged_out'):
             logged=kind=='logged_in'
             email=event.get('email') or self.data['email']
-            self.update(loggedIn=logged,email=email,team=event.get('team',''),busy=False,challenge='',status='Bereit' if logged else 'Anmeldung erforderlich')
+            state='signed_in' if logged else event.get('reason','signed_out')
+            self.update(loggedIn=logged,authState=state,email=email,team=event.get('team',''),busy=False,challenge='',status='Bereit' if logged else 'Sitzung abgelaufen · bitte anmelden' if state=='expired' else 'Anmeldung erforderlich',**({} if logged else dict(appIdsLimit=-1,appIdsAvailable=-1,appIdsRegistered=-1)))
             if email:self.persist(email)
             if self.initializing:self.initializing=False;self.refresh()
+        elif kind=='account_quota':
+            self.update(appIdsLimit=event.get('limit') if event.get('limit') is not None else -1,appIdsAvailable=event.get('available') if event.get('available') is not None else -1,appIdsRegistered=event.get('registered',-1))
         elif kind=='devices':
             old=self.data['devices'];index=self.data['deviceIndex']
             selected=old[index].get('id') if old and index<len(old) else None
@@ -145,16 +162,21 @@ class DesktopBridge(QObject):
         elif kind=='installed':self.installing=False;self.update(busy=False,success=True,progress=100,status='Installiert',challenge='');self.inspectDevice()
 
     def persist(self,email):
-        try:self.preferences.save(email,self.data['language']);return True
+        try:self.preferences.save(email,self.data['language']);self.data['savedEmail']=email.strip();return True
         except OSError:self.fail('Account-Einstellungen konnten nicht gespeichert werden.');return False
 
-    @Slot(str,str)
+    @Slot(str,str,result=bool)
     def login(self,email,password):
-        if self.data['busy']:return
-        if not email.strip() or not password:self.fail('Apple-ID und Passwort eingeben.');return
-        if not self.persist(email):return
-        self.update(email=email.strip(),busy=True,error='',status='Bei Apple anmelden …',success=False)
+        if not email.strip() or not password:self.fail('Apple-ID und Passwort eingeben.');return False
+        if self.data['busy']:
+            if not self.data['scanning']:return False
+            self.pendingLogin=(email,password)
+            self.update(authState='signing_in',status='Bei Apple anmelden …')
+            return True
+        if not self.persist(email):return False
+        self.update(email=email.strip(),loggedIn=False,authState='signing_in',appIdsLimit=-1,appIdsAvailable=-1,appIdsRegistered=-1,busy=True,scanning=False,error='',status='Bei Apple anmelden …',success=False)
         self.send({'command':'login','email':email.strip(),'password':password})
+        return True
 
     @Slot()
     def logout(self):
@@ -167,7 +189,7 @@ class DesktopBridge(QObject):
         self.update(busy=True,scanning=True);self.send({'command':'devices'})
 
     def auto_refresh(self):
-        if not self.initializing and not self.data['busy']:
+        if not self.initializing and not self.data['busy'] and self.pendingLogin is None:
             self.update(busy=True,scanning=True);self.send({'command':'devices'})
 
     @Slot(int)
@@ -176,7 +198,7 @@ class DesktopBridge(QObject):
 
     @Slot('QVariantList')
     def loadAppIcons(self,bundles):
-        if self.data['busy'] or not self.data['devices']:return
+        if self.data['busy'] or self.pendingLogin is not None or not self.data['devices']:return
         wanted={app['id'] for app in self.data['installedApps'] if not app.get('iconChecked')}
         selected=[bundle for bundle in bundles if isinstance(bundle,str) and bundle in wanted][:12]
         if not selected:return
@@ -186,7 +208,7 @@ class DesktopBridge(QObject):
 
     @Slot()
     def inspectDevice(self):
-        if self.data['busy'] or not self.data['devices']:return
+        if self.data['busy'] or self.pendingLogin is not None or not self.data['devices']:return
         self.update(busy=True,scanning=True,vpnState='unknown',lcState='unknown',directsidePresent=False,slotsUsed=-1,developerApps=[])
         self.send({'command':'device_components','device_id':self.data['devices'][self.data['deviceIndex']]['id']})
 
@@ -283,6 +305,7 @@ class DesktopBridge(QObject):
         if self.process.state()==QProcess.NotRunning:self.fail('Signierkern beendet. DirectSide neu starten.')
 
     def close(self):
+        self.pendingLogin=None
         self.timer.stop()
         if self.process.state()!=QProcess.NotRunning:self.process.terminate();self.process.waitForFinished(1500)
 

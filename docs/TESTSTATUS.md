@@ -5,13 +5,14 @@ Entwicklungsstand, keine Release-Freigabe.
 ## Windows
 
 - Rust-Kern lokal kompiliert. Drei Tests prüfen das Drei-App-Limit samt Erneuerung bestehender Apps, die Erkennung anhand korrekter Bundle-IDs und den lokalen Anisette-Callback. Zwei zusätzliche Vendor-Tests prüfen Callback-Payloads sowie passenden und unpassenden Schlüssel-/Zertifikatsimport.
-- 19 Python-Tests bestanden: IPA-Auswahl, Voreinstellungen ohne Passwort, lokale Anmeldung, Komponentenprüfung, Hashprüfung, integrierte Bestätigungen, automatisches Gerätescannen, getrennte Gerätezustände, Icon-Cache und gespeicherte Sprachwahl mit Englisch als Standard.
+- 21 Python-Tests bestanden: IPA-Auswahl, Voreinstellungen ohne Passwort, lokale Anmeldung, Komponentenprüfung, Hashprüfung, integrierte Bestätigungen, automatisches Gerätescannen, getrennte Gerätezustände, Icon-Cache und gespeicherte Sprachwahl mit Englisch als Standard. Neue QML-Regressionstests prüfen Eingabeerhalt während einer Geräteabfrage, anschließend ausgeführten Anmeldeklick und rote/gelbe/grüne App-ID-Kontingente anhand tatsächlicher Apple-Antwortfelder.
 - Die echte gepackte EXE wurde mit --smoke-test gestartet: Qt, QML, Fenster-Icon, eigene Titelleiste, Signierkern und tatsächliche lokale Anisette-Erzeugung erfolgreich. Bericht: build/smoke-test.json.
 - CoreADI erzeugt lokal Machine Data und OTP. Es wird kein Fremd-Anisette-Dienst verwendet. Die alte gespeicherte Developer-Sitzung wurde von Apple als abgelaufen zurückgewiesen (1100). Eine frische Anmeldung bestand die Passwortprüfung, scheiterte aber beim Xcode-App-Token mit Apple-Fehler −80046. Das Windows-/iTunes-Clientprofil wurde danach angepasst; eine erfolgreiche Anmeldung ist damit noch nicht bestätigt.
 - Am angeschlossenen Gerät wurden 191 Benutzer-Apps gelesen. LocalDevVPN wurde erkannt; LiveContainer war nicht vorhanden. Drei angefragte echte App-Icons wurden erfolgreich von SpringBoard Services gelesen.
 - Offizielle LiveContainer-Standalone-IPA 3.8.0 heruntergeladen; SHA-256 und Haupt-Bundle-ID geprüft. Keine Installation oder Zertifikatsübertragung auf dem Gerät vorgenommen.
 - Apple-USB-Dienst war auf diesem PC bereits installiert und gestartet. Deshalb wurde keine Neuinstallation ausgelöst. Download-/Prüf-/Startpfade wurden mit Testdaten geprüft; ein kompletter Installerlauf auf einem unvorbereiteten PC steht aus.
 - Oberfläche auf Mindestgröße 960 × 680 in Deutsch und Englisch geprüft: kurze VPN-Karte, farbige Status-Badges, Hilfe aus dem ⋯-Menü, Einstellungen und App-Kacheln ohne Haupt-Scrollbar.
+- Überarbeitete Windows-Oberfläche mit synthetischen Daten außerhalb des Benutzerfensters gerendert: Status unten rechts, bündige Konto-/Geräteüberschriften, USB im Header und unterschiedliche Vektor-Icons. Keine Anmeldung mit Test-Zugangsdaten ausgelöst.
 
 Der frühere QtCore-DLL-Fehler kam von einer fremden ICU-DLL im Build-PATH. Der lokale Paketbau isoliert diesen Pfad und schließt die fremde DLL aus.
 

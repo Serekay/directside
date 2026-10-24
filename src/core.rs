@@ -3,7 +3,7 @@ use idevice::{IdeviceService, lockdown::LockdownClient, usbmuxd::{UsbmuxdAddr, U
 use isideload::{
     anisette::{local::LocalAnisetteProvider, AnisetteProvider, AnisetteDataResponse},
     auth::apple_account::{AppleAccount, AppToken, TwoFactorCallbackParams, TwoFactorCallbackResponse},
-    dev::{developer_session::DeveloperSession, teams::DeveloperTeam},
+    dev::{developer_session::DeveloperSession, teams::DeveloperTeam, app_ids::{AppIdsApi,ListAppIdsResponse}},
     sideload::{SideloaderBuilder, TeamSelection, builder::MaxCertsBehavior, sideloader::Sideloader},
     util::{callbacks::{ExtensionsBehaviorCallbackBox, MaxCertsCallbackBox}, keyring_storage::KeyringStorage, storage::SideloadingStorage},
 };
@@ -162,8 +162,23 @@ async fn make_engine(session:DeveloperSession,email:&str)->Result<Engine,Report>
         .storage(Box::new(storage))
         .build();
     let team = engine.get_team().await?;
+    let quota=tokio::time::timeout(Duration::from_secs(12),engine.get_dev_session().list_app_ids(&team,None)).await;
     emit(json!({"event":"logged_in","team":team.name,"team_id":team.team_id,"type":team.r#type,"email":email}));
+    match quota {Ok(Ok(q))=>emit(quota_event(&q)),_=>emit(json!({"event":"account_quota","limit":null,"available":null,"registered":-1}))};
     Ok(engine)
+}
+
+fn quota_event(q:&ListAppIdsResponse)->Value {
+    // Apple's rolling registration allowance is not the number of existing IDs.
+    json!({"event":"account_quota","limit":q.max_quantity,"available":q.available_quantity.map(|n|n.max(0)),"registered":q.app_ids.len()})
+}
+
+async fn refresh_account_quota(engine:&mut Engine) {
+    let result=tokio::time::timeout(Duration::from_secs(12),async {
+        let team=engine.get_team().await?;
+        engine.get_dev_session().list_app_ids(&team,None).await
+    }).await;
+    match result {Ok(Ok(q))=>emit(quota_event(&q)),_=>emit(json!({"event":"account_quota","limit":null,"available":null,"registered":-1}))};
 }
 
 async fn restore()->Result<Option<Engine>,Report> {
@@ -346,7 +361,7 @@ pub async fn run() {
             "restore" => {
                 match tokio::time::timeout(Duration::from_secs(45),restore()).await {
                     Ok(Ok(Some(e)))=>{engine=Some(e);Ok(())},
-                    Ok(Err(e))=>{emit(json!({"event":"status","message":format!("Gespeicherte Sitzung konnte lokal nicht übernommen werden: {e}")}));emit(json!({"event":"logged_out"}));Ok(())},
+                    Ok(Err(e))=>{let detail=format!("{e}");let reason=if detail.contains("1100") {"expired"}else{"signed_out"};emit(json!({"event":"status","message":format!("Gespeicherte Sitzung konnte lokal nicht übernommen werden: {detail}")}));emit(json!({"event":"logged_out","reason":reason}));Ok(())},
                     _=>{emit(json!({"event":"logged_out"}));Ok(())},
                 }
             },
@@ -373,7 +388,7 @@ pub async fn run() {
                 }
             },
             "install" => match engine.as_mut() {
-                Some(e) => install(e,&request).await,
+                Some(e) => {let result=install(e,&request).await;refresh_account_quota(e).await;result},
                 None => Err(report!("Bitte zuerst mit deiner Apple-ID anmelden.")),
             },
             "install_local" => match engine.as_mut() {

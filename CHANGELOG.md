@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Apple-ID-Eingabe bleibt bei automatischen Geräteabfragen erhalten. Anmeldeklicks während einer Abfrage werden anschließend ausgeführt; Passwort wird nur bei angenommener Anmeldung aus dem Eingabefeld entfernt.
+- Abgelaufene Sitzungen klar gekennzeichnet; kein irreführendes „Bereit“ im abgemeldeten Zustand. App-ID-Verbrauch aus Apples tatsächlichem Registrierungskontingent, getrennt von installierten Apps pro Gerät.
+- USB-Badge neben der Version, Hilfe-Fragezeichen, größere unterschiedliche Vektor-Icons für Aktualisierung und App-Übersicht; ausgerichtete Überschriften, kompakter Installationsbereich und Statusleiste unten rechts.
+
 - Aktivität vollständig kopierbar: Textauswahl, Strg+C und Kopieren-Button; Fehlerdetails über die Fußleiste erreichbar.
 - Windows-Clientprofil an den lokalen iTunes-Anisette-Provider angepasst; Behebung von Apples Tokenfehler −80046 noch am Account zu prüfen.
 - Lokale iOS-Anmeldung über AnisetteKit-TCI implementiert; ARM64-IPA gebaut und tatsächliche Provisionierung mit wiederholter OTP-Erzeugung auf macOS geprüft. Hardwareprüfung von Anmeldung und Selbsterneuerung ausstehend.

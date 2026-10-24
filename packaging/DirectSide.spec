@@ -13,8 +13,9 @@ a = Analysis([str(root / 'ui/desktop.py')], pathex=[str(root / 'ui')],
            (str(root / 'ui/en.json'), '.'),
            (str(root / 'assets/DirectSide.ico'), 'assets'),
            (str(root / 'assets/localdevvpn-qr.png'), 'assets'),
+           (str(root / 'assets/icons'), 'assets/icons'),
            (str(root / 'assets/brand-128.png'), 'assets')],
-    hiddenimports=['PySide6.QtQuickControls2'],
+    hiddenimports=['PySide6.QtQuickControls2','PySide6.QtSvg'],
     excludes=['tkinter', 'PySide6.QtWebEngineCore', 'PySide6.QtWebEngineWidgets'])
 
 # Qt 6.12 uses Windows' unversioned ICU API. A foreign icuuc.dll on PATH
