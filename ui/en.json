@@ -229,5 +229,17 @@
   "3. Falls iOS fragt: Einstellungen → Allgemein → VPN & Geräteverwaltung → deinem Entwicklerprofil vertrauen.": "3. If iOS asks: Settings → General → VPN & Device Management → trust your developer profile.",
   "Option auf dem Gerät anzeigen": "Show option on device",
   "Weiter zur Installation": "Continue to installation",
-  "Entwicklermodus in den iPhone-Einstellungen aktivieren.": "Enable Developer Mode in the iPhone settings."
+  "Entwicklermodus in den iPhone-Einstellungen aktivieren.": "Enable Developer Mode in the iPhone settings.",
+  "DirectSide-Einrichtung reparieren": "Repair DirectSide setup",
+  "Für die Einrichtung bitte die DirectSide-IPA auswählen.": "Select the DirectSide IPA for device setup.",
+  "Geräteinformationen für die Kopplung lesen …": "Reading device information for pairing …",
+  "USB-Kopplungsdienst öffnen …": "Opening USB pairing service …",
+  "USB-Kopplung automatisch bestätigen …": "Completing USB pairing automatically …",
+  "USB-Kopplung prüfen …": "Verifying USB pairing …",
+  "Signierschlüssel für DirectSide vorbereiten …": "Preparing DirectSide signing keys …",
+  "Installiertes DirectSide suchen …": "Finding installed DirectSide …",
+  "DirectSide für die Übertragung öffnen …": "Opening DirectSide for transfer …",
+  "Pairing und Original-IPA übertragen und prüfen …": "Transferring and verifying pairing and original IPA …",
+  "Einrichtung repariert. DirectSide auf dem iPhone erneut öffnen.": "Setup repaired. Reopen DirectSide on the iPhone.",
+  "DirectSide ist installiert. Pairing und Original-IPA wurden übertragen.": "DirectSide is installed. Pairing and original IPA have been transferred."
 }

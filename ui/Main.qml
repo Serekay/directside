@@ -210,7 +210,7 @@ ApplicationWindow {
                 Card {
                     id:installCard;objectName:"installCard";visible:win.page==="install";Layout.fillWidth:true;Layout.fillHeight:true;Layout.minimumHeight:272;border.color:s.vpnState==="missing"?"#805440":"#30333a"
                     ColumnLayout {anchors.fill:parent;anchors.margins:24;spacing:12
-                        RowLayout {visible:s.vpnState!=="missing";spacing:8
+                        RowLayout {visible:s.vpnState!=="missing" || s.settingUp;spacing:8
                             Image {source:s.icon;Layout.preferredWidth:56;Layout.preferredHeight:56;sourceSize.width:112;sourceSize.height:112}
                             ColumnLayout {spacing:6
                                 RowLayout {spacing:8
@@ -220,7 +220,7 @@ ApplicationWindow {
                                 Label {text:"iOS 17+ · "+win.t("Pairing inklusive");font.pixelSize:12;color:win.muted}
                             }
                         }
-                        RowLayout {visible:s.vpnState==="missing";Layout.fillWidth:true;spacing:20
+                        RowLayout {objectName:"vpnInstallPrompt";visible:s.vpnState==="missing" && !s.settingUp;Layout.fillWidth:true;spacing:20
                             Rectangle {property real codeSize:Math.max(96,Math.min(156,installCard.height-180));Layout.preferredWidth:codeSize;Layout.preferredHeight:codeSize;radius:12;color:"white"
                                 Image {anchors.fill:parent;anchors.margins:6;source:s.vpnQr;fillMode:Image.PreserveAspectFit;smooth:false}
                             }
@@ -229,6 +229,10 @@ ApplicationWindow {
                                 Text {text:win.t("Auf dem ausgewählten Gerät installieren");font.pixelSize:18;font.weight:Font.DemiBold;color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                                 Text {text:win.t("Der Anleitung in der App folgen.");color:win.muted;font.pixelSize:13;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                             }
+                        }
+                        RowLayout {objectName:"deviceSetupProgress";visible:s.settingUp;Layout.fillWidth:true;spacing:10
+                            BusyIndicator {running:parent.visible;implicitWidth:30;implicitHeight:30}
+                            Text {objectName:"deviceSetupProgressText";text:win.t(s.setupPhase);color:win.accent;wrapMode:Text.WordWrap;Layout.fillWidth:true;font.pixelSize:13}
                         }
                         Action {objectName:"installDirectSideButton";text:s.directsideInstalling?win.t("Bitte warten …"):win.t("DirectSide installieren");primary:true;Layout.fillWidth:true;implicitHeight:48;enabled:s.loggedIn && s.devices.length>0 && (!s.busy || s.scanning) && !s.updateBusy && !s.directsideInstalling && s.releaseIPA;onClicked:backend.downloadDirectSide()}
                         RowLayout {objectName:"customIPARow";Layout.fillWidth:true;spacing:8
@@ -259,6 +263,7 @@ ApplicationWindow {
                         RowLayout {Label {text:win.t("LocalDevVPN · dieses Gerät");Layout.fillWidth:true} Badge {text:s.vpnState==="installed"?win.t("Installiert"):s.vpnState==="missing"?win.t("Fehlt"):win.t("Nicht geprüft");tone:s.vpnState==="installed"?"ok":s.vpnState==="missing"?"missing":"warning"}}
                         Action {visible:s.usbState!=="ready";text:s.usbState==="stopped"?win.t("Apple USB starten"):win.t("Apple USB / iTunes installieren");primary:true;enabled:!s.busy;onClicked:backend.setupComponents()}
                         Action {text:win.t("Erneut prüfen");enabled:!s.busy;onClicked:backend.checkComponents()}
+                        Action {objectName:"repairDirectSideButton";text:win.t("DirectSide-Einrichtung reparieren");enabled:s.devices.length>0 && !s.busy && !s.updateBusy;onClicked:if(backend.repairDirectSide())win.page="install"}
                         Action {text:s.slotsUsed>=0?win.t("Apps ansehen · ")+s.slotsUsed+win.t(" / 3 Plätze"):win.t("Apps ansehen");enabled:s.devices.length>0;onClicked:{win.appPage=0;win.page="apps"}}
                         Action {text:win.t("Zertifikate verwalten");enabled:s.loggedIn && !s.busy;onClicked:{win.page="certificates";backend.loadCertificates()}}
                         }
@@ -401,7 +406,7 @@ ApplicationWindow {
             RowLayout {Layout.fillWidth:true;spacing:8
                 Item {Layout.fillWidth:true}
                 Label {visible:s.updateBusy || s.updateMessage.length>0;text:s.updateBusy?win.t("GitHub …")+(s.updateProgress>0?" "+s.updateProgress+"%":""):win.t(s.updateMessage);font.pixelSize:12;color:s.updateState==="error"?"#ffb49a":win.muted;Layout.maximumWidth:parent.width*0.55;horizontalAlignment:Text.AlignRight}
-                Label {visible:!!s.error || (s.busy && !s.scanning) || s.lcPrepared || s.success;text:(s.error || (s.busy && !s.scanning?s.status:s.lcPrepared?win.t("Zertifikat übertragen · auf dem iPhone fortfahren"):s.success?win.t("Installiert"):"")).split("\n")[0];font.pixelSize:12;color:s.error?"#ffb49a":win.muted;Layout.maximumWidth:parent.width-150;horizontalAlignment:Text.AlignRight}
+                Label {visible:!!s.error || (s.busy && !s.scanning && !s.settingUp) || s.lcPrepared || s.success;text:(s.error || (s.busy && !s.scanning?s.status:s.lcPrepared?win.t("Zertifikat übertragen · auf dem iPhone fortfahren"):s.success?s.status:"")).split("\n")[0];font.pixelSize:12;color:s.error?"#ffb49a":win.muted;Layout.maximumWidth:parent.width-150;horizontalAlignment:Text.AlignRight}
                 IconButton {visible:s.error.length>0;text:"≡";hint:win.t("Aktivität");onClicked:win.page="activity"}
                 ProgressBar {visible:s.busy && !s.scanning;Layout.preferredWidth:100;from:0;to:100;value:s.progress;indeterminate:s.progress<=0
                     background:Rectangle{implicitHeight:4;radius:2;color:"#343a42"}

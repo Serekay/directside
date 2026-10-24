@@ -315,34 +315,84 @@ async fn install(engine: &mut Engine, request: &Value) -> Result<(), Report> {
         emit(json!({"event":"progress","value":(p*85.0).clamp(0.0,85.0)}));
     }),None).await?;
     if directside {
-        bootstrap(engine,&provider,&path).await?;
+        bootstrap(Some(engine),&provider,&path).await?;
     }
     emit(json!({"event":"installed","path":request["path"],"device_id":id,"bootstrap_ready":directside}));
     Ok(())
 }
 
-async fn bootstrap(engine: &mut Engine, provider: &impl idevice::provider::IdeviceProvider, ipa: &std::path::Path) -> Result<(),Report> {
-    use idevice::{remote_pairing::{RemotePairingLockdownService,RpPairingFile},house_arrest::HouseArrestClient};
-    emit(json!({"event":"status","message":"Remote-Pairing für DirectSide einrichten …"}));
-    let info=isideload::util::device::IdeviceInfo::from_device(provider).await?;
-    let service=RemotePairingLockdownService::connect(provider).await?;
-    let mut client=service.into_client("DirectSide Windows")?;
-    let mut pairing=RpPairingFile::generate("DirectSide Windows");
-    client.connect(&mut pairing,||async {
-        emit(json!({"event":"pairing_pin"}));
-        read().ok().and_then(|r|r.get("code").and_then(Value::as_str).map(str::to_string)).unwrap_or_default()
+async fn pairing_step<T>(message:&str,seconds:u64,future:impl std::future::Future<Output=Result<T,Report>>)->Result<T,Report> {
+    emit(json!({"event":"status","message":message,"phase":"device_setup"}));
+    tokio::time::timeout(Duration::from_secs(seconds),future).await.map_err(|_|report!("{} Zeitlimit erreicht. USB-Verbindung erneut herstellen und Einrichtung reparieren.",message))?
+}
+
+async fn usb_remote_pairing(provider:&impl idevice::provider::IdeviceProvider,udid:&str)->Result<idevice::remote_pairing::RpPairingFile,Report> {
+    use idevice::remote_pairing::{RemotePairingLockdownService,RpPairingFile};
+    let storage=KeyringStorage::new("DirectSide.pairing".into());
+    let key=format!("device-{udid}");
+    let cached=storage.retrieve_data(&key)?.and_then(|bytes|serde_json::from_slice::<Value>(&bytes).ok()).and_then(|v|{
+        let host=v.get("host")?.as_str()?.to_string();
+        let bytes:Vec<u8>=serde_json::from_value(v.get("record")?.clone()).ok()?;
+        Some((host,RpPairingFile::from_bytes(&bytes).ok()?))
+    });
+    let (host,mut pairing)=cached.unwrap_or_else(||{
+        let seed=RpPairingFile::generate("DirectSide seed");
+        let tag=seed.public_key_bytes().iter().take(6).map(|b|format!("{b:02x}")).collect::<String>();
+        let host=format!("DirectSide-{tag}");let pairing=RpPairingFile::generate(&host);(host,pairing)
+    });
+    let service=pairing_step("USB-Kopplungsdienst öffnen …",10,async {Ok(RemotePairingLockdownService::connect(provider).await?)}).await?;
+    let mut client=service.into_client(&host)?;
+    // Like iloader's USB setup: trusted lockdown uses the protocol's fixed PIN,
+    // not an interactive tvOS/wireless PIN prompt. Never wait on stdin here.
+    pairing_step("USB-Kopplung automatisch bestätigen …",25,async {Ok(client.connect(&mut pairing,||async {"000000".to_string()}).await?)}).await?;
+    drop(client);
+    pairing_step("USB-Kopplung prüfen …",15,async {
+        let service=RemotePairingLockdownService::connect(provider).await?;
+        let mut check=service.into_client(&host)?;
+        check.attempt_pair_verify().await?;check.validate_pairing(&mut pairing).await?;Ok(())
     }).await?;
-    let team=engine.get_team().await?;
-    let bundle=format!("com.directside.app.{}",team.team_id);
-    let mut afc=HouseArrestClient::connect(provider).await?.vend_documents(bundle).await?;
-    let signing=engine.bootstrap_signing_identity().await?;
-    for (name,data) in [
+    storage.store_data(&key,&serde_json::to_vec(&json!({"host":host,"record":pairing.to_bytes()}))?)?;
+    Ok(pairing)
+}
+
+async fn repair_directside(request:&Value)->Result<(),Report> {
+    let id=text(request,"device_id")?;
+    let path=PathBuf::from(text(request,"path")?);
+    let info=isideload::sideload::application::inspect_ipa(&path)?;
+    if info.get("CFBundleIdentifier").and_then(plist::Value::as_string)!=Some("com.directside.app") {bail!("Für die Einrichtung bitte die DirectSide-IPA auswählen.");}
+    let mut mux=UsbmuxdConnection::default().await?;
+    let device=mux.get_devices().await?.into_iter().find(|d|d.udid==id).ok_or_else(||report!("iPhone nicht mehr verbunden."))?;
+    let provider=device.to_provider(UsbmuxdAddr::from_env_var()?,"DirectSide");
+    bootstrap(None,&provider,&path).await?;
+    emit(json!({"event":"directside_repaired","device_id":id}));Ok(())
+}
+
+async fn bootstrap(engine: Option<&mut Engine>, provider: &impl idevice::provider::IdeviceProvider, ipa: &std::path::Path) -> Result<(),Report> {
+    use idevice::house_arrest::HouseArrestClient;
+    let info=pairing_step("Geräteinformationen für die Kopplung lesen …",10,async {isideload::util::device::IdeviceInfo::from_device(provider).await}).await?;
+    let pairing=usb_remote_pairing(provider,&info.udid).await?;
+    let (bundle,signing)=if let Some(engine)=engine {
+        let team=engine.get_team().await?;
+        let signing=pairing_step("Signierschlüssel für DirectSide vorbereiten …",35,async {engine.bootstrap_signing_identity().await}).await?;
+        (format!("com.directside.app.{}",team.team_id),Some(signing))
+    }else {
+        let bundle=pairing_step("Installiertes DirectSide suchen …",10,async {
+            let mut proxy=idevice::installation_proxy::InstallationProxyClient::connect(provider).await?;
+            let apps=proxy.get_apps(Some("User"),None).await?;
+            let matches:Vec<_>=apps.keys().filter(|id|*id=="com.directside.app" || id.starts_with("com.directside.app.")).cloned().collect();
+            if matches.len()!=1 {bail!("DirectSide konnte nicht eindeutig auf diesem Gerät gefunden werden.");}Ok(matches[0].clone())
+        }).await?;
+        (bundle,None)
+    };
+    let mut afc=pairing_step("DirectSide für die Übertragung öffnen …",10,async {Ok(HouseArrestClient::connect(provider).await?.vend_documents(bundle).await?)}).await?;
+    let mut files=vec![
         ("DirectSide-pairing.plist",pairing.to_bytes()),
         ("DirectSide-original.ipa",std::fs::read(ipa)?),
-        ("DirectSide-signing.json",signing),
-        // The metadata is the final commit marker, after all required files.
-        ("DirectSide-bootstrap.json",serde_json::to_vec(&json!({"udid":info.udid,"name":info.name}))?),
-    ] {
+    ];
+    if let Some(signing)=signing {files.push(("DirectSide-signing.json",signing));}
+    files.push(("DirectSide-bootstrap.json",serde_json::to_vec(&json!({"udid":info.udid,"name":info.name}))?));
+    pairing_step("Pairing und Original-IPA übertragen und prüfen …",90,async {
+    for (name,data) in files {
         let temporary=format!("/Documents/{name}.pending");
         let destination=format!("/Documents/{name}");
         let mut f=afc.open(&temporary,idevice::afc::opcode::AfcFopenMode::WrOnly).await?;
@@ -353,6 +403,8 @@ async fn bootstrap(engine: &mut Engine, provider: &impl idevice::provider::Idevi
         if transferred!=data {bail!("Pairing-Übertragung unvollständig. DirectSide erneut installieren.");}
         afc.rename(temporary,destination).await?;
     }
+    Ok(())
+    }).await?;
     emit(json!({"event":"status","message":"DirectSide ist installiert. Pairing und Original-IPA wurden übertragen."}));
     Ok(())
 }
@@ -509,6 +561,7 @@ pub async fn run() {
             "export_livecontainer"=>match engine.as_mut() {Some(e)=>export_livecontainer(e,&request).await,None=>Err(report!("Bitte zuerst anmelden."))},
             "pair_local"=>pair_local(&request).await,
             "reveal_developer_mode"=>reveal_developer_mode(&request).await,
+            "repair_directside"=>repair_directside(&request).await,
             "restore" => {
                 match tokio::time::timeout(Duration::from_secs(45),restore()).await {
                     Ok(Ok(Some(e)))=>{engine=Some(e);Ok(())},
@@ -564,6 +617,12 @@ pub async fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn pairing_steps_complete_or_fail_with_their_phase_instead_of_hanging() {
+        assert_eq!(pairing_step("Test phase",1,async {Ok(42)}).await.unwrap(),42);
+        let result=pairing_step("Blocked pairing phase",0,std::future::pending::<Result<(),Report>>()).await;
+        assert!(result.unwrap_err().to_string().contains("Blocked pairing phase"));
+    }
     #[test]
     fn removal_requires_an_explicit_boolean_confirmation() {
         for request in [json!({}),json!({"confirmed":false}),json!({"confirmed":"true"})] {assert!(require_confirmation(&request).is_err());}

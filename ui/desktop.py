@@ -55,7 +55,7 @@ class DesktopBridge(QObject):
             if path.is_file(): self.data.update(ipa=str(path),ipaName=path.name);break
         self.data.update(language=language,savedEmail=saved.get('email',''),translations=ENGLISH,status=translate(self.data['status'],language))
         self.data.update(version=VERSION,updateBusy=False,updateProgress=0,updateState='unchecked',updateMessage='',releaseVersion='',windowsUpdate=False,releaseIPA=False,directsideInstalling=False,customIPA='',customIPAName='',ipaSource='file',githubSaved=(CACHE/'github.dpapi').is_file())
-        self.data.update(certificates=[],certificatesLoaded=False,certificateTeam='',certificateLimit=False,removal={},developerMode='unknown')
+        self.data.update(certificates=[],certificatesLoaded=False,certificateTeam='',certificateLimit=False,removal={},developerMode='unknown',settingUp=False,setupPhase='')
         self.releaseClient=ReleaseClient(HOME if getattr(sys,'frozen',False) else ROOT)
         self.release=None
         self.buffer=bytearray()
@@ -145,7 +145,7 @@ class DesktopBridge(QObject):
         self.pendingLogin=None
         self.pendingReleaseInstall=None
         if not self.data['loggedIn']:self.data['authState']='signed_out'
-        self.update(error=clean_error(message),busy=False,scanning=False,challenge='',directsideInstalling=False,status='Fehlgeschlagen')
+        self.update(error=clean_error(message),busy=False,scanning=False,challenge='',directsideInstalling=False,settingUp=False,setupPhase='',status='Fehlgeschlagen')
         self.append_log(message)
 
     def handle(self,event):
@@ -194,7 +194,9 @@ class DesktopBridge(QObject):
                 apps=[dict(app,icon=('data:image/png;base64,'+icons[app['id']]) if icons[app['id']] else '',iconChecked=True) if app['id'] in icons else app for app in self.data['installedApps']]
                 self.update(installedApps=apps,busy=False,scanning=False)
         elif kind=='livecontainer_prepared':self.update(busy=False,lcPrepared=True,status='Auf dem iPhone: DirectSide → Konto → LiveContainer einrichten')
-        elif kind=='status':self.update(status=event.get('message',''));self.append_log(event.get('message',''))
+        elif kind=='status':
+            message=event.get('message','')
+            self.update(status=message,**({'settingUp':True,'setupPhase':message} if event.get('phase')=='device_setup' else {}));self.append_log(message)
         elif kind=='progress':self.update(progress=event.get('value',0))
         elif kind=='two_factor':self.update(challenge='code',busy=True,numbers=event.get('numbers',[]),challengeError='Code nicht akzeptiert' if event.get('last_error') else '')
         elif kind=='choose_team':self.update(challenge='team',busy=True,teams=event.get('teams',[]))
@@ -214,7 +216,8 @@ class DesktopBridge(QObject):
             if event.get('command')=='login' and 'Auth error -80046:' in event.get('message',''):
                 self.update(loggedIn=False,authState='rejected',error='Apple verweigert die lokale Anmeldung (−80046).',status='Anmeldung erforderlich')
             if event.get('command')=='local_auth_probe' and self.initializing:self.initializing=False;self.refresh()
-        elif kind=='installed':self.installing=False;self.update(busy=False,success=True,progress=100,status='Installiert',challenge='',directsideInstalling=False);self.inspectDevice()
+        elif kind=='installed':self.installing=False;self.update(busy=False,success=True,progress=100,status='Installiert',challenge='',directsideInstalling=False,settingUp=False,setupPhase='');self.inspectDevice()
+        elif kind=='directside_repaired':self.update(busy=False,success=True,progress=100,settingUp=False,setupPhase='',status='Einrichtung repariert. DirectSide auf dem iPhone erneut öffnen.');self.inspectDevice()
 
     def persist(self,email):
         try:self.preferences.save(email,self.data['language']);self.data['savedEmail']=email.strip();return True
@@ -462,6 +465,19 @@ class DesktopBridge(QObject):
 
     @Slot()
     def dismissError(self):self.update(error='')
+
+    @Slot(result=bool)
+    def repairDirectSide(self):
+        if self.data['busy'] or self.data['updateBusy'] or not self.data['devices']:return False
+        paths=[Path(self.data['ipa']),HOME/'DirectSide.ipa',ROOT/'dist'/'DirectSide.ipa']
+        for path in paths:
+            try:
+                if ipa_identity(path)=='com.directside.app':break
+            except Exception:pass
+        else:self.fail('Für die Einrichtung bitte die DirectSide-IPA auswählen.');return False
+        self.update(busy=True,settingUp=True,setupPhase='Geräteinformationen für die Kopplung lesen …',error='',success=False)
+        self.send({'command':'repair_directside','device_id':self.data['devices'][self.data['deviceIndex']]['id'],'path':str(path)})
+        return True
 
     @Slot()
     def checkComponents(self):
