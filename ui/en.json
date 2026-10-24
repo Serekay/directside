@@ -216,5 +216,8 @@
   "App entfernt.": "App removed.",
   "Entfernen …": "Removing …",
   "Zertifikat widerrufen. Zugehörige Apps erneut installieren.": "Certificate revoked. Reinstall affected apps.",
-  "Signierzertifikatlimit erreicht. Zertifikate verwalten.": "Signing certificate limit reached. Manage certificates."
+  "Signierzertifikatlimit erreicht. Zertifikate verwalten.": "Signing certificate limit reached. Manage certificates.",
+  "Automatisch anmelden …": "Signing in automatically …",
+  "Ein Zertifikat kann mehrere Apps signieren.": "One certificate can sign multiple apps.",
+  "Apps auf diesem Gerät": "Apps on this device"
 }

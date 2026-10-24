@@ -4,6 +4,8 @@ Entwicklungsstand, keine Release-Freigabe.
 
 ## Windows
 
+- Ergänzung Account-/Zertifikatsansicht: insgesamt 43 Python-Tests bestanden. Neue Tests prüfen die sichtbare automatische Anmeldung in der Account-Karte bis zur bestätigten Sitzung, die erneute Anmeldung nach Ablauf sowie getrennte Zertifikats-/App-Zähler und Seitenwechsel nach Entfernung. Die Verwaltung zeigt alle von Apples iOS-Zertifikatsabfrage gelieferten Einträge ohne zusätzlichen Plattformfilter; der Auswahlpfad zum Signieren bleibt unverändert. Ansichten mit synthetischen Daten bei 960 × 680 geprüft. Die tatsächliche Zertifikatszahl dieses Accounts ist damit noch nicht bestätigt.
+
 - Rust-Kern lokal kompiliert. Vier Tests prüfen das Drei-App-Limit samt Erneuerung bestehender Apps, die Erkennung anhand korrekter Bundle-IDs den lokalen Anisette-Callback samt Neusynchronisierung sowie die ausdrückliche Bestätigung vor Löschvorgängen. Zwei zusätzliche Vendor-Tests prüfen Callback-Payloads, passenden und unpassenden Schlüssel-/Zertifikatsimport sowie die Erkennung vorhandener privater Schlüssel.
 - 41 Python-Tests bestanden: IPA-Auswahl, Voreinstellungen ohne Passwort, lokale Anmeldung, Komponentenprüfung, Hashprüfung, integrierte Bestätigungen, automatisches Gerätescannen, getrennte Gerätezustände, Icon-Cache und gespeicherte Sprachwahl. QML-Regressionstests prüfen Eingabeerhalt, Anmeldeklick und App-ID-Kontingente. Weitere Tests prüfen den abgelehnten Token, DPAPI-Schutz samt Manipulationserkennung und die Beschränkung der Provisionierung auf Apple-HTTPS-Endpunkte.
 - Die echte gepackte EXE wurde mit --smoke-test gestartet: Qt, QML, Fenster-Icon, eigene Titelleiste, Signierkern und tatsächliche lokale Anisette-Erzeugung erfolgreich. Bericht: build/smoke-test.json.
