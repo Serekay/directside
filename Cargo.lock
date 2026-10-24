@@ -787,6 +787,7 @@ name = "directside-engine"
 version = "0.1.0"
 dependencies = [
  "apple-codesign-quick",
+ "base64 0.22.1",
  "idevice",
  "isideload",
  "plist",
@@ -1496,6 +1497,7 @@ dependencies = [
  "isideload-p12-keystore",
  "isideload-vfs",
  "keyring",
+ "md-5",
  "pbkdf2",
  "plist",
  "plist-macro",
@@ -1519,6 +1521,7 @@ dependencies = [
  "urlencoding",
  "uuid",
  "web-time",
+ "windows-sys 0.61.2",
  "x509-cert 0.2.5",
  "zip",
 ]

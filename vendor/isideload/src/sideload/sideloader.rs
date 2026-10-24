@@ -41,6 +41,14 @@ pub struct Sideloader<C: MaxCertsCallback, E: ExtensionsBehaviorCallback> {
 }
 
 impl<C: MaxCertsCallback, E: ExtensionsBehaviorCallback> Sideloader<C, E> {
+    /// Prepare an encrypted certificate archive for explicit local transfer to DirectSide on iOS.
+    /// Never emit this payload through status events or logs.
+    pub async fn livecontainer_certificate(&mut self)->Result<Vec<u8>,Report> {
+        let team=self.get_team().await?;
+        let cert=CertificateIdentity::retrieve(&self.machine_name,&self.apple_email,&mut self.dev_session,&team,self.storage.as_ref(),&self.max_certs_behavior).await?;
+        let certificate=cert.as_p12(&cert.machine_id).await?;
+        Ok(serde_json::to_vec(&serde_json::json!({"certificate":certificate,"password":cert.machine_id}))?)
+    }
     /// Construct a new `Sideloader` instance with the provided configuration
     ///
     /// See [`crate::sideload::SideloaderBuilder`] for more details and a more convenient way to construct a `Sideloader`.

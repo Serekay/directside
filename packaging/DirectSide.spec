@@ -4,11 +4,15 @@ root = Path(SPECPATH).parent
 binaries = [(str(root / 'bin/directside-engine.exe'), 'bin')]
 if (root / 'bin/libunwind.dll').exists():
     binaries.append((str(root / 'bin/libunwind.dll'), 'bin'))
+if (root / 'bin/apple/CoreADI64.dll').exists():
+    binaries.append((str(root / 'bin/apple/CoreADI64.dll'), 'bin/apple'))
 
 a = Analysis([str(root / 'ui/desktop.py')], pathex=[str(root / 'ui')],
     binaries=binaries,
     datas=[(str(root / 'ui/Main.qml'), 'ui'),
+           (str(root / 'ui/en.json'), '.'),
            (str(root / 'assets/DirectSide.ico'), 'assets'),
+           (str(root / 'assets/localdevvpn-qr.png'), 'assets'),
            (str(root / 'assets/brand-128.png'), 'assets')],
     hiddenimports=['PySide6.QtQuickControls2'],
     excludes=['tkinter', 'PySide6.QtWebEngineCore', 'PySide6.QtWebEngineWidgets'])

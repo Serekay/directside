@@ -19,14 +19,16 @@ class Preferences:
     def load(self):
         try:
             data = json.loads(self.path.read_text(encoding='utf-8'))
-            return {key: data[key] for key in ('email', 'server') if isinstance(data.get(key), str)}
+            result={key: data[key] for key in ('email',) if isinstance(data.get(key), str)}
+            result['language']=data.get('language') if data.get('language') in ('en','de') else 'en'
+            return result
         except (OSError, ValueError, AttributeError):
             return {}
 
-    def save(self, email, server):
+    def save(self, email, language='en'):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temp = self.path.with_suffix('.tmp')
-        temp.write_text(json.dumps({'email':email.strip(), 'server':server.strip()}, ensure_ascii=False), encoding='utf-8')
+        temp.write_text(json.dumps({'email':email.strip(),'language':language if language in ('en','de') else 'en'}, ensure_ascii=False), encoding='utf-8')
         temp.replace(self.path)
 
 def valid_code(value):

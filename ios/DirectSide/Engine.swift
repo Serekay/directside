@@ -15,7 +15,7 @@ import SwiftUI
     @Published var sources: [SourceCatalog] = []
     @Published var pendingSource: SourceCatalog?
     @Published var pairingReady = false
-    @Published var server = UserDefaults.standard.string(forKey: "server") ?? "https://new.ani.sidestore.io"
+    @Published var liveContainerCertificateReady = false
     private var timer: Timer?
     private var pendingApp: ManagedApp?
     private var bootstrap: Bootstrap?
@@ -66,6 +66,8 @@ import SwiftUI
     func refreshBootstrap() {
         do {
             try Paths.importBootstrap()
+            try LiveContainerBridge.importTransfer()
+            liveContainerCertificateReady=LiveContainerBridge.certificateReady
             bootstrap = try? JSONDecoder().decode(Bootstrap.self, from: Data(contentsOf: Paths.bootstrap))
             pairingReady = bootstrap != nil && FileManager.default.fileExists(atPath: Paths.pairing.path)
         } catch { self.error = error.localizedDescription }
@@ -76,10 +78,8 @@ import SwiftUI
     }
     func login(email: String, password: String) {
         guard !busy, !email.isEmpty, !password.isEmpty else { return }
-        do { _ = try SourceURL.parse(server) } catch { fail(error.localizedDescription); return }
         busy = true
-        UserDefaults.standard.set(server, forKey: "server")
-        send(["command":"login", "email":email, "password":password, "server":server])
+        send(["command":"login", "email":email, "password":password])
     }
     func submitCode(_ code: String) {
         guard code.count == 6, code.allSatisfy(\.isNumber) else { error = "Bitte sechs Ziffern eingeben."; return }

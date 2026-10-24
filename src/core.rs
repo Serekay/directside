@@ -1,7 +1,7 @@
 use std::{io::{self, Write}, path::PathBuf, time::Duration};
 use idevice::{IdeviceService, lockdown::LockdownClient, usbmuxd::{UsbmuxdAddr, UsbmuxdConnection}};
 use isideload::{
-    anisette::remote_v3::RemoteV3AnisetteProvider,
+    anisette::{local::LocalAnisetteProvider, AnisetteProvider, AnisetteDataResponse},
     auth::apple_account::{AppleAccount, AppToken, TwoFactorCallbackParams, TwoFactorCallbackResponse},
     dev::{developer_session::DeveloperSession, teams::DeveloperTeam},
     sideload::{SideloaderBuilder, TeamSelection, builder::MaxCertsBehavior, sideloader::Sideloader},
@@ -55,6 +55,62 @@ async fn devices() -> Result<Value, Report> {
     Ok(json!({"event":"devices", "devices":result}))
 }
 
+fn app_present(apps:&std::collections::HashMap<String,plist::Value>,bundle:&str,allow_team_suffix:bool)->bool {
+    apps.keys().any(|id|id==bundle || (allow_team_suffix && id.strip_prefix(bundle).is_some_and(|suffix|suffix.starts_with('.') && suffix.len()>1)))
+}
+
+async fn device_components(request:&Value)->Result<(),Report> {
+    let id=text(request,"device_id")?;
+    let mut mux=UsbmuxdConnection::default().await?;
+    let dev=mux.get_devices().await?.into_iter().find(|d|d.udid==id).ok_or_else(||report!("iPhone nicht mehr verbunden."))?;
+    let provider=dev.to_provider(UsbmuxdAddr::from_env_var()?,"DirectSide");
+    let mut proxy=idevice::installation_proxy::InstallationProxyClient::connect(&provider).await?;
+    let apps=proxy.get_apps(Some("User"),None).await?;
+    let developer=developer_apps(&apps);
+    let mut overview:Vec<Value>=apps.iter().filter_map(|(bundle,value)| {
+        let info=value.as_dictionary()?;
+        Some(json!({"id":bundle,"name":info.get("CFBundleDisplayName").or_else(||info.get("CFBundleName")).and_then(plist::Value::as_string).unwrap_or(bundle),"developer":developer.iter().any(|app|app["id"].as_str()==Some(bundle.as_str()))}))
+    }).collect();
+    overview.sort_by_key(|app|(!app["developer"].as_bool().unwrap_or(false),app["name"].as_str().unwrap_or("").to_lowercase()));
+    emit(json!({"event":"device_components","device_id":id,"localdevvpn":app_present(&apps,"com.jkcoxson.LocalDevVPN",false),"livecontainer":app_present(&apps,"com.kdt.livecontainer",true),"directside":app_present(&apps,"com.directside.app",true),"slots_used":developer.len(),"developer_apps":developer,"apps":overview}));
+    Ok(())
+}
+
+async fn app_icons(request:&Value)->Result<(),Report> {
+    use base64::Engine as _;
+    let id=text(request,"device_id")?;
+    let bundles=request["bundles"].as_array().ok_or_else(||report!("App-Auswahl fehlt."))?;
+    if bundles.len()>12 {bail!("Zu viele Icons angefragt.");}
+    let mut mux=UsbmuxdConnection::default().await?;
+    let dev=mux.get_devices().await?.into_iter().find(|d|d.udid==id).ok_or_else(||report!("Gerät nicht verbunden."))?;
+    let provider=dev.to_provider(UsbmuxdAddr::from_env_var()?,"DirectSide");
+    let mut spring=idevice::springboardservices::SpringBoardServicesClient::connect(&provider).await?;
+    let mut icons=Vec::new();
+    for bundle in bundles {
+        let Some(bundle)=bundle.as_str() else {continue};
+        let png=match tokio::time::timeout(Duration::from_secs(2),spring.get_icon_pngdata(bundle.to_string())).await {
+            Ok(Ok(data)) if data.len()<=1024*1024=>base64::prelude::BASE64_STANDARD.encode(data),
+            _=>String::new(),
+        };
+        icons.push(json!({"id":bundle,"png":png}));
+    }
+    emit(json!({"event":"app_icons","device_id":id,"icons":icons}));Ok(())
+}
+
+async fn prepare_livecontainer(engine:&mut Engine,request:&Value)->Result<(),Report> {
+    let id=text(request,"device_id")?;
+    let mut mux=UsbmuxdConnection::default().await?;
+    let dev=mux.get_devices().await?.into_iter().find(|d|d.udid==id).ok_or_else(||report!("iPhone nicht mehr verbunden."))?;
+    let provider=dev.to_provider(UsbmuxdAddr::from_env_var()?,"DirectSide");
+    let team=engine.get_team().await?;
+    let bytes=engine.livecontainer_certificate().await?;
+    let mut afc=idevice::house_arrest::HouseArrestClient::connect(&provider).await?.vend_documents(format!("com.directside.app.{}",team.team_id)).await?;
+    let mut file=afc.open("/Documents/DirectSide-livecontainer.json",idevice::afc::opcode::AfcFopenMode::WrOnly).await?;
+    file.write_entire(&bytes).await?;file.close().await?;
+    emit(json!({"event":"livecontainer_prepared","device_id":id}));
+    Ok(())
+}
+
 fn choose_team(teams: &Vec<DeveloperTeam>) -> Option<String> {
     emit(json!({"event":"choose_team", "teams":teams.iter().map(|t|json!({"id":t.team_id,"name":t.name,"type":t.r#type})).collect::<Vec<_>>()}));
     let r = read().ok()?;
@@ -81,10 +137,8 @@ async fn second_factor(p: TwoFactorCallbackParams) -> Result<TwoFactorCallbackRe
 async fn login(request: &Value) -> Result<Engine, Report> {
     let email = text(request,"email")?.trim();
     let password = text(request,"password")?;
-    let server = text(request,"server")?.trim_end_matches('/');
-    let url = req_server(server)?;
     emit(json!({"event":"status","message":"Apple-Anmeldung wird aufgebaut …"}));
-    let provider = RemoteV3AnisetteProvider::new(&url, Box::new(KeyringStorage::new(format!("DirectSide.anisette.{}",url))), "0".to_string())?;
+    let provider = LocalAnisetteProvider::new()?;
     let mut account = AppleAccount::builder(email)
         .anisette_provider(provider)
         .err_429_retries(Some(1))
@@ -92,7 +146,7 @@ async fn login(request: &Value) -> Result<Engine, Report> {
     emit(json!({"event":"status","message":"Anmeldung bestätigt. Developer-Team wird geladen …"}));
     let session = DeveloperSession::from_account(&mut account).await?;
     let (token,adsid)=session.session_credentials();
-    let secret=json!({"email":email,"server":url,"token":token.token,"adsid":adsid,"duration":token.duration,"expiry":token.expiry});
+    let secret=json!({"email":email,"auth":"local","token":token.token,"adsid":adsid,"duration":token.duration,"expiry":token.expiry});
     // Session tokens, not passwords; stored only in the OS credential store.
     KeyringStorage::new("DirectSide.session".to_string()).store_data("active",&serde_json::to_vec(&secret)?)?;
     make_engine(session,email).await
@@ -114,26 +168,31 @@ async fn restore()->Result<Option<Engine>,Report> {
     let Some(bytes)=KeyringStorage::new("DirectSide.session".to_string()).retrieve_data("active")? else {return Ok(None)};
     let saved:Value=serde_json::from_slice(&bytes)?;
     let email=text(&saved,"email")?;
-    let url=req_server(text(&saved,"server")?)?;
-    let provider=RemoteV3AnisetteProvider::new(&url,Box::new(KeyringStorage::new(format!("DirectSide.anisette.{}",url))),"0".to_string())?;
+    let provider=LocalAnisetteProvider::new()?;
     let account=AppleAccount::builder(email).anisette_provider(provider).err_429_retries(Some(1)).build().await?;
     let token=AppToken {token:text(&saved,"token")?.to_string(),duration:saved["duration"].as_u64().unwrap_or(0),expiry:saved["expiry"].as_u64().unwrap_or(0)};
     let session=DeveloperSession::new(token,text(&saved,"adsid")?.to_string(),account.grandslam_client,account.anisette_generator);
     Ok(Some(make_engine(session,email).await?))
 }
 
+async fn probe_local_auth()->Result<(),Report> {
+    let mut provider=LocalAnisetteProvider::new()?;
+    let mut data=provider.get_anisette_data().await?;
+    if !matches!(data,AnisetteDataResponse::Data(_)) {
+        let gs=std::sync::Arc::new(isideload::auth::grandslam::GrandSlam::new(provider.get_client_info().await?,false,None).await?);
+        provider.provision(&gs,false).await?;
+        data=provider.get_anisette_data().await?;
+    }
+    let AnisetteDataResponse::Data(data)=data else {bail!("Lokale Apple-Einrichtung ist unvollständig.");};
+    let headers=data.get_headers();
+    emit(json!({"event":"local_auth_ready","mode":"local","machine_data_present":headers.get("X-Apple-I-MD-M").is_some_and(|v|!v.is_empty()),"otp_present":headers.get("X-Apple-I-MD").is_some_and(|v|!v.is_empty())}));
+    Ok(())
+}
+
 fn profile_expiry(path:&std::path::Path)->Option<String> {
     let bytes=std::fs::read(path).ok()?;
     let profile=apple_codesign_quick::ProvisioningProfile::parse(&bytes).ok()?;
     profile.plist().get("ExpirationDate")?.as_date().map(|d|d.to_xml_format())
-}
-
-fn req_server(server: &str) -> Result<String, Report> {
-    // No credentials or query parameters in a service URL.
-    if !server.starts_with("https://") || server.contains('@') || server.contains('?') || server.contains('#') || server.contains(char::is_whitespace) {
-        bail!("Der Anisette-Server benötigt eine HTTPS-Adresse ohne Zugangsdaten oder Parameter.");
-    }
-    Ok(server.to_string())
 }
 
 async fn install(engine: &mut Engine, request: &Value) -> Result<(), Report> {
@@ -211,15 +270,19 @@ async fn connect_local(request: &Value) -> Result<(idevice::tcp::handle::Adapter
     Ok((handle,rsd))
 }
 
-fn check_slots(installed:&std::collections::HashMap<String,plist::Value>,target:Option<&str>)->Result<(),Report> {
-    let developer:Vec<Value>=installed.iter().filter_map(|(id,value)|{
+fn developer_apps(installed:&std::collections::HashMap<String,plist::Value>)->Vec<Value> {
+    installed.iter().filter_map(|(id,value)|{
         let d=value.as_dictionary()?;
         let signer=d.get("SignerIdentity").and_then(plist::Value::as_string).unwrap_or("");
         let debug=d.get("Entitlements").and_then(plist::Value::as_dictionary).and_then(|e|e.get("get-task-allow")).and_then(plist::Value::as_boolean).unwrap_or(false);
         if debug || signer.contains("iPhone Developer") || signer.contains("Apple Development") {
             Some(json!({"id":id,"name":d.get("CFBundleDisplayName").and_then(plist::Value::as_string).unwrap_or(id)}))
         } else {None}
-    }).collect();
+    }).collect()
+}
+
+fn check_slots(installed:&std::collections::HashMap<String,plist::Value>,target:Option<&str>)->Result<(),Report> {
+    let developer=developer_apps(installed);
     emit(json!({"event":"slots","used":developer.len(),"limit":3,"apps":developer}));
     if let Some(target)=target {
         if developer.len()>=3 && !installed.contains_key(target) {bail!("Die drei Plätze für selbst signierte Apps sind belegt. Updates und Erneuerungen bestehender Apps bleiben möglich. Für weitere kompatible Apps kannst du LiveContainer verwenden.");}
@@ -272,9 +335,14 @@ pub async fn run() {
                 Ok(Err(e)) => Err(e),
                 Err(_) => Err(report!("Die Geräteerkennung antwortet nicht. Apple-USB-Verbindung prüfen.")),
             },
+            "local_auth_probe" => match tokio::time::timeout(Duration::from_secs(45),probe_local_auth()).await {Ok(r)=>r,Err(_)=>Err(report!("Lokale Apple-Einrichtung hat zu lange gedauert."))},
+            "device_components" => match tokio::time::timeout(Duration::from_secs(20),device_components(&request)).await {Ok(r)=>r,Err(_)=>Err(report!("App-Prüfung nicht möglich. iPhone entsperren und Vertrauen bestätigen."))},
+            "app_icons" => match tokio::time::timeout(Duration::from_secs(25),app_icons(&request)).await {Ok(r)=>r,Err(_)=>Err(report!("Icons konnten nicht geladen werden."))},
+            "prepare_livecontainer" => match engine.as_mut() {Some(e)=>prepare_livecontainer(e,&request).await,None=>Err(report!("Bitte zuerst anmelden."))},
             "restore" => {
                 match tokio::time::timeout(Duration::from_secs(45),restore()).await {
                     Ok(Ok(Some(e)))=>{engine=Some(e);Ok(())},
+                    Ok(Err(e))=>{emit(json!({"event":"status","message":format!("Gespeicherte Sitzung konnte lokal nicht übernommen werden: {e}")}));emit(json!({"event":"logged_out"}));Ok(())},
                     _=>{emit(json!({"event":"logged_out"}));Ok(())},
                 }
             },
@@ -311,9 +379,13 @@ pub async fn run() {
 mod tests {
     use super::*;
     #[test]
-    fn rejects_credentials_and_insecure_service_urls() {
-        for u in ["http://host", "https://user:pass@host", "https://host?token=secret", "https://host\nother"] { assert!(req_server(u).is_err()); }
-        assert!(req_server("https://new.ani.sidestore.io").is_ok());
+    fn component_detection_accepts_team_suffix_but_not_similar_app_names() {
+        let mut apps=std::collections::HashMap::new();
+        apps.insert("com.kdt.livecontainer.TEAM".into(),plist::Value::Boolean(true));
+        apps.insert("com.jkcoxson.LocalDevVPN.fake".into(),plist::Value::Boolean(true));
+        assert!(app_present(&apps,"com.kdt.livecontainer",true));
+        assert!(!app_present(&apps,"com.kdt.live",true));
+        assert!(!app_present(&apps,"com.jkcoxson.LocalDevVPN",false));
     }
     #[test]
     fn three_slots_allow_existing_app_refresh_but_block_new_app() {
