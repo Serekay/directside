@@ -31,7 +31,7 @@ jobs:
         run: python3 scripts/build-ios-mac-auth.py
       - name: Source format tests
         run: |
-          swiftc ios/DirectSide/Models.swift ios/Tests/main.swift -o /tmp/directside-source-tests
+          swiftc ios/DirectSide/Models.swift ios/DirectSide/Localization.swift ios/Tests/main.swift -o /tmp/directside-source-tests
           /tmp/directside-source-tests
       - name: Xcode project
         run: |

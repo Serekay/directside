@@ -155,9 +155,9 @@ enum SourceURL {
            let wrapped = components.queryItems?.first(where: { $0.name == "url" })?.value {
             return try parse(wrapped)
         }
-        guard components.scheme?.lowercased() == "https", components.host != nil,
+        guard ["https","http"].contains(components.scheme?.lowercased() ?? ""), let host=components.host, !host.isEmpty,
               components.user == nil, components.password == nil, let url = components.url else {
-            throw DirectSideError.message("Bitte eine HTTPS-Adresse für die Quelle verwenden.")
+            throw DirectSideError.message("Bitte eine HTTP- oder HTTPS-Adresse für die Quelle verwenden.")
         }
         return url
     }

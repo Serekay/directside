@@ -12,8 +12,7 @@ enum LiveContainerBridge {
         var request=query;request[kSecReturnData as String]=true
         return SecItemCopyMatching(request as CFDictionary,nil)==errSecSuccess
     }
-    static func importTransfer() throws {
-        let path=Paths.documents.appendingPathComponent("DirectSide-livecontainer.json")
+    static func importTransfer(from path:URL=Paths.documents.appendingPathComponent("DirectSide-livecontainer.json")) throws {
         guard FileManager.default.fileExists(atPath:path.path) else {return}
         let bytes=try Data(contentsOf:path)
         guard bytes.count<131072 else {throw DirectSideError.message("LiveContainer-Zertifikat ist ungültig.")}
@@ -31,10 +30,10 @@ enum LiveContainerBridge {
         try FileManager.default.removeItem(at:path)
     }
     static func configure(engine:Engine) {
-        guard available else {engine.error="LiveContainer zuerst am PC installieren.";return}
+        guard available else {engine.error="LiveContainer zuerst in den Einstellungen installieren.";return}
         var request=query;request[kSecReturnData as String]=true
         var result:CFTypeRef?
-        guard SecItemCopyMatching(request as CFDictionary,&result)==errSecSuccess,let data=result as? Data,let archive=try? JSONDecoder().decode(CertificateArchive.self,from:data) else {engine.error="Am PC in den Einstellungen das Zertifikat übertragen. Danach DirectSide erneut öffnen.";return}
+        guard SecItemCopyMatching(request as CFDictionary,&result)==errSecSuccess,let data=result as? Data,let archive=try? JSONDecoder().decode(CertificateArchive.self,from:data) else {engine.error="Zertifikat unter Einstellungen → LiveContainer erneut übertragen.";return}
         var url=URLComponents();url.scheme="livecontainer";url.host="certificate"
         url.queryItems=[URLQueryItem(name:"cert",value:Data(archive.certificate).base64EncodedString()),URLQueryItem(name:"password",value:archive.password)]
         guard let destination=url.url else {return}
@@ -44,9 +43,10 @@ enum LiveContainerBridge {
         }}
     }
     static var available:Bool {URL(string:"livecontainer://").map{UIApplication.shared.canOpenURL($0)} ?? false}
+    static func open() {if let url=URL(string:"livecontainer://") {UIApplication.shared.open(url)}}
     @MainActor static func importApp(_ app:CatalogApp,engine:Engine) {
         guard available else {engine.error="LiveContainer ist noch nicht installiert. Du kannst die offizielle Standalone-IPA über DirectSide installieren. DirectSide und LiveContainer benötigen zusammen zwei der drei Plätze.";return}
-        guard let latest=app.latest,latest.downloadURL.scheme=="https" else {engine.error="Keine geeignete IPA-Adresse vorhanden.";return}
+        guard let latest=app.latest,(try? SourceURL.parse(latest.downloadURL.absoluteString)) != nil else {engine.error="Keine geeignete IPA-Adresse vorhanden.";return}
         var url=URLComponents();url.scheme="livecontainer";url.host="install";url.queryItems=[URLQueryItem(name:"url",value:latest.downloadURL.absoluteString)]
         guard let destination=url.url else {return}
         UIApplication.shared.open(destination,options:[:]){success in Task{@MainActor in

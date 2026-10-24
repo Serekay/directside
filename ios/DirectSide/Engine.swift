@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import SwiftUI
+import CryptoKit
 
 @MainActor final class Engine: ObservableObject {
     @Published var message = "Bereit"
@@ -36,7 +37,34 @@ import SwiftUI
     @Published var certificateTeam=""
     private var removalConnection:(String,Int)?
     @Published var importedIPA:ImportedIPA?
+    @Published var needsPairingCode=false
     private var importingPath:URL?
+    func pairDevice(peer:String,port:Int) {
+        guard !busy else {return}
+        guard port>0 else {fail("LocalDevVPN verbinden und erneut suchen.");return}
+        busy=true;error=nil;message="Gerät koppeln …"
+        send(["command":"pair_local","peer":peer,"port":port,"pairing_path":Paths.pairing.path,"bootstrap_path":Paths.bootstrap.path])
+    }
+    func submitPairingCode(_ code:String) {needsPairingCode=false;send(["code":code])}
+    func configureLiveContainer() {
+        guard !busy,loggedIn else {return}
+        busy=true;error=nil;message="Zertifikat vorbereiten …"
+        send(["command":"export_livecontainer","path":Paths.support.appendingPathComponent("livecontainer-transfer.json").path])
+    }
+    func installLiveContainer(peer:String,port:Int) async {
+        guard !busy else {return}
+        guard loggedIn,pairingReady else {fail("In den Einstellungen anmelden und dieses Gerät koppeln.");return}
+        busy=true;error=nil;message="LiveContainer herunterladen …"
+        do {
+            let (temp,response)=try await URLSession.shared.download(from:URL(string:"https://github.com/LiveContainer/LiveContainer/releases/download/3.8.0/LiveContainer.ipa")!)
+            guard (response as? HTTPURLResponse)?.statusCode==200,response.url?.scheme=="https" else {throw DirectSideError.message("LiveContainer-Download fehlgeschlagen.")}
+            let bytes=try Data(contentsOf:temp,options:.mappedIfSafe)
+            guard bytes.count==4_707_271,SHA256.hash(data:bytes).map({String(format:"%02x",$0)}).joined()=="b6fea95e30083382e29ffef88fa1aaa40b5069e1112e5307d490dab04648bba6" else {throw DirectSideError.message("LiveContainer-Prüfsumme stimmt nicht.")}
+            let saved=Paths.support.appendingPathComponent("LiveContainer-3.8.0.ipa")
+            try bytes.write(to:saved,options:[.atomic,.completeFileProtectionUntilFirstUserAuthentication])
+            try await waitForInstall(saved,app:ManagedApp(id:"com.kdt.livecontainer",name:"LiveContainer",cachedIPA:saved.path,installedAt:Date(),version:"3.8.0"),peer:peer,port:port)
+        }catch{fail(error.localizedDescription)}
+    }
 
     func importIPA(_ url:URL) async {
         guard !busy else {return}
@@ -160,6 +188,10 @@ import SwiftUI
             ds_free(pointer)
             guard let data = string.data(using: .utf8), let event = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any], let type = event["event"] as? String else { continue }
             switch type {
+            case "pairing_pin":needsPairingCode=true;message="Pairing-Code eingeben"
+            case "paired_local":busy=false;needsPairingCode=false;refreshBootstrap();message="Gerät gekoppelt"
+            case "livecontainer_exported":
+                do {try LiveContainerBridge.importTransfer(from:Paths.support.appendingPathComponent("livecontainer-transfer.json"));liveContainerCertificateReady=LiveContainerBridge.certificateReady;busy=false;LiveContainerBridge.configure(engine:self)}catch{fail(error.localizedDescription)}
             case "status": message = event["message"] as? String ?? message
             case "progress": progress = (event["value"] as? Double ?? 0)/100
             case "logged_in": busy=false; loggedIn=true;signingCertificates=[];certificatesLoaded=false;certificateTeam=""; teamName=event["team"] as? String ?? "Developer-Team"; message="Angemeldet";if let email=event["email"] as? String {accountEmail=email;UserDefaults.standard.set(email,forKey:"accountEmail")}
@@ -202,13 +234,13 @@ import SwiftUI
     }
     func fail(_ reason: String) {
         if let path=importingPath {try? FileManager.default.removeItem(at:path);importingPath=nil}
-        busy=false; pendingApp=nil; message="Vorgang fehlgeschlagen"; error=reason
+        busy=false;needsPairingCode=false; pendingApp=nil; message="Vorgang fehlgeschlagen"; error=reason
         let continuation=installContinuation; installContinuation=nil; continuation?.resume(throwing:DirectSideError.message(reason))
     }
     private func fetchSource(_ url:URL) async throws -> SourceCatalog {
         var request=URLRequest(url:try SourceURL.parse(url.absoluteString)); request.timeoutInterval=20
         let (bytes,response)=try await URLSession.shared.bytes(for:request)
-        guard let http=response as? HTTPURLResponse,http.statusCode==200,http.url?.scheme=="https" else { throw DirectSideError.message("Quelle nicht erreichbar.") }
+        guard let http=response as? HTTPURLResponse,http.statusCode==200,let final=http.url,(try? SourceURL.parse(final.absoluteString)) != nil else { throw DirectSideError.message("Quelle nicht erreichbar.") }
         var data=Data()
         for try await byte in bytes { data.append(byte); if data.count>5_000_000 { throw DirectSideError.message("Quelldatei zu groß.") } }
         var result=try JSONDecoder().decode(SourceCatalog.self,from:data)
@@ -250,7 +282,7 @@ import SwiftUI
             let url=try SourceURL.parse(raw)
             var request=URLRequest(url:url); request.timeoutInterval=20
             let (bytes,response)=try await URLSession.shared.bytes(for:request)
-            guard let http=response as? HTTPURLResponse, http.statusCode==200, http.url?.scheme=="https" else { throw DirectSideError.message("Die Quelle konnte nicht geladen werden.") }
+            guard let http=response as? HTTPURLResponse, http.statusCode==200,let final=http.url,(try? SourceURL.parse(final.absoluteString)) != nil else { throw DirectSideError.message("Die Quelle konnte nicht geladen werden.") }
             var data=Data()
             for try await byte in bytes { data.append(byte); if data.count>5_000_000 { throw DirectSideError.message("Die Quelldatei ist zu groß.") } }
             var catalog=try JSONDecoder().decode(SourceCatalog.self,from:data)
@@ -267,15 +299,16 @@ import SwiftUI
     func removeSource(_ source:SourceCatalog) {sources.removeAll{$0.id==source.id};save(sources,"sources.json")}
     func install(_ app: CatalogApp, source: SourceCatalog? = nil, peer: String, port: Int) async {
         guard !busy else { return }
-        guard loggedIn else { fail("Bitte zuerst unter Konto anmelden."); return }
-        guard pairingReady else { fail("Bitte DirectSide am PC einrichten. Dabei wird das Pairing automatisch übertragen."); return }
+        refreshBootstrap()
+        guard loggedIn else { fail("Bitte zuerst in den Einstellungen anmelden."); return }
+        guard pairingReady else { fail("Dieses Gerät unter Einstellungen → Verbindung koppeln."); return }
         guard let latest=app.latest else { fail("Diese App hat keine Download-Adresse."); return }
         busy=true; message="IPA herunterladen …"; progress=0
         do {
             let url=try SourceURL.parse(latest.downloadURL.absoluteString)
             var request=URLRequest(url:url); request.timeoutInterval=180
             let (temp,response)=try await URLSession.shared.download(for:request)
-            guard let http=response as? HTTPURLResponse, http.statusCode==200, http.url?.scheme=="https" else { throw DirectSideError.message("IPA-Download fehlgeschlagen.") }
+            guard let http=response as? HTTPURLResponse, http.statusCode==200,let final=http.url,(try? SourceURL.parse(final.absoluteString)) != nil else { throw DirectSideError.message("IPA-Download fehlgeschlagen.") }
             let saved=Paths.support.appendingPathComponent(UUID().uuidString+".ipa")
             try FileManager.default.moveItem(at:temp,to:saved)
             let managed=ManagedApp(id:app.id,name:app.name,cachedIPA:saved.path,installedAt:Date(),version:latest.version,buildVersion:latest.buildVersion,sourceID:source?.id,iconURL:app.iconURL)
@@ -299,7 +332,7 @@ import SwiftUI
     }
     private func startInstall(_ url: URL, app: ManagedApp, peer: String, port: Int) throws {
         guard loggedIn else { throw DirectSideError.message("Bitte zuerst anmelden.") }
-        guard let bootstrap, pairingReady else { throw DirectSideError.message("Das PC-Pairing fehlt.") }
+        guard let bootstrap, pairingReady else { throw DirectSideError.message("Dieses Gerät unter Einstellungen → Verbindung koppeln.") }
         guard port>0 && port<=65535 else { throw DirectSideError.message("Remote-Pairing-Port fehlt. Unter Verbindung suchen.") }
         guard FileManager.default.fileExists(atPath:url.path) else { throw DirectSideError.message("Die Original-IPA fehlt. Bitte erneut vom PC übertragen.") }
         busy=true; progress=0; pendingApp=app
