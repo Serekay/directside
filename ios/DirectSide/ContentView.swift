@@ -2,7 +2,7 @@ import SwiftUI
 import VisionKit
 import AVFoundation
 
-private enum AppSheet:String,Identifiable {case add,scan,preview,code,team;var id:String{rawValue}}
+private enum AppSheet:String,Identifiable {case add,scan,preview,code,team,ipa;var id:String{rawValue}}
 
 struct ContentView:View {
     @EnvironmentObject var engine:Engine
@@ -21,16 +21,18 @@ struct ContentView:View {
             NavigationStack{SourcesView(connection:connection,addSource:{sheet = .add})}.tabItem{Label("Quellen",systemImage:"square.stack.3d.up")}.tag(2)
             NavigationStack{account}.tabItem{Label("Konto",systemImage:"person.crop.circle")}.tag(3)
         }.tint(Style.accent)
-        .task {connection.discover();await engine.refreshSources()}
+        .safeAreaInset(edge:.top){VPNStatusView(connection:connection)}
+        .task {connection.startMonitoring();await engine.refreshSources()}
         .onAppear {if email.isEmpty {email=engine.accountEmail}}
         .onChange(of:engine.accountEmail){_,value in if email.isEmpty {email=value}}
-        .onChange(of:phase){_,value in if value == .active {engine.refreshBootstrap()}}
+        .onChange(of:phase){_,value in if value == .active {engine.refreshBootstrap();connection.startMonitoring()} else if value == .background {connection.stopMonitoring()}}
         .onChange(of:engine.needsCode){_,value in if value {sheet = .code}}
         .onChange(of:engine.pendingSource?.id){_,value in if value != nil {sheet = .preview}}
+        .onChange(of:engine.importedIPA?.id){_,value in if value != nil {tab=1;sheet = .ipa}}
         .onChange(of:engine.teams.count){_,value in if value>0 {sheet = .team}}
         .onChange(of:connection.port){_,value in if value>0 {engine.inspectConnection(peer:connection.peer,port:value)}}
-        .sheet(item:$sheet,onDismiss:{if engine.needsCode {engine.cancelCode()};if !engine.teams.isEmpty {engine.chooseTeam("")}}){item in
-            NavigationStack {sheetContent(item)}.presentationDetents(item == .scan ? [.large]:[.medium,.large]).interactiveDismissDisabled(item == .code || item == .team)
+        .sheet(item:$sheet,onDismiss:{if engine.needsCode {engine.cancelCode()};if !engine.teams.isEmpty {engine.chooseTeam("")};if engine.importedIPA != nil {engine.cancelIPAImport()}}){item in
+            NavigationStack {sheetContent(item)}.safeAreaInset(edge:.top){VPNStatusView(connection:connection)}.presentationDetents(item == .scan ? [.large]:[.medium,.large]).interactiveDismissDisabled(item == .code || item == .team)
         }
         .alert("DirectSide",isPresented:Binding(get:{engine.error != nil},set:{if !$0 {engine.error=nil}})){Button("OK"){engine.error=nil}}message:{Text(engine.error ?? "")}
     }
@@ -57,6 +59,10 @@ struct ContentView:View {
                 Button("LiveContainer einrichten"){LiveContainerBridge.configure(engine:engine)}.disabled(!engine.liveContainerCertificateReady)
                 Text(engine.liveContainerCertificateReady ? "Zertifikat bereit. Nach der Übergabe in LiveContainer den JIT-less-Test ausführen.":"Am PC: Einstellungen → LiveContainer installieren → Zertifikat übertragen.").font(.caption).foregroundStyle(.secondary)
             }
+            Section("Signierung") {
+                NavigationLink {CertificateManagementView()} label:{Label("Zertifikate verwalten",systemImage:"signature")}
+                    .disabled(!engine.loggedIn)
+            }
             Section {
                 DisclosureGroup("Erweiterte Verbindungseinstellungen") {
                     TextField("VPN-Gegenstelle",text:$connection.peer).textInputAutocapitalization(.never).autocorrectionDisabled()
@@ -69,6 +75,14 @@ struct ContentView:View {
     }
     @ViewBuilder private func sheetContent(_ item:AppSheet)->some View {
         switch item {
+        case .ipa:
+            if let app=engine.importedIPA {
+                Form {
+                    Section {Label(app.name,systemImage:"app.fill").font(.headline);Text(app.version ?? "");Text(app.bundleID).font(.caption).textSelection(.enabled)}
+                    Button("Signieren und installieren"){engine.installImportedIPA(peer:connection.peer,port:connection.port);sheet=nil}.disabled(!engine.loggedIn || !engine.pairingReady || engine.busy)
+                    Button("Abbrechen",role:.cancel){engine.cancelIPAImport();sheet=nil}
+                }.navigationTitle("IPA installieren")
+            }
         case .add:
             Form {
                 Section {Text("Deine nächste Quelle.").font(.title2.bold());Text("Scanne den QR-Code einer Quelle oder füge ihre Adresse ein.").font(.subheadline).foregroundStyle(.secondary)}

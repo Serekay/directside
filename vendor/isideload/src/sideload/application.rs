@@ -22,6 +22,24 @@ use std::path::PathBuf;
 use tracing::{info, warn};
 use zip::ZipArchive;
 
+/// Read the one main Info.plist without extracting an imported archive.
+pub fn inspect_ipa(path:&std::path::Path)->Result<plist::Dictionary,Report> {
+    use std::io::Read;
+    let mut archive=ZipArchive::new(std::fs::File::open(path)?)?;
+    let main:Vec<String>=archive.file_names().filter(|name|{
+        let parts:Vec<_>=name.split('/').collect();
+        parts.len()==3 && parts[0]=="Payload" && parts[1].ends_with(".app") && parts[2]=="Info.plist"
+    }).map(str::to_string).collect();
+    if main.len()!=1 {bail!("Die IPA enthält keine eindeutige Haupt-App.");}
+    let entry=archive.by_name(&main[0])?;
+    if entry.size()>2_000_000 {bail!("Die App-Metadaten sind zu groß.");}
+    let mut bytes=Vec::new();entry.take(2_000_001).read_to_end(&mut bytes)?;
+    if bytes.len()>2_000_000 {bail!("Die App-Metadaten sind zu groß.");}
+    let info:plist::Dictionary=plist::from_bytes(&bytes)?;
+    if !info.get("CFBundleIdentifier").and_then(plist::Value::as_string).is_some_and(|id|!id.is_empty() && id.len()<=255) {bail!("Die IPA enthält keine gültige Bundle-ID.");}
+    Ok(info)
+}
+
 static ALT_PAIRING_FILE: &str = "ALTPairingFile.dat";
 
 pub struct Application {

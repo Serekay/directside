@@ -17,6 +17,12 @@ ApplicationWindow {
     property string page: "install"
     property string settingsSection: "system"
     property int appPage: 0
+    property int certificatePage: 0
+    property bool certificateLimitShown: false
+    onSChanged: {
+        if(s.certificateLimit && !certificateLimitShown) {certificateLimitShown=true;page="certificates";backend.loadCertificates()}
+        if(!s.certificateLimit) certificateLimitShown=false
+    }
     property bool developerOnly: false
     property var filteredApps: developerOnly ? s.installedApps.filter(a=>a.developer) : s.installedApps
     onFilteredAppsChanged: if(appPage*9>=filteredApps.length) appPage=0
@@ -57,7 +63,7 @@ ApplicationWindow {
     component IconButton: Action {
         id:iconControl
         property string hint: ""
-        property string iconName: ({"⚙":"settings","↻":"refresh","▦":"apps","?":"help","−":"minimize","□":"maximize","×":"close","‹":"back","›":"forward","≡":"activity","…":"more"})[text] || "more"
+        property string iconName: ({"⚙":"settings","↻":"refresh","▦":"apps","?":"help","−":"minimize","□":"maximize","×":"close","‹":"back","›":"forward","≡":"activity","…":"more","⌫":"trash"})[text] || "more"
         implicitWidth:36; implicitHeight:36; quiet:true
         ToolTip.visible: hovered; ToolTip.text:hint; ToolTip.delay:500
         Accessible.name:hint
@@ -94,6 +100,7 @@ ApplicationWindow {
                         MenuItem {text:win.t("Hilfe");onTriggered:win.page="help"}
                         MenuItem {text:win.t("Aktivität");onTriggered:win.page="activity"}
                         MenuItem {text:win.t("Updates");onTriggered:{win.page="settings";win.settingsSection="updates";backend.checkUpdates()}}
+                        MenuItem {text:win.t("Zertifikate");enabled:s.loggedIn;onTriggered:{win.page="certificates";backend.loadCertificates()}}
                     }
                 }
                 Rectangle {width:1;height:20;color:"#34373e";Layout.leftMargin:6;Layout.rightMargin:6}
@@ -156,7 +163,7 @@ ApplicationWindow {
                 Layout.fillWidth:true;Layout.fillHeight:true;spacing:16
                 RowLayout {Layout.preferredHeight:30
                     IconButton {visible:win.page!=="install";text:"‹";hint:win.t("Zurück");onClicked:win.page="install"}
-                    Label {text:win.page==="settings"?win.t("Einstellungen"):win.page==="activity"?win.t("Aktivität"):win.page==="help"?win.t("Hilfe"):win.page==="apps"?win.t("Installierte Apps"):win.t("DEIN GERÄT");font.pixelSize:win.page==="install"?10:17;font.letterSpacing:win.page==="install"?1.6:0;color:win.page==="install"?win.muted:win.ink;font.weight:Font.DemiBold}
+                    Label {text:win.page==="certificates"?win.t("Zertifikate"):win.page==="confirm"?win.t("Entfernen bestätigen"):win.page==="settings"?win.t("Einstellungen"):win.page==="activity"?win.t("Aktivität"):win.page==="help"?win.t("Hilfe"):win.page==="apps"?win.t("Installierte Apps"):win.t("DEIN GERÄT");font.pixelSize:win.page==="install"?10:17;font.letterSpacing:win.page==="install"?1.6:0;color:win.page==="install"?win.muted:win.ink;font.weight:Font.DemiBold}
                     Item {Layout.fillWidth:true}
                     Action {visible:win.page==="activity";text:win.t("Kopieren");enabled:s.logs.length>0;onClicked:backend.copyActivity()}
                 }
@@ -229,6 +236,7 @@ ApplicationWindow {
                         Action {visible:s.usbState!=="ready";text:s.usbState==="stopped"?win.t("Apple USB starten"):win.t("Apple USB / iTunes installieren");primary:true;enabled:!s.busy;onClicked:backend.setupComponents()}
                         Action {text:win.t("Erneut prüfen");enabled:!s.busy;onClicked:backend.checkComponents()}
                         Action {text:s.slotsUsed>=0?win.t("Apps ansehen · ")+s.slotsUsed+win.t(" / 3 Plätze"):win.t("Apps ansehen");enabled:s.devices.length>0;onClicked:{win.appPage=0;win.page="apps"}}
+                        Action {text:win.t("Zertifikate verwalten");enabled:s.loggedIn && !s.busy;onClicked:{win.page="certificates";backend.loadCertificates()}}
                         }
                         ColumnLayout {visible:win.settingsSection==="livecontainer";Layout.fillWidth:true;spacing:16
                         RowLayout {Label {text:"LiveContainer";Layout.fillWidth:true} Badge {text:"Optional"} Badge {text:s.lcState==="installed"?win.t("Installiert"):s.lcState==="missing"?win.t("Fehlt"):win.t("Nicht geprüft");tone:s.lcState==="installed"?"ok":s.lcState==="missing"?"missing":"warning"}}
@@ -297,6 +305,7 @@ ApplicationWindow {
                                             Label {text:modelData.name;Layout.fillWidth:true;font.pixelSize:12;font.weight:Font.DemiBold}
                                             Label {text:modelData.developer?win.t("Entwickler-App"):win.t("Installiert");color:modelData.developer?win.accent:win.muted;font.pixelSize:10;Layout.fillWidth:true}
                                         }
+                                        IconButton {text:"⌫";hint:win.t("App entfernen");enabled:!s.busy && !s.updateBusy && !s.directsideInstalling;onClicked:{backend.requestAppRemoval(modelData.id);if(backend.state.removal.kind)win.page="confirm"}}
                                     }
                                 }
                             }
@@ -309,6 +318,47 @@ ApplicationWindow {
                             Item {Layout.fillWidth:true}
                             IconButton {text:"›";hint:win.t("Nächste Seite");enabled:(win.appPage+1)*9<win.filteredApps.length;onClicked:win.appPage++}
                         }
+                    }
+                }
+                Card {
+                    visible:win.page==="certificates";Layout.fillWidth:true;Layout.fillHeight:true
+                    ColumnLayout {anchors.fill:parent;anchors.margins:24;spacing:12
+                        RowLayout {Label {text:win.t("Developer-Team");Layout.fillWidth:true} Badge {text:s.certificatesLoaded?String(s.certificates.length):"?";tone:s.certificateLimit?"missing":"neutral"} IconButton {text:"↻";hint:win.t("Erneut prüfen");enabled:s.loggedIn && !s.busy;onClicked:backend.loadCertificates()}}
+                        Text {text:win.t("Zertifikate gelten für das Team, App-Plätze für jedes Gerät.");color:win.muted;font.pixelSize:12;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Repeater {model:s.certificates.slice(win.certificatePage*3,win.certificatePage*3+3)
+                            delegate:Rectangle {required property var modelData;Layout.fillWidth:true;implicitHeight:66;radius:12;color:"#25282e"
+                                RowLayout {anchors.fill:parent;anchors.margins:12;spacing:8
+                                    ColumnLayout {Layout.fillWidth:true;spacing:4
+                                        Label {text:modelData.name;Layout.fillWidth:true;font.weight:Font.DemiBold}
+                                        Label {text:win.t("Seriennummer · ")+(modelData.serial || "?").slice(-8);font.pixelSize:11;color:win.muted;Layout.fillWidth:true}
+                                    }
+                                    Badge {visible:modelData.reusable;text:win.t("Schlüssel vorhanden");tone:"ok"}
+                                    IconButton {text:"⌫";hint:win.t("Zertifikat widerrufen");enabled:!s.busy && !s.updateBusy && !!modelData.serial;onClicked:{backend.requestCertificateRemoval(modelData.serial);if(backend.state.removal.kind)win.page="confirm"}}
+                                }
+                            }
+                        }
+                        Label {visible:s.certificatesLoaded && s.certificates.length===0;text:win.t("Keine Zertifikate vorhanden");color:win.muted}
+                        Item {Layout.fillHeight:true}
+                        RowLayout {Layout.fillWidth:true
+                            IconButton {text:"‹";hint:win.t("Vorherige Seite");enabled:win.certificatePage>0;onClicked:win.certificatePage--}
+                            Item {Layout.fillWidth:true}
+                            Label {text:(win.certificatePage+1)+" / "+Math.max(1,Math.ceil(s.certificates.length/3));font.pixelSize:12;color:win.muted}
+                            Item {Layout.fillWidth:true}
+                            IconButton {text:"›";hint:win.t("Nächste Seite");enabled:(win.certificatePage+1)*3<s.certificates.length;onClicked:win.certificatePage++}
+                        }
+                    }
+                }
+                Card {
+                    visible:win.page==="confirm";Layout.fillWidth:true;Layout.fillHeight:true
+                    ColumnLayout {anchors.fill:parent;anchors.margins:24;spacing:18
+                        Item {Layout.fillHeight:true}
+                        Label {text:s.removal.name || "";font.pixelSize:20;font.weight:Font.DemiBold;Layout.fillWidth:true}
+                        Text {text:s.removal.kind==="app"?win.t("App und zugehörige Daten werden vom ausgewählten Gerät gelöscht."):win.t("Damit signierte Apps auf allen Geräten müssen anschließend neu signiert werden.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        RowLayout {spacing:12
+                            Action {objectName:"confirmRemovalButton";text:s.removal.kind==="app"?win.t("App entfernen"):win.t("Zertifikat widerrufen");enabled:!!s.removal.id && !s.busy;onClicked:{var target=s.removal.kind==="app"?"apps":"certificates";backend.confirmRemoval();win.page=target}}
+                            Action {text:win.t("Abbrechen");onClicked:{var target=s.removal.kind==="app"?"apps":"certificates";backend.cancelRemoval();win.page=target}}
+                        }
+                        Item {Layout.fillHeight:true}
                     }
                 }
                 Card {

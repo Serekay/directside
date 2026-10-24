@@ -30,9 +30,58 @@ import SwiftUI
     @Published var selfExpiration:Date?
     @Published var slotsUsed:Int?
     @Published var developerApps:[String]=[]
+    @Published var deviceApps:[DeviceApp]=[]
+    @Published var signingCertificates:[SigningCertificate]=[]
+    @Published var certificatesLoaded=false
+    @Published var certificateTeam=""
+    private var removalConnection:(String,Int)?
+    @Published var importedIPA:ImportedIPA?
+    private var importingPath:URL?
+
+    func importIPA(_ url:URL) async {
+        guard !busy else {return}
+        guard url.pathExtension.lowercased()=="ipa" else {fail("Bitte eine IPA-Datei auswählen.");return}
+        busy=true;error=nil;message="IPA prüfen …"
+        let saved=Paths.support.appendingPathComponent(UUID().uuidString+".ipa")
+        do {
+            try await Task.detached {
+                let scoped=url.startAccessingSecurityScopedResource()
+                defer {if scoped {url.stopAccessingSecurityScopedResource()}}
+                try FileManager.default.copyItem(at:url,to:saved)
+                try FileManager.default.setAttributes([.protectionKey:FileProtectionType.completeUntilFirstUserAuthentication],ofItemAtPath:saved.path)
+            }.value
+            importingPath=saved;send(["command":"inspect_ipa","path":saved.path])
+        } catch {try? FileManager.default.removeItem(at:saved);fail(error.localizedDescription)}
+    }
+    func cancelIPAImport() {
+        if let item=importedIPA {try? FileManager.default.removeItem(at:item.file)}
+        importedIPA=nil
+    }
+    func installImportedIPA(peer:String,port:Int) {
+        guard !busy,let item=importedIPA else {return}
+        importedIPA=nil
+        let app=ManagedApp(id:item.bundleID,name:item.name,cachedIPA:item.file.path,installedAt:Date(),version:item.version)
+        Task {do {try await waitForInstall(item.file,app:app,peer:peer,port:port)}catch{fail(error.localizedDescription)}}
+    }
+
+    func loadCertificates() {
+        guard !busy,loggedIn else {return}
+        busy=true;send(["command":"certificates"])
+    }
+    func revokeCertificate(_ certificate:SigningCertificate) {
+        guard !busy,loggedIn,!certificate.serial.isEmpty,!certificateTeam.isEmpty,signingCertificates.contains(where:{$0.serial==certificate.serial}) else {return}
+        busy=true;error=nil
+        send(["command":"revoke_certificate","serial":certificate.serial,"team_id":certificateTeam,"confirmed":true])
+    }
+    func removeDeviceApp(_ app:DeviceApp,peer:String,port:Int) {
+        guard !busy,pairingReady,port>0,deviceApps.contains(where:{$0.id==app.id}) else {return}
+        busy=true;error=nil;removalConnection=(peer,port)
+        send(["command":"remove_local_app","bundle_id":app.id,"peer":peer,"port":port,"pairing_path":Paths.pairing.path,"confirmed":true])
+    }
     var slotsText:String {slotsUsed.map{"\($0) von 3 Plätzen belegt"} ?? "App-Plätze noch nicht geprüft"}
     func inspectConnection(peer:String,port:Int) {
         guard !busy,port>0,pairingReady else {return}
+        busy=true;message="Apps werden gelesen …"
         send(["command":"inspect_local","peer":peer,"port":port,"pairing_path":Paths.pairing.path])
     }
     var remainingDays:Int? {
@@ -113,11 +162,27 @@ import SwiftUI
             switch type {
             case "status": message = event["message"] as? String ?? message
             case "progress": progress = (event["value"] as? Double ?? 0)/100
-            case "logged_in": busy=false; loggedIn=true; teamName=event["team"] as? String ?? "Developer-Team"; message="Angemeldet";if let email=event["email"] as? String {accountEmail=email;UserDefaults.standard.set(email,forKey:"accountEmail")}
+            case "logged_in": busy=false; loggedIn=true;signingCertificates=[];certificatesLoaded=false;certificateTeam=""; teamName=event["team"] as? String ?? "Developer-Team"; message="Angemeldet";if let email=event["email"] as? String {accountEmail=email;UserDefaults.standard.set(email,forKey:"accountEmail")}
             case "signing_imported": signingImportPending=false;if let email=event["email"] as? String {accountEmail=email;UserDefaults.standard.set(email,forKey:"accountEmail")}
             case "profile": if let raw=event["expires_at"] as? String {selfExpiration=ISO8601DateFormatter().date(from:raw)}
             case "slots": slotsUsed=event["used"] as? Int;developerApps=(event["apps"] as? [[String:String]] ?? []).compactMap{$0["name"]}
-            case "logged_out": loggedIn=false; busy=false
+            case "local_apps":
+                if let bytes=try? JSONSerialization.data(withJSONObject:event["apps"] ?? []),let apps=try? JSONDecoder().decode([DeviceApp].self,from:bytes) {deviceApps=apps.sorted{($0.developer ? "0":"1")+$0.name.lowercased()<($1.developer ? "0":"1")+$1.name.lowercased()}}
+                busy=false
+            case "ipa_inspected":
+                if let path=event["path"] as? String,let file=importingPath,path==file.path,let bundle=event["bundle_id"] as? String {
+                    importedIPA=ImportedIPA(file:file,bundleID:bundle,name:event["name"] as? String ?? "Imported app",version:event["version"] as? String)
+                }
+                importingPath=nil;busy=false
+            case "app_removed":
+                busy=false;message="App entfernt."
+                if let id=event["bundle_id"] as? String {deviceApps.removeAll{$0.id==id};managed.removeAll{id==$0.id || id.hasPrefix($0.id+".")};save(managed,"apps.json")}
+                if let (peer,port)=removalConnection {removalConnection=nil;inspectConnection(peer:peer,port:port)}
+            case "certificates":
+                if let bytes=try? JSONSerialization.data(withJSONObject:event["certificates"] ?? []),let items=try? JSONDecoder().decode([SigningCertificate].self,from:bytes) {signingCertificates=items}
+                certificateTeam=event["team_id"] as? String ?? "";certificatesLoaded=true;busy=false
+            case "certificate_revoked":message="Zertifikat widerrufen. Zugehörige Apps neu signieren."
+            case "logged_out": loggedIn=false; busy=false;signingCertificates=[];certificatesLoaded=false;certificateTeam=""
             case "two_factor": codeNumbers=event["numbers"] as? [[String:Any]] ?? [];codeError=event["last_error"] == nil || event["last_error"] is NSNull ? "":"Code nicht akzeptiert. Bitte erneut versuchen.";needsCode=true;message="Apple-Bestätigung erforderlich"
             case "choose_team": teams=(event["teams"] as? [[String:Any]] ?? []).map { ["id":$0["id"] as? String ?? "", "name":$0["name"] as? String ?? "Developer-Team"] }
             case "installed":
@@ -136,6 +201,7 @@ import SwiftUI
         }
     }
     func fail(_ reason: String) {
+        if let path=importingPath {try? FileManager.default.removeItem(at:path);importingPath=nil}
         busy=false; pendingApp=nil; message="Vorgang fehlgeschlagen"; error=reason
         let continuation=installContinuation; installContinuation=nil; continuation?.resume(throwing:DirectSideError.message(reason))
     }

@@ -55,6 +55,7 @@ class DesktopBridge(QObject):
             if path.is_file(): self.data.update(ipa=str(path),ipaName=path.name);break
         self.data.update(language=language,savedEmail=saved.get('email',''),translations=ENGLISH,status=translate(self.data['status'],language))
         self.data.update(version=VERSION,updateBusy=False,updateProgress=0,updateState='unchecked',updateMessage='',releaseVersion='',windowsUpdate=False,releaseIPA=False,directsideInstalling=False,customIPA='',customIPAName='',ipaSource='file',githubSaved=(CACHE/'github.dpapi').is_file())
+        self.data.update(certificates=[],certificatesLoaded=False,certificateTeam='',certificateLimit=False,removal={})
         self.releaseClient=ReleaseClient(HOME if getattr(sys,'frozen',False) else ROOT)
         self.release=None
         self.buffer=bytearray()
@@ -152,6 +153,7 @@ class DesktopBridge(QObject):
         if kind=='ready':self.send({'command':'local_auth_probe'})
         elif kind=='local_auth_ready':self.update(authLocal=True);self.send({'command':'restore'})
         elif kind in ('logged_in','logged_out'):
+            self.data.update(certificates=[],certificatesLoaded=False,certificateTeam='',certificateLimit=False,removal={})
             logged=kind=='logged_in'
             email=event.get('email') or self.data['email']
             state='signed_in' if logged else event.get('reason','signed_out')
@@ -160,6 +162,11 @@ class DesktopBridge(QObject):
             if self.initializing:self.initializing=False;self.refresh()
         elif kind=='account_quota':
             self.update(appIdsLimit=event.get('limit') if event.get('limit') is not None else -1,appIdsAvailable=event.get('available') if event.get('available') is not None else -1,appIdsRegistered=event.get('registered',-1))
+        elif kind=='certificates':self.update(certificates=event.get('certificates',[]),certificatesLoaded=True,certificateTeam=event.get('team_id',''),busy=False,scanning=False)
+        elif kind=='certificate_revoked':self.update(removal={},certificateLimit=False,status='Zertifikat widerrufen. Zugehörige Apps erneut installieren.')
+        elif kind=='app_removed':
+            self.update(busy=False,scanning=False,removal={},status='App entfernt.',success=False)
+            self.componentDevice=None;self.inspectDevice()
         elif kind=='devices':
             old=self.data['devices'];index=self.data['deviceIndex']
             selected=old[index].get('id') if old and index<len(old) else None
@@ -200,6 +207,8 @@ class DesktopBridge(QObject):
                 self.update(busy=False,scanning=False,vpnState='unknown',lcState='unknown',directsidePresent=False,slotsUsed=-1,developerApps=[],installedApps=[])
                 self.append_log('App-Prüfung nicht möglich. iPhone entsperren und Vertrauen bestätigen.');return
             self.fail(event.get('message','Unbekannter Fehler'))
+            if '7460' in event.get('message',''):
+                self.update(certificateLimit=True,error='Signierzertifikatlimit erreicht. Zertifikate verwalten.')
             if event.get('command')=='login' and 'Auth error -80046:' in event.get('message',''):
                 self.update(loggedIn=False,authState='rejected',error='Apple verweigert die lokale Anmeldung (−80046).',status='Anmeldung erforderlich')
             if event.get('command')=='local_auth_probe' and self.initializing:self.initializing=False;self.refresh()
@@ -238,7 +247,40 @@ class DesktopBridge(QObject):
 
     @Slot(int)
     def selectDevice(self,index):
-        if not self.data['busy'] and 0<=index<len(self.data['devices']):self.update(deviceIndex=index,lcPrepared=False,installedApps=[]);self.inspectDevice()
+        if not self.data['busy'] and 0<=index<len(self.data['devices']):self.update(deviceIndex=index,lcPrepared=False,installedApps=[],removal={});self.inspectDevice()
+
+    @Slot()
+    def loadCertificates(self):
+        if self.data['busy'] or self.data['updateBusy'] or not self.data['loggedIn']:return
+        self.update(busy=True,removal={});self.send({'command':'certificates'})
+
+    @Slot(str)
+    def requestAppRemoval(self,bundle):
+        if self.data['busy'] or self.data['updateBusy'] or self.data['directsideInstalling'] or not self.data['devices']:return
+        app=next((app for app in self.data['installedApps'] if app['id']==bundle),None)
+        if app:self.update(removal={'kind':'app','id':bundle,'name':app['name'],'device':self.data['devices'][self.data['deviceIndex']]['id']})
+
+    @Slot(str)
+    def requestCertificateRemoval(self,serial):
+        if self.data['busy'] or self.data['updateBusy'] or self.data['directsideInstalling']:return
+        cert=next((cert for cert in self.data['certificates'] if cert.get('serial')==serial),None)
+        if cert:self.update(removal={'kind':'certificate','id':serial,'name':cert['name'],'team':self.data['certificateTeam']})
+
+    @Slot()
+    def cancelRemoval(self):self.update(removal={})
+
+    @Slot()
+    def confirmRemoval(self):
+        if self.data['busy'] or self.data['updateBusy'] or self.data['directsideInstalling']:return
+        removal=self.data['removal']
+        if removal.get('kind')=='app':
+            if not self.data['devices'] or self.data['devices'][self.data['deviceIndex']]['id']!=removal.get('device'):self.update(removal={});return
+            payload={'command':'remove_app','device_id':removal['device'],'bundle_id':removal['id'],'confirmed':True}
+        elif removal.get('kind')=='certificate':
+            if removal.get('team')!=self.data['certificateTeam']:self.update(removal={});return
+            payload={'command':'revoke_certificate','serial':removal['id'],'team_id':removal['team'],'confirmed':True}
+        else:return
+        self.update(busy=True,scanning=False,removal={},error='',success=False,status='Entfernen …');self.send(payload)
 
     @Slot('QVariantList')
     def loadAppIcons(self,bundles):

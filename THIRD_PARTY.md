@@ -1,16 +1,28 @@
 # Third-party components
 
-## AnisetteKit — iOS authentication
+## iOS local authentication
 
-- Upstream: https://github.com/mahee96/AnisetteKit
-- Pinned revision: `db8b41022697b6c19be8a5f01a1ce834145a2a26`
-- Copyright © 2026 Magesh K.
-- License: GNU AGPL v3; the full notice is in [licenses/AnisetteKit-AGPL-3.0.txt](licenses/AnisetteKit-AGPL-3.0.txt).
-- The iOS application links this library. Combined iOS builds are subject to its AGPL terms; recipients must receive corresponding source and notices. DirectSide's original code remains available under its MIT license. Private development does not require making this repository public.
+The iPhone build uses the MIT `native/adi-core` subset of
+[os-findmy-e](https://github.com/sacca97/os-findmy-e), revision
+`374d83854f657a7fdca45f813387d99d491db0e2`, vendored in `vendor/mac-adi-rust/`.
+It calls Apple's genuine Mac CoreADI under a local x86-64 guest interpreter.
+No upstream Find My account code or plaintext account-storage tools are included.
 
-AnisetteKit supplies the Unicorn TCI interpreter integration. Its Swift package pins the Unicorn XCFramework URL and checksum. There is no dependency on an installed SideStore app or an Anisette server.
+The interpreter is built from [mahee96/unicorn](https://github.com/mahee96/unicorn),
+revision `a53ddc9ac6d65b24936d4a37917333fcd816cfd0`, under GPL v2 with
+LGPL components. The pinned source, compiler configuration and DirectSide's
+read/write-only TCI allocation patch are recorded in `scripts/build-ios-mac-auth.py`.
+The build does not use JIT, an installed SideStore app or a remote Anisette service.
+See `licenses/Unicorn-GPL-2.0.txt` and the upstream source notices.
+Corresponding source and license material must accompany a binary distribution.
 
-The Apple ARM64 libraries are extracted from Apple's own Apple Music package during the build, verified by SHA-256 and bundled as runtime resources. They are proprietary Apple components, not covered by DirectSide's MIT license. They are not committed to this repository. The URL and hashes are recorded in `scripts/prepare-anisette-runtime.py` and the bundle's runtime provenance manifest. Public redistribution of Apple components requires a separate review before a public release.
+AnisetteKit and its Android Apple Music libraries were used by the earlier IPA;
+they are no longer linked or bundled by the current iPhone build. Their historical
+notice remains available in Git history and `licenses/AnisetteKit-AGPL-3.0.txt`.
+
+The Apple Mac CoreADI runtime is extracted from Apple's official iTunes package,
+verified by SHA-256 and bundled as a resource. It is proprietary and excluded from
+Git. Its download and hashes are in `scripts/prepare-mac-runtime.py`.
 
 ## isideload and idevice
 

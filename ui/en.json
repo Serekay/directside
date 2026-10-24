@@ -200,5 +200,21 @@
   "DirectSide installieren": "Install DirectSide",
   "IPA installieren": "Install IPA",
   "Zielgerät oder Anmeldung hat sich geändert. Installation erneut starten.": "Target device or sign-in changed. Start the installation again.",
-  "Auf dem ausgewählten Gerät installieren": "Install on the selected device"
+  "Auf dem ausgewählten Gerät installieren": "Install on the selected device",
+  "Zertifikate": "Certificates",
+  "Zertifikate verwalten": "Manage certificates",
+  "Developer-Team": "Developer team",
+  "Entfernen bestätigen": "Confirm removal",
+  "App entfernen": "Remove app",
+  "Zertifikat widerrufen": "Revoke certificate",
+  "Zertifikate gelten für das Team, App-Plätze für jedes Gerät.": "Certificates apply to the team; app slots apply to each device.",
+  "Seriennummer · ": "Serial · ",
+  "Schlüssel vorhanden": "Key available",
+  "Keine Zertifikate vorhanden": "No certificates found",
+  "App und zugehörige Daten werden vom ausgewählten Gerät gelöscht.": "The app and its data will be deleted from the selected device.",
+  "Damit signierte Apps auf allen Geräten müssen anschließend neu signiert werden.": "Apps signed with this certificate on all devices will need signing again.",
+  "App entfernt.": "App removed.",
+  "Entfernen …": "Removing …",
+  "Zertifikat widerrufen. Zugehörige Apps erneut installieren.": "Certificate revoked. Reinstall affected apps.",
+  "Signierzertifikatlimit erreicht. Zertifikate verwalten.": "Signing certificate limit reached. Manage certificates."
 }
