@@ -33,6 +33,8 @@ jobs:
         run: |
           swiftc ios/DirectSide/Models.swift ios/DirectSide/Localization.swift ios/Tests/main.swift -o /tmp/directside-source-tests
           /tmp/directside-source-tests
+          swiftc ios/DirectSide/SourceRefreshCoordinator.swift ios/Tests/SourceRefreshTests.swift -o /tmp/directside-refresh-tests
+          /tmp/directside-refresh-tests
       - name: Xcode project
         run: |
           cd ios

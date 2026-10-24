@@ -18,7 +18,6 @@ struct LibraryView:View {
                     HStack {
                         Label(L("Signaturen"),systemImage:"checkmark.seal").font(.headline)
                         Spacer()
-                        if let days=engine.remainingDays {Text(L("\(days) Tage")).font(.caption.bold()).padding(.horizontal,10).padding(.vertical,6).background((days<=1 ? Color.red:days<=3 ? Color.orange:Style.accent).opacity(0.12),in:Capsule()).foregroundStyle(days<=1 ? Color.red:days<=3 ? Color.orange:Style.accent)}
                     }
                     Button {Task{await engine.renewAll(peer:connection.peer,port:connection.port)}}label:{Label(L("Alle Signaturen erneuern"),systemImage:"arrow.clockwise").font(.subheadline.bold()).frame(maxWidth:.infinity).padding(.vertical,5)}.buttonStyle(.borderedProminent).disabled(engine.busy || !engine.loggedIn || !engine.pairingReady)
                 }.padding(18).background(Style.surface,in:RoundedRectangle(cornerRadius:20))
@@ -32,24 +31,22 @@ struct LibraryView:View {
                     HStack {
                         Text(L("Installiert")).font(.title3.bold());Spacer()
                         if let slots=engine.slotsUsed {Text("\(slots) / 3").font(.caption.weight(.semibold)).foregroundStyle(slots>=3 ? Color.red:slots==2 ? Color.orange:Style.accent)}
-                        Button(L("Verwalten")){showManagement=true}.font(.caption.bold())
+                        Button {showManagement=true}label:{Label(L("Verwalten"),systemImage:"square.grid.2x2")}.font(.caption.bold())
                     }.padding(.bottom,10)
                     HStack(spacing:12) {
                         BrandIcon(size:50)
-                        VStack(alignment:.leading,spacing:4){Text("DirectSide").font(.subheadline.bold());Text(L(engine.selfExpirationText)).font(.caption).foregroundStyle(.secondary)}
+                        Text("DirectSide").font(.subheadline.bold())
                         Spacer()
-                        Menu {Button(L("Signatur erneuern")){engine.refreshSelf(peer:connection.peer,port:connection.port)}}label:{Image(systemName:"ellipsis").padding(12)}.disabled(engine.busy)
+                        SignatureBadge(expiresAt:engine.selfExpiration){engine.refreshSelf(peer:connection.peer,port:connection.port)}.disabled(engine.busy || !engine.loggedIn || !engine.pairingReady)
                     }.padding(.vertical,10)
                     ForEach(engine.managed.filter{$0.id != "com.directside.app"}) {app in
                         Divider().padding(.leading,62)
                         HStack(spacing:12) {
                             Artwork(url:app.iconURL,size:50)
-                            VStack(alignment:.leading,spacing:4){Text(app.name).font(.subheadline.bold());Text(L(engine.expirationText(app))).font(.caption).foregroundStyle(.secondary)}
+                            Text(app.name).font(.subheadline.bold())
                             Spacer()
-                            Menu {
-                                if let update=engine.updates.first(where:{$0.app.id==app.id}) {Button(L("Aktualisieren")){Task{await engine.install(update.app,source:update.source,peer:connection.peer,port:connection.port)}}}
-                                Button(L("Signatur erneuern")){engine.refresh(app,peer:connection.peer,port:connection.port)}
-                            }label:{Image(systemName:"ellipsis").padding(12)}.disabled(engine.busy)
+                            if let update=engine.updates.first(where:{$0.app.id==app.id}) {Button(L("Aktualisieren")){Task{await engine.install(update.app,source:update.source,peer:connection.peer,port:connection.port)}}.font(.caption.bold()).disabled(engine.busy)}
+                            SignatureBadge(expiresAt:app.expiresAt){engine.refresh(app,peer:connection.peer,port:connection.port)}.disabled(engine.busy || !engine.loggedIn || !engine.pairingReady)
                         }.padding(.vertical,10)
                     }
                 }

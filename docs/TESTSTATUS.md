@@ -4,6 +4,21 @@ Entwicklungsstand, keine Release-Freigabe.
 
 ## Bestätigung vom Besitzer und neue Einrichtung
 
+Vor dem nächsten Build gesammelt: Quellenaktualisierung erhält einen eigenen,
+von Ansichten unabhängigen und zusammengeführten Task. Swift-CancellationError
+und URLSession-Abbruch werden nicht mehr als Serverausfall gespeichert. Der
+Status ist auch in der Quellenzeile sichtbar. Native List/swipeActions ersetzen
+den Entfernen-Text; zum Aktualisieren gibt es nur Herunterziehen. Automatisch
+angezeigte IP-/Host-Adressen sind aus Karten und Vorschau entfernt. Geräte-Apps
+verwalten nutzt das Raster-Symbol. Erneuerung erfolgt pro App über ein Tages-
+Badge: ab vier Tagen grün, zwei/drei Tage gelb, null/ein Tag rot; unbekannte
+Gültigkeit wird nicht erfunden. Neue Swift-Regressionen für gemeinsame Refreshes,
+abgebrochene Ansichtswarter, Fehlerklassifizierung und Tagesgrenzen vorbereitet.
+Sie wurden auf diesem Windows-PC nicht ausgeführt; kein neuer Build gestartet.
+Der vorher gestartete iPhone-Build 40100949040 ist auf Wunsch des Besitzers
+abgebrochen (GitHub: cancelled). Die Artefakte unter dist bleiben vorerst beim
+bisher ausgelieferten Stand.
+
 Nachtrag Signieridentität: Der erste reine Pairing-Reparaturweg ließ die
 Signieridentität aus. Nach der erfolgreichen Pairing-Reparatur meldete der
 Besitzer deshalb beim LiveContainer-Installieren Fehler 7460. Die Einrichtung

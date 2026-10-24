@@ -70,7 +70,10 @@ struct CatalogInstallAction:View {
         Menu {
             Button {if let installed=engine.installed(app),!engine.hasUpdate(app) {engine.refresh(installed,peer:connection.peer,port:connection.port)}else{Task{await engine.install(app,source:source,peer:connection.peer,port:connection.port)}}} label:{Label(L("Auf diesem Gerät"),systemImage:"iphone")}
             Button {if LiveContainerBridge.available {LiveContainerBridge.importApp(app,engine:engine)}else{showContainerSetup=true}} label:{Label(L("In LiveContainer"),systemImage:"square.stack.3d.up")}
-        }label:{Text(L(engine.hasUpdate(app) ? "Aktualisieren":engine.installed(app) != nil ? "Erneuern":"Laden")).font(.caption.bold()).padding(.horizontal,15).padding(.vertical,9).background(Style.accent.opacity(0.12),in:Capsule())}
+        }label:{
+            if let installed=engine.installed(app),!engine.hasUpdate(app) {SignatureLabel(expiresAt:installed.expiresAt)}
+            else {Text(L(engine.hasUpdate(app) ? "Aktualisieren":"Laden")).font(.caption.bold()).padding(.horizontal,15).padding(.vertical,9).background(Style.accent.opacity(0.12),in:Capsule())}
+        }
         .foregroundStyle(Style.accent).disabled(engine.busy || app.latest==nil)
         .sheet(isPresented:$showContainerSetup){NavigationStack{LiveContainerSettings(connection:connection).toolbar{Button(L("Fertig")){showContainerSetup=false}}}.safeAreaInset(edge:.top){VPNStatusView(connection:connection)}}
     }
@@ -166,16 +169,37 @@ struct AppDetailView: View {
     private func info(_ label:String,_ value:String)->some View {HStack(alignment:.top) {Text(L(label)).foregroundStyle(.secondary);Spacer();Text(L(value)).multilineTextAlignment(.trailing).textSelection(.enabled)}.font(.caption).padding(.vertical,10)}
 }
 
-struct SourcesView: View {
+struct SourcesView:View {
     @EnvironmentObject var engine:Engine
     @ObservedObject var connection:Connection
     var addSource:()->Void
-    var body: some View {
-        ScrollView {VStack(alignment:.leading,spacing:16) {
-            HStack {VStack(alignment:.leading,spacing:6){Text(L("DEIN APP-KATALOG")).font(.caption2.weight(.semibold)).tracking(1.5).foregroundStyle(.secondary);Text(L("Quellen")).font(.largeTitle.bold()).tracking(-1)};Spacer();Button(action:addSource){Image(systemName:"plus").font(.title3).padding(11).background(Style.surface,in:Circle())}.accessibilityLabel(L("Quelle hinzufügen"))}
-            Text(L("Deine Sammlungen. Immer aktuell.")).font(.subheadline).foregroundStyle(.secondary)
-            ForEach(engine.sources) {source in NavigationLink {SourceDetailView(source:source,connection:connection)} label:{VStack(alignment:.leading,spacing:14) {HStack(spacing:12){Artwork(url:source.iconURL,fallback:"square.stack.3d.up.fill");VStack(alignment:.leading,spacing:4){Text(L(source.name)).font(.subheadline.bold()).foregroundStyle(.primary);Text(L(source.subtitle ?? source.sourceURL?.host ?? "")).font(.caption).foregroundStyle(.secondary).lineLimit(2)};Spacer();Image(systemName:"chevron.right").font(.caption).foregroundStyle(.secondary)};HStack(spacing:16){Label(L("\(source.apps.count) Apps"),systemImage:"square.grid.2x2");Label(L(engine.sourceFailures[source.id] == nil ? "Aktuell":"Nicht erreichbar"),systemImage:engine.sourceFailures[source.id] == nil ? "checkmark":"exclamationmark.circle")}.font(.caption2).foregroundStyle(.secondary)}.padding(17).background(Style.surface,in:RoundedRectangle(cornerRadius:21))}.buttonStyle(.plain)}
-        }.padding(21)}.background(Style.background).toolbar(.hidden,for:.navigationBar).refreshable{await engine.refreshSources()}
+    var body:some View {
+        List {
+            HStack {
+                Text(L("Quellen")).font(.largeTitle.bold()).tracking(-1)
+                Spacer()
+                Button(action:addSource){Image(systemName:"plus").font(.title3.weight(.semibold)).padding(11).background(Style.surface,in:Circle())}.accessibilityLabel(L("Quelle hinzufügen"))
+            }.listRowBackground(Color.clear).listRowSeparator(.hidden).listRowInsets(EdgeInsets(top:14,leading:21,bottom:18,trailing:21))
+            ForEach(engine.sources) {source in
+                NavigationLink {SourceDetailView(source:source,connection:connection)}label:{
+                    HStack(spacing:13) {
+                        Artwork(url:source.iconURL,fallback:"square.stack.3d.up.fill")
+                        VStack(alignment:.leading,spacing:7) {
+                            Text(source.name).font(.subheadline.bold()).foregroundStyle(.primary)
+                            HStack(spacing:10) {
+                                Text(L("\(source.apps.count) Apps"))
+                                if engine.refreshingSources {ProgressView().controlSize(.mini);Text(L("Aktualisieren …"))}
+                                else {Label(L(engine.sourceFailures[source.id] != nil ? "Nicht erreichbar":source.refreshedAt == nil ? "Nicht geprüft":"Aktuell"),systemImage:engine.sourceFailures[source.id] != nil ? "exclamationmark.circle":"checkmark.circle")}
+                            }.font(.caption2).foregroundStyle(engine.sourceFailures[source.id] != nil ? Color.orange:Color.secondary)
+                        }
+                    }.padding(.vertical,10)
+                }.listRowBackground(Style.surface)
+                .swipeActions(edge:.trailing,allowsFullSwipe:true) {
+                    Button(role:.destructive){withAnimation{engine.removeSource(source)}}label:{Label(L("Quelle entfernen"),systemImage:"trash")}
+                }
+            }
+        }.listStyle(.plain).scrollContentBackground(.hidden).background(Style.background).toolbar(.hidden,for:.navigationBar)
+        .refreshable {await engine.refreshSources()}
     }
 }
 
@@ -183,7 +207,5 @@ struct SourceDetailView:View {
     @EnvironmentObject var engine:Engine
     let source:SourceCatalog
     @ObservedObject var connection:Connection
-    @Environment(\.dismiss) var dismiss
-    @State private var confirmRemove=false
-    var body:some View {ScrollView {VStack(alignment:.leading,spacing:18){HStack(spacing:14){Artwork(url:source.iconURL,size:74,fallback:"square.stack.3d.up.fill");VStack(alignment:.leading,spacing:5){Text(L(source.name)).font(.title2.bold());Text(L(source.subtitle ?? "\(source.apps.count) Apps")).font(.subheadline).foregroundStyle(.secondary)}};if let text=source.description {Text(L(text)).font(.subheadline).foregroundStyle(.secondary)};if let failure=engine.sourceFailures[source.id] {Label(L(failure),systemImage:"exclamationmark.circle").font(.caption).foregroundStyle(.orange)};ForEach(source.apps){CatalogRow(app:$0,source:source,connection:connection)};if let url=source.website,["http","https"].contains(url.scheme ?? "") {Link(L("Website der Quelle"),destination:url)};Button(L("Quelle entfernen"),role:.destructive){confirmRemove=true}.padding(.top,20)}.padding(21)}.background(Style.background).navigationTitle(L("Quelle")).navigationBarTitleDisplayMode(.inline).confirmationDialog(L("Quelle entfernen?"),isPresented:$confirmRemove,titleVisibility:.visible){Button(L("Quelle entfernen"),role:.destructive){engine.removeSource(source);dismiss()}}message:{Text(L("Bereits installierte Apps bleiben erhalten."))}}
+    var body:some View {ScrollView {VStack(alignment:.leading,spacing:18){HStack(spacing:14){Artwork(url:source.iconURL,size:74,fallback:"square.stack.3d.up.fill");VStack(alignment:.leading,spacing:5){Text(L(source.name)).font(.title2.bold());Text(L(source.subtitle ?? "\(source.apps.count) Apps")).font(.subheadline).foregroundStyle(.secondary)}};if let text=source.description {Text(L(text)).font(.subheadline).foregroundStyle(.secondary)};if let failure=engine.sourceFailures[source.id] {Label(L(failure),systemImage:"exclamationmark.circle").font(.caption).foregroundStyle(.orange)};ForEach(source.apps){CatalogRow(app:$0,source:source,connection:connection)};if let url=source.website,["http","https"].contains(url.scheme ?? "") {Link(L("Website der Quelle"),destination:url)}}.padding(21)}.background(Style.background).navigationTitle(L("Quelle")).navigationBarTitleDisplayMode(.inline)}
 }

@@ -390,5 +390,6 @@
   "Zertifikat unter Einstellungen → LiveContainer erneut übertragen.": "Transfer the certificate again under Settings > LiveContainer.",
   "Signaturen": "Signatures",
   "Verwalten": "Manage",
-  "%@ Tage": "%@ days"
+  "%@ Tage": "%@ days",
+  "Aktualisieren …": "Refreshing …"
 }

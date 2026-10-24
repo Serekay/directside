@@ -28,6 +28,7 @@ import CryptoKit
     private var installContinuation: CheckedContinuation<Void,Error>?
     @Published var sourceFailures: [String:String] = [:]
     @Published var refreshingSources = false
+    private let sourceRefresh=SourceRefreshCoordinator()
     @Published var selfExpiration:Date?
     @Published var slotsUsed:Int?
     @Published var developerApps:[String]=[]
@@ -248,17 +249,25 @@ import CryptoKit
         result.sourceURL=url; result.refreshedAt=Date(); return result
     }
     func refreshSources() async {
-        guard !refreshingSources else { return }
-        refreshingSources=true; defer {refreshingSources=false}
+        await sourceRefresh.run { [weak self] in
+            guard let self else {return}
+            self.refreshingSources=true;defer{self.refreshingSources=false}
+            await self.refreshSourceSnapshot()
+        }
+    }
+    private func refreshSourceSnapshot() async {
+        defer {save(sources,"sources.json")}
         for old in sources {
             guard let url=old.sourceURL else { continue }
             do {
                 let refreshed=try await fetchSource(url)
                 if let index=sources.firstIndex(where:{$0.id==old.id}) {sources[index]=refreshed}
                 sourceFailures.removeValue(forKey:old.id)
-            } catch {sourceFailures[old.id]=error.localizedDescription}
+            } catch {
+                if SourceURL.isCancellation(error) || Task.isCancelled {return}
+                if sources.contains(where:{$0.id==old.id}) {sourceFailures[old.id]=error.localizedDescription}
+            }
         }
-        save(sources,"sources.json")
     }
     func updateAll(peer:String,port:Int) async {
         guard !busy else { return }
@@ -289,14 +298,14 @@ import CryptoKit
             catalog.sourceURL=url; catalog.refreshedAt=Date()
             guard catalog.apps.count<=5000 else { throw DirectSideError.message("Die Quelle enthält zu viele Einträge.") }
             pendingSource=catalog; message="Quelle bereit"
-        } catch { fail(error.localizedDescription) }
+        } catch { if !SourceURL.isCancellation(error) {fail(error.localizedDescription)} }
     }
     func acceptSource() {
         guard let source=pendingSource else { return }
         sources.removeAll { $0.id==source.id }; sources.append(source); save(sources,"sources.json"); pendingSource=nil
     }
     func removeSources(at offsets: IndexSet) { sources.remove(atOffsets:offsets); save(sources,"sources.json") }
-    func removeSource(_ source:SourceCatalog) {sources.removeAll{$0.id==source.id};save(sources,"sources.json")}
+    func removeSource(_ source:SourceCatalog) {sources.removeAll{$0.id==source.id};sourceFailures.removeValue(forKey:source.id);save(sources,"sources.json")}
     func install(_ app: CatalogApp, source: SourceCatalog? = nil, peer: String, port: Int) async {
         guard !busy else { return }
         refreshBootstrap()
