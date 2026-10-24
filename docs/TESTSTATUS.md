@@ -4,6 +4,24 @@ Entwicklungsstand, keine Release-Freigabe.
 
 ## Bestätigung vom Besitzer und neue Einrichtung
 
+Nachtrag USB-Pairing: Der Besitzer meldete eine Code-Abfrage ohne Code auf dem
+iPhone. Vergleich mit `nab138/iloader/src-tauri/src/pairing.rs` bestätigt: Über
+den bereits vertrauten USB-Lockdown-Kanal verwendet iLoader automatisch die
+Protokoll-PIN `000000`. Der DirectSide-USB-Pfad wartete stattdessen auf eine
+Eingabe. Das ist korrigiert; der drahtlose Reparaturweg bleibt getrennt.
+
+Der korrigierte Windows-Kern hat am angeschlossenen iPhone tatsächlich eine
+Remote-Kopplung aufgebaut, diese auf einer frischen USB-Verbindung verifiziert,
+im Windows-Schlüsselbund gerätespezifisch gespeichert und Pairing, Original-IPA
+und Bootstrap-Metadaten in die vorhandene DirectSide-App übertragen und
+zurückgelesen. Der Reparaturbefehl meldete Erfolg ohne Apple-Anmeldung und ohne
+Neuinstallation. Keine Kopplungsschlüssel oder Gerätekennungen protokolliert
+oder eingecheckt. Jede Phase besitzt ein Zeitlimit. Die Oberfläche zeigt die
+Phase im Installationsbereich; unter Einstellungen ist eine Reparatur ohne
+Neuinstallation verfügbar. 46 Python-/UI-Tests und fünf Rust-Tests decken unter
+anderem die Reparatur ohne Anmeldung, Gerätezuordnung, sichtbare Phase ohne
+PIN-Abfrage und den Abbruch einer blockierten Phase ab.
+
 Der Besitzer hat nach dem Zertifikatswiderruf die erfolgreiche Installation und
 die lokale Apple-ID-Anmeldung in DirectSide auf dem echten iPhone bestätigt.
 Selbsterneuerung ist damit noch nicht bestätigt.

@@ -267,6 +267,29 @@ class WindowsUIStateTests(unittest.TestCase):
   self.assertEqual(self.sent,[])
   self.assertIn('Signing certificate limit',self.bridge.data['error'])
 
+ def test_setup_repair_does_not_reinstall_or_require_an_apple_login(self):
+  import zipfile,plistlib
+  ipa=Path(self.folder.name)/'DirectSide.ipa'
+  with zipfile.ZipFile(ipa,'w') as archive:archive.writestr('Payload/DirectSide.app/Info.plist',plistlib.dumps({'CFBundleIdentifier':'com.directside.app'}))
+  self.bridge.update(busy=False,loggedIn=False,devices=[{'id':'phone'},{'id':'tablet'}],deviceIndex=1,ipa=str(ipa))
+  self.assertTrue(self.bridge.repairDirectSide())
+  self.assertEqual(self.sent,[{'command':'repair_directside','device_id':'tablet','path':str(ipa)}])
+  self.assertTrue(self.bridge.data['settingUp']);self.assertEqual(self.bridge.data['challenge'],'')
+  self.assertFalse(self.bridge.repairDirectSide());self.assertEqual(len(self.sent),1)
+
+ def test_usb_pairing_progress_is_visible_without_a_code_challenge_and_clears_on_error(self):
+  self.bridge.update(busy=True,vpnState='missing')
+  engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
+  engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')));root=engine.rootObjects()[0]
+  self.bridge.handle({'event':'status','phase':'device_setup','message':'USB-Kopplung automatisch bestätigen …'});APP.processEvents()
+  self.assertTrue(root.findChild(QObject,'deviceSetupProgress').property('visible'))
+  self.assertFalse(root.findChild(QObject,'vpnInstallPrompt').property('visible'))
+  self.assertEqual(self.bridge.data['challenge'],'')
+  self.assertEqual(root.findChild(QObject,'deviceSetupProgressText').property('text'),'Completing USB pairing automatically …')
+  self.bridge.handle({'event':'error','message':'Pairing timed out'});APP.processEvents()
+  self.assertFalse(root.findChild(QObject,'deviceSetupProgress').property('visible'));self.assertFalse(self.bridge.data['settingUp'])
+  root.close();engine.deleteLater();APP.processEvents()
+
  def test_developer_mode_guide_uses_device_status_and_never_enables_or_reboots(self):
   self.bridge.initializing=False
   self.bridge.update(busy=False,devices=[{'id':'phone','name':'iPhone','label':'iPhone'}])
