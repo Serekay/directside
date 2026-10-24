@@ -34,6 +34,16 @@ Noch am Gerät zu prüfen: vollständiger neuer automatischer Pairing-Transfer,
 HTTP-Katalog/IPA-Installation, Sprachwechsel, LiveContainer-Installation,
 Zertifikatsimport und Start einer Gast-App sowie Selbsterneuerung.
 
+Artefakte dieses Stands: Windows aus `build/ios-settings-setup` nach bestandenem
+Paketstarttest und nach Schließen durch den Besitzer nach `dist/DirectSide.exe`
+übernommen. iPhone-Action 40098669744 erfolgreich; `dist/DirectSide.ipa` ist
+Version 0.1.0, Build 4. IPA-Bundle-ID, CoreADI-Hash, eingebettete 389
+Übersetzungseinträge und HTTP-Transportkonfiguration geprüft. Swift-Tests für
+Quellen/HTTP und Übersetzungen sowie echte lokale TCI-Provisionierung,
+Zustandswiederherstellung und wiederholte OTP-Erzeugung bestanden. Der erste
+Build wurde wegen eines SwiftUI-Section-Initialisierers korrigiert. Kein Release
+erstellt.
+
 ## Windows
 
 - Ergänzung Account-/Zertifikatsansicht: insgesamt 43 Python-Tests bestanden. Neue Tests prüfen die sichtbare automatische Anmeldung in der Account-Karte bis zur bestätigten Sitzung, die erneute Anmeldung nach Ablauf sowie getrennte Zertifikats-/App-Zähler und Seitenwechsel nach Entfernung. Die Verwaltung zeigt alle von Apples iOS-Zertifikatsabfrage gelieferten Einträge ohne zusätzlichen Plattformfilter; der Auswahlpfad zum Signieren bleibt unverändert. Ansichten mit synthetischen Daten bei 960 × 680 geprüft. Die tatsächliche Zertifikatszahl dieses Accounts ist damit noch nicht bestätigt.
