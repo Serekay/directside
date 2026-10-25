@@ -333,16 +333,22 @@ class WindowsUIStateTests(unittest.TestCase):
   self.assertFalse(self.bridge.data['updateBusy'])
   self.assertIn('Update bereit',self.bridge.data['updateMessage'])
 
- def test_github_and_other_ipa_controls_fit_update_settings_at_minimum_size(self):
+ def test_settings_only_offer_the_available_update_action(self):
+  from PySide6.QtTest import QTest
   self.bridge.update(busy=False,updateState='available',windowsUpdate=True,releaseVersion='v0.2.0',releaseIPA=True,bundledIPAReady=False)
   engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
   engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')))
   root=engine.rootObjects()[0];root.setWidth(960);root.setHeight(680)
-  root.setProperty('page','settings');root.setProperty('settingsSection','updates');APP.processEvents()
-  self.assertEqual(root.property('settingsSection'),'updates')
+  root.setProperty('page','settings');QTest.qWait(50)
   self.assertEqual(root.findChild(QObject,'installDirectSideButton').property('text'),'Install DirectSide')
   self.assertEqual(root.findChild(QObject,'ipaVersionBadge').property('text'),'v0.2.0')
-  self.assertEqual(len(root.findChildren(QObject,'windowsUpdateButton')),1)
+  check=root.findChild(QObject,'settingsUpdateCheck');install=root.findChild(QObject,'settingsUpdateInstall')
+  self.assertTrue(install.property('visible'));self.assertFalse(check.property('visible'))
+  self.assertFalse(root.findChild(QObject,'windowsUpdateButton').property('visible'))
+  self.bridge.update(updateBusy=True);APP.processEvents()
+  self.assertFalse(install.property('visible'));self.assertFalse(check.property('visible'))
+  self.bridge.update(updateBusy=False,windowsUpdate=False,updateState='current');APP.processEvents()
+  self.assertFalse(install.property('visible'));self.assertTrue(check.property('visible'))
   root.close();engine.deleteLater();APP.processEvents()
 
  def test_primary_install_uses_current_adjacent_ipa_without_a_release(self):
@@ -431,14 +437,14 @@ class WindowsUIStateTests(unittest.TestCase):
   top=custom_card.mapToScene(QPointF(0,0));position=row.mapToScene(QPointF(0,0))
   self.assertLessEqual(position.y()+row.height(),top.y()+custom_card.height()-20)
   self.assertLessEqual(position.x()+row.width(),top.x()+custom_card.width()-20)
-  root.setProperty('page','settings');root.setProperty('settingsSection','system')
-  settings_card=root.findChild(QObject,'settingsCard');app_ids=root.findChild(QObject,'settingsAppIDsButton')
+  root.setProperty('page','settings')
+  settings_card=root.findChild(QObject,'settingsCard');change=root.findChild(QObject,'settingsSigningChange')
   for language in ('en','de'):
    self.bridge.update(language=language);QTest.qWait(50)
-   self.assertTrue(app_ids.property('visible'))
-   top=settings_card.mapToScene(QPointF(0,0));position=app_ids.mapToScene(QPointF(0,0))
-   self.assertLessEqual(position.y()+app_ids.height(),top.y()+settings_card.height()-20)
-   self.assertLessEqual(position.x()+app_ids.width(),top.x()+settings_card.width()-20)
+   self.assertTrue(change.property('visible'))
+   top=settings_card.mapToScene(QPointF(0,0));position=change.mapToScene(QPointF(0,0))
+   self.assertLessEqual(position.y()+change.height(),top.y()+settings_card.height()-20)
+   self.assertLessEqual(position.x()+change.width(),top.x()+settings_card.width()-20)
   root.close();engine.deleteLater();APP.processEvents()
 
  def test_app_removal_needs_confirmation_and_remains_device_scoped(self):
@@ -537,18 +543,69 @@ class WindowsUIStateTests(unittest.TestCase):
   self.assertNotIn('fixture-only-password',str(self.bridge.data))
   self.assertNotIn('fixture-only-password',self.bridge.preferences.path.read_text())
 
+ def test_certificate_file_selection_is_not_lost_during_a_device_check(self):
+  from unittest.mock import patch
+  for method,dialog,result,key,expected in [
+   ('chooseIdentityCertificate','getOpenFileName',('fixture.p12',''),'identityP12','fixture.p12'),
+   ('chooseIdentityProfiles','getOpenFileNames',(['fixture.mobileprovision'],''),'identityProfiles',['fixture.mobileprovision'])]:
+   self.bridge.update(busy=True,scanning=True)
+   with patch('desktop.QFileDialog.'+dialog,return_value=result) as choose:
+    getattr(self.bridge,method)();choose.assert_not_called()
+    self.bridge.update(busy=False,scanning=False)
+    self.bridge.startPendingUserAction();APP.processEvents()
+    choose.assert_called_once()
+   self.assertEqual(self.bridge.data[key],expected)
+
  def test_imported_signing_form_stays_inside_compact_window(self):
   from PySide6.QtCore import QPointF
+  from PySide6.QtTest import QTest
   self.bridge.update(busy=False,loggedIn=False)
   engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
   engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')));root=engine.rootObjects()[0]
   root.setProperty('page','identity');root.setWidth(960);root.setHeight(680);APP.processEvents()
   card=root.findChild(QObject,'importedSigningCard');button=root.findChild(QObject,'importIdentityButton')
   self.assertTrue(card.property('visible'))
+  self.assertFalse(root.findChild(QObject,'certificateImportFields').property('visible'))
+  self.bridge.update(signingMode='imported');QTest.qWait(50)
+  self.assertTrue(root.findChild(QObject,'certificateImportFields').property('visible'))
   point=button.mapToScene(QPointF(0,0));top=card.mapToScene(QPointF(0,0))
   self.assertGreaterEqual(point.y(),top.y())
   self.assertLessEqual(point.y()+button.height(),top.y()+card.height())
   self.assertFalse(button.property('enabled'))
+  root.close();engine.deleteLater();APP.processEvents()
+
+ def test_help_shows_only_the_current_setup_step_and_calls_logs_a_log(self):
+  self.bridge.update(busy=False,language='en',usbState='missing',devices=[],releaseIPA=True,bundledIPAReady=True)
+  engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
+  engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')));root=engine.rootObjects()[0]
+  root.setProperty('page','help');APP.processEvents()
+  self.assertTrue(root.findChild(QObject,'helpAppleSetup').property('visible'))
+  self.assertFalse(root.findChild(QObject,'helpInstall').property('visible'))
+  self.bridge.update(usbState='ready');APP.processEvents()
+  self.assertEqual(root.property('helpStep'),'connect')
+  self.assertTrue(root.findChild(QObject,'helpConnectCheck').property('visible'))
+  self.bridge.update(devices=[{'id':'phone'}]);APP.processEvents()
+  self.assertEqual(root.property('helpStep'),'account')
+  self.assertFalse(root.findChild(QObject,'helpConnectCheck').property('visible'))
+  self.bridge.update(loggedIn=True);APP.processEvents()
+  self.assertTrue(root.findChild(QObject,'helpInstall').property('visible'))
+  self.bridge.update(directsidePresent=True,developerMode='unknown');APP.processEvents()
+  self.assertEqual(root.findChild(QObject,'helpNextTitle').property('text'),'Check iPhone status')
+  self.assertFalse(root.findChild(QObject,'helpDeveloper').property('visible'))
+  self.bridge.update(developerMode='disabled');APP.processEvents()
+  self.assertTrue(root.findChild(QObject,'helpDeveloper').property('visible'))
+  self.bridge.update(developerMode='enabled');APP.processEvents()
+  self.assertEqual(root.property('helpStep'),'iphone')
+  self.assertFalse(root.findChild(QObject,'repairDirectSideButton').property('visible'))
+  root.setProperty('helpTrouble',True);APP.processEvents()
+  self.assertTrue(root.findChild(QObject,'repairDirectSideButton').property('visible'))
+  self.bridge.update(busy=True);APP.processEvents()
+  self.assertFalse(root.findChild(QObject,'repairDirectSideButton').property('visible'))
+  log=root.findChild(QObject,'helpLogButton');self.assertFalse(log.property('visible'))
+  self.bridge.update(busy=False,logs=['fixture event']);APP.processEvents()
+  self.assertTrue(log.property('visible'));self.assertEqual(log.property('text'),'Log')
+  QMetaObject.invokeMethod(log,'clicked');APP.processEvents()
+  self.assertEqual(root.property('page'),'activity')
   root.close();engine.deleteLater();APP.processEvents()
 
  def test_app_id_details_do_not_block_or_finish_an_installation(self):

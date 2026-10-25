@@ -1,5 +1,25 @@
 # Teststand vom 25. Oktober 2026
 
+## Einstellungen und Hilfe aus Nutzersicht
+
+Windows-Einstellungen auf Sprache, Updates und Installieren mit Apple Account
+oder eigenem Zertifikat reduziert. Keine Komponenten-/LiveContainer-Tabs,
+doppelten App-Listen, Schlüsselbund-Badges oder ständigen Reparaturbuttons.
+Zertifikatfelder erscheinen erst bei ausgewähltem eigenem Zertifikat;
+Apple-Zertifikate lassen sich in der Auswahl der Installationsmethode verwalten.
+Hilfe öffnet direkt und zeigt nur den nächsten Schritt passend zu Verbindung,
+Anmeldung und App-Status. Unbekannter Entwicklermodus fordert eine erneute
+Prüfung, nicht dessen angeblich fehlende Aktivierung. Reparatur erst unter
+„App startet nicht?“ bei vorhandener App, Anmeldung und geeigneter lokaler IPA.
+„Aktivität“ heißt jetzt „Protokoll“ und ist aus der Hilfe beziehungsweise bei
+Fehlern erreichbar. Zertifikat-Dateiauswahl geht bei Hintergrundprüfungen nicht
+mehr verloren. 76 Python/Qt-Tests bestanden, einschließlich Zustandswechseln,
+Dateidialog-Warteschlange und Layout in beiden Sprachen. Windows-Paket neu
+gebaut und Paket-Startprüfung bestanden. Die drei Einstellungszeilen,
+zustandsabhängige Hilfe und der als Log bezeichnete Protokoll-Zugang wurden
+im laufenden Paket geprüft. Neue Einstellungen zur Ansicht geöffnet.
+Kein iPhone-Eingriff.
+
 ## Vereinfachte Windows-Startseite
 
 Kein dauerhafter Dev-Badge und kein Entwicklermodus-Hinweis unter Installieren.
