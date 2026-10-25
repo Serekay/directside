@@ -11,6 +11,24 @@ spec.loader.exec_module(verifier)
 
 
 class BuildIdentityTests(unittest.TestCase):
+    def test_unsigned_release_rejects_personal_material_and_unsafe_paths(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'DirectSide.ipa'
+            for extra in ['Payload/DirectSide.app/identity.p12',
+                          'Payload/DirectSide.app/embedded.mobileprovision',
+                          'Payload/DirectSide.app/DirectSide-pairing.plist',
+                          'Payload/DirectSide.app/DirectSide-signing.json',
+                          'Payload/DirectSide.app/DirectSide-imported.json',
+                          'Payload/DirectSide.app/DirectSide-bootstrap.json',
+                          '../outside', '/absolute']:
+                with self.subTest(entry=extra):
+                    with ZipFile(path, 'w') as archive:
+                        archive.writestr('Payload/DirectSide.app/Info.plist', plistlib.dumps({
+                            'CFBundleIdentifier': 'com.directside.app'}))
+                        archive.writestr(extra, b'synthetic test fixture')
+                    with self.assertRaises(ValueError):
+                        verifier.verify(path)
+
     def test_build_number_changes_keep_identity_and_signed_artifacts_are_rejected(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'DirectSide.ipa'
