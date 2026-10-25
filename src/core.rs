@@ -329,7 +329,7 @@ async fn install(engine:Option<&mut Engine>,request:&Value)->Result<(),Report> {
     let _temporary=isideload::sideload::application::ExtractionCleanup::new(&path)?;
     validate_self_update(request,&path)?;
     let info=isideload::sideload::application::inspect_ipa(&path)?;
-    let directside=info.get("CFBundleIdentifier").and_then(plist::Value::as_string)==Some("com.directside.app");
+    let directside=info.get("CFBundleIdentifier").and_then(plist::Value::as_string).is_some_and(|id|id=="com.directside.app" || id.starts_with("com.directside.app."));
     let livecontainer=info.get("CFBundleIdentifier").and_then(plist::Value::as_string)==Some("com.kdt.livecontainer");
     let mut mux=UsbmuxdConnection::default().await?;
     let dev=mux.get_devices().await?.into_iter().find(|d|d.udid==id).ok_or_else(||report!("Das ausgewählte Gerät ist nicht mehr verbunden."))?;
@@ -619,6 +619,15 @@ pub async fn run() {
             "remove_app"=>match tokio::time::timeout(Duration::from_secs(45),remove_device_app(&request)).await {Ok(r)=>r,Err(_)=>Err(report!("App konnte nicht rechtzeitig entfernt werden. Gerät erneut prüfen."))},
             "remove_local_app"=>match tokio::time::timeout(Duration::from_secs(45),remove_local_app(&request)).await {Ok(r)=>r,Err(_)=>Err(report!("App konnte nicht rechtzeitig entfernt werden. Verbindung erneut prüfen."))},
             "certificates"=>match engine.as_mut() {Some(e)=>certificates(e).await,None=>Err(report!("Bitte zuerst anmelden."))},
+            "app_ids"=>match engine.as_mut() {
+                Some(e)=>async {
+                    let team=e.get_team().await?;
+                    let q=e.get_dev_session().list_app_ids(&team,None).await?;
+                    emit(json!({"event":"app_ids","limit":q.max_quantity,"available":q.available_quantity,"ids":q.app_ids.iter().map(|id|json!({"name":id.name,"identifier":id.identifier,"expires_at":id.expiration_date.map(|d|d.to_xml_format())})).collect::<Vec<_>>()}));
+                    Ok(())
+                }.await,
+                None=>Err(report!("Bitte zuerst anmelden.")),
+            },
             "revoke_certificate"=>match engine.as_mut() {Some(e)=>revoke_certificate(e,&request).await,None=>Err(report!("Bitte zuerst anmelden."))},
             "prepare_livecontainer" if request["signing_mode"].as_str()==Some("imported")=>match crate::imported_identity::load() {Ok(Some(identity))=>match identity.livecontainer_certificate().await {Ok(bytes)=>transfer_livecontainer(&request,&bytes).await,Err(e)=>Err(e)},Ok(None)=>Err(report!("Zertifikat fehlt.")),Err(e)=>Err(e)},
             "prepare_livecontainer" => match engine.as_mut() {Some(e)=>prepare_livecontainer(e,&request).await,None=>Err(report!("Bitte zuerst anmelden."))},

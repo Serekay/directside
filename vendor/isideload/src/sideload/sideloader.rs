@@ -124,7 +124,7 @@ impl<C: MaxCertsCallback, E: ExtensionsBehaviorCallback> Sideloader<C, E> {
 
         let main_bundle_id = app.main_bundle_id()?;
         let main_app_name = app.main_app_name()?;
-        let main_app_id_str = format!("{}.{}", main_bundle_id, team.team_id);
+        let main_app_id_str = super::identifier::account_bundle_identifier(&main_bundle_id, &team.team_id)?;
         app.update_bundle_id(&main_bundle_id, &main_app_id_str)?;
 
         let extensions_behavior = self

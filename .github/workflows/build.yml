@@ -52,6 +52,7 @@ jobs:
           cp -R build/Build/Products/Release-iphoneos/DirectSide.app package/Payload/
           cd package
           ditto -c -k --sequesterRsrc --keepParent Payload DirectSide.ipa
+          python3 ../scripts/verify-directside-ipa.py DirectSide.ipa
       - uses: actions/upload-artifact@v4
         with:
           name: DirectSide-iPhone-unsigned

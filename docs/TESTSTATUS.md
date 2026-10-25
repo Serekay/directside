@@ -1,5 +1,24 @@
 # Teststand vom 25. Oktober 2026
 
+## App-ID-Prüfung und feste Kennung
+
+Apple-Konto nur lesend geprüft: neun registrierte IDs, davon DirectSide eine,
+LiveContainer einschließlich drei Erweiterungen vier, SideStore einschließlich
+Widget zwei sowie E&P Test und E&P Dev jeweils eine. Keine DirectSide-Duplikate.
+Alle lokal vorliegenden iPhone-Builds 1 bis 6 enthalten `com.directside.app`;
+die Kennung ist auch in der gesamten Historie der Build-Konfiguration unverändert.
+Keine Team- oder Gerätekennungen und keine Zugangsdaten hier gespeichert.
+
+Der Account-Signierer hängt die Teamkennung jetzt höchstens einmal an und
+vereinheitlicht bereits mehrfach angehängte gleiche DirectSide-Teamsuffixe.
+Veränderte oder fremde DirectSide-Suffixe werden vor der App-ID-Registrierung
+abgewiesen. Der iPhone-Build prüft die fertige IPA auf die feste ursprüngliche
+Kennung. 51 Python-/Qt-Tests, acht Kern-Tests und drei neue Rust-Regressionstests
+bestanden. Windows mit korrigiertem Signierkern neu gebaut; Startprüfung der
+gepackten EXE einschließlich Qt/QML und lokalem Signierkern bestanden.
+Die vorhandene iPhone-IPA bleibt Build 6; die zusätzliche Signierkorrektur ist
+erst in einem neu gebauten iPhone-Kern enthalten.
+
 ## Neuer Korrekturstand: zwölf gemeldete Punkte
 
 Windows lokal gebaut. Auf ausdrücklichen Buildauftrag wurde iPhone-Build 6
