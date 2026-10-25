@@ -446,5 +446,9 @@
   "Nach dem Neustart: USB-Kabel erneut einstecken.": "After restarting: reconnect the USB cable.",
   "USB-Verbindung verloren": "USB connection lost",
   "iPhone entsperren und Kabel neu einstecken.": "Unlock your iPhone and reconnect the cable.",
-  "USB unterbrochen": "USB disconnected"
+  "USB unterbrochen": "USB disconnected",
+  "Falls gefragt: Auf dem iPhone „Vertrauen“ bestätigen.": "If prompted, confirm Trust on your iPhone.",
+  "Automatische Prüfung alle 3 Sekunden": "Automatic check every 3 seconds",
+  "Verbindung prüfen …": "Checking connection…",
+  "Einrichtung abgeschlossen": "Setup complete"
 }

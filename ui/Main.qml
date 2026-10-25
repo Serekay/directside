@@ -211,7 +211,9 @@ ApplicationWindow {
                         }
                         Text {objectName:"usbReconnectTitle";text:win.t("USB-Verbindung verloren");color:win.ink;font.pixelSize:23;font.weight:Font.DemiBold;horizontalAlignment:Text.AlignHCenter;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                         Text {text:win.t("iPhone entsperren und Kabel neu einstecken.");color:"#f1bd70";font.pixelSize:16;horizontalAlignment:Text.AlignHCenter;wrapMode:Text.WordWrap;Layout.fillWidth:true}
-                        Action {text:win.t("Erneut prüfen");Layout.alignment:Qt.AlignHCenter;enabled:!s.busy;onClicked:backend.refresh()}
+                        Text {objectName:"usbTrustReconnectHint";text:win.t("Falls gefragt: Auf dem iPhone „Vertrauen“ bestätigen.");color:win.ink;font.pixelSize:16;horizontalAlignment:Text.AlignHCenter;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Label {objectName:"usbCheckStatus";text:win.t("Automatische Prüfung alle 3 Sekunden")+(s.deviceCheckedAt?" · "+s.deviceCheckedAt:"");color:win.muted;Layout.alignment:Qt.AlignHCenter;font.pixelSize:12}
+                        Action {text:win.t(s.scanning?"Verbindung prüfen …":"Erneut prüfen");Layout.alignment:Qt.AlignHCenter;enabled:!s.busy;onClicked:backend.refresh()}
                     }
                 }
                 RowLayout {visible:win.page!=="reconnect";Layout.preferredHeight:30
@@ -248,17 +250,22 @@ ApplicationWindow {
                     }
                 }
                 Card {
-                    objectName:"developerModeGuide";visible:win.page==="developer";Layout.fillWidth:true;Layout.fillHeight:true
-                    ColumnLayout {anchors.fill:parent;anchors.margins:24;spacing:18
-                        RowLayout {Label {text:win.t("Entwicklermodus");font.pixelSize:20;font.weight:Font.DemiBold;Layout.fillWidth:true} Badge {text:s.developerMode==="enabled"?win.t("Aktiv"):s.developerMode==="disabled"?win.t("Aus"):win.t("Nicht geprüft");tone:s.developerMode==="enabled"?"ok":s.developerMode==="disabled"?"missing":"warning"}}
+                    objectName:"developerModeGuide";visible:win.page==="developer";Layout.fillWidth:true;Layout.fillHeight:true;border.color:s.setupReady?win.accent:"#b57a37"
+                    ColumnLayout {anchors.fill:parent;anchors.margins:24;spacing:14
+                        Item {Layout.fillHeight:true}
+                        Rectangle {objectName:"developerModeIllustration";Layout.alignment:Qt.AlignHCenter;implicitWidth:54;implicitHeight:82;radius:12;color:"#15171b";border.width:3;border.color:s.setupReady?win.accent:"#f1bd70"
+                            Label {anchors.centerIn:parent;text:s.setupReady?"✓":"!";font.pixelSize:34;font.weight:Font.Bold;color:s.setupReady?win.accent:"#f1bd70"}
+                            SequentialAnimation on opacity {running:win.page==="developer" && s.developerMode!=="enabled";loops:Animation.Infinite;NumberAnimation {from:1;to:0.5;duration:1000} NumberAnimation {from:0.5;to:1;duration:1000}}
+                        }
+                        Text {objectName:"developerModeTitle";text:win.t(s.setupReady?"Einrichtung abgeschlossen":s.developerMode==="enabled"?"Einrichtung abschließen …":"Entwicklermodus aktivieren");font.pixelSize:23;font.weight:Font.DemiBold;color:win.ink;horizontalAlignment:Text.AlignHCenter;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                         Label {visible:s.setupPending;text:win.t("DirectSide installiert");color:win.accent;font.weight:Font.DemiBold}
                         Text {objectName:"setupReconnectHint";visible:s.setupPending && s.devices.length===0;text:win.t("Nach dem Neustart: USB-Kabel erneut einstecken.");color:win.accent;wrapMode:Text.WordWrap;Layout.fillWidth:true}
-                        Text {visible:s.developerMode!=="enabled";text:win.t("1. Einstellungen → Datenschutz & Sicherheit → Entwicklermodus einschalten.");color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
-                        Text {visible:s.developerMode!=="enabled";text:win.t("2. Neustarten → Entsperren → Aktivieren bestätigen.");color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Text {visible:s.developerMode!=="enabled";text:win.t("1. Einstellungen → Datenschutz & Sicherheit → Entwicklermodus einschalten.");font.pixelSize:16;color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Text {visible:s.developerMode!=="enabled";text:win.t("2. Neustarten → Entsperren → Aktivieren bestätigen.");font.pixelSize:16;color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                         Text {visible:s.developerMode!=="enabled" || s.setupReady;text:win.t("Falls verlangt: Einstellungen → Allgemein → VPN & Geräteverwaltung → Vertrauen.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                         Label {visible:s.setupPending && s.developerMode==="enabled";text:win.t("Einrichtung abschließen …");color:win.muted}
                         Label {visible:s.setupReady;text:win.t("DirectSide auf dem iPhone öffnen.");color:win.accent;font.weight:Font.DemiBold}
-                        RowLayout {visible:s.developerMode!=="enabled";Action {text:win.t("Schalter anzeigen");enabled:s.devices.length>0 && !s.busy;onClicked:backend.revealDeveloperMode()} Action {text:win.t("Erneut prüfen");enabled:s.devices.length>0 && !s.busy;onClicked:backend.inspectDevice()}}
+                        RowLayout {visible:s.developerMode!=="enabled";Action {text:win.t("Schalter anzeigen");enabled:s.devices.length>0 && !s.busy;onClicked:backend.revealDeveloperMode()} Action {objectName:"developerModeRefresh";text:win.t(s.scanning?"Verbindung prüfen …":"Erneut prüfen");enabled:!s.busy;onClicked:backend.refresh()}}
                         Item {Layout.fillHeight:true}
                         Action {text:win.t(s.setupPending ? "Warte auf das iPhone …":s.setupReady ? "Fertig":"Weiter zur Installation");primary:true;enabled:!s.setupPending;onClicked:{backend.acknowledgeSetup();win.page="install"}}
                     }
