@@ -1,5 +1,20 @@
 # Teststand vom 25. Oktober 2026
 
+## Stabile Statusanzeigen am zugehörigen Bereich
+
+Die Geräteprüfung setzte vor jeder Antwort App-Anzahl und Komponentenstatus
+auf unbekannt zurück. Sie behält jetzt die zuletzt bestätigten Werte bis zum
+Ergebnis. Bei Gerätewechsel, Trennung oder tatsächlichem Prüfungsfehler werden
+sie weiterhin verworfen; andere Geräte übernehmen keine alten Werte.
+App-Kennungen stehen kompakt am Konto, Sideload-App-Anzahl unter dem Gerätenamen.
+Der doppelte Anmelde-Badge entfällt; die Fußleiste ist im Leerlauf ausgeblendet
+und zeigt nur laufende Vorgänge oder Meldungen. 77 Python/Qt-Tests bestanden,
+einschließlich stabiler Texte/Geometrie während der Prüfung und unveränderter
+Fehlerbehandlung. Windows-Paket neu gebaut, Startprüfung bestanden.
+Geräteanzeige und ausgeblendete Leerlauf-Fußleiste im laufenden Paket auch
+beim manuellen Aktualisieren geprüft; Kontobadge im Qt-Test mit angemeldetem
+Testzustand geprüft. App zur weiteren Prüfung geöffnet. Kein iPhone-Eingriff.
+
 ## Einstellungen und Hilfe aus Nutzersicht
 
 Windows-Einstellungen auf Sprache, Updates und Installieren mit Apple Account

@@ -155,6 +155,30 @@ class WindowsUIStateTests(unittest.TestCase):
   self.bridge.initializing=False;self.bridge.update(busy=False,devices=[{'id':'phone'}])
   self.bridge.auto_refresh()
   self.assertEqual(self.sent[-1],{'command':'devices'})
+ def test_background_device_check_keeps_badges_and_footer_stable(self):
+  from PySide6.QtTest import QTest
+  self.bridge.initializing=False
+  self.bridge.update(busy=False,loggedIn=True,authState='signed_in',devices=[{'id':'phone','name':'Test iPhone'}],slotsUsed=3,directsidePresent=True,developerMode='enabled',vpnState='installed',lcState='installed',appIdsLimit=10,appIdsAvailable=1)
+  self.bridge.componentDevice='phone';self.bridge.componentTime=0
+  engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
+  engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')));root=engine.rootObjects()[0];QTest.qWait(50)
+  slots=root.findChild(QObject,'deviceSlotsBadge');quota=root.findChild(QObject,'quotaBadge');footer=root.findChild(QObject,'operationFooter')
+  before=(slots.property('text'),quota.property('text'),quota.width(),quota.height())
+  self.assertTrue(slots.property('visible'));self.assertTrue(quota.property('visible'));self.assertFalse(footer.property('visible'))
+  self.bridge.handle({'event':'devices','devices':[{'id':'phone','name':'Test iPhone'}]});APP.processEvents()
+  self.assertEqual(self.sent[-1],{'command':'device_components','device_id':'phone'})
+  self.assertTrue(self.bridge.data['scanning']);self.assertTrue(self.bridge.data['directsidePresent'])
+  self.assertEqual(self.bridge.data['slotsUsed'],3)
+  self.assertEqual((slots.property('text'),quota.property('text'),quota.width(),quota.height()),before)
+  self.assertFalse(footer.property('visible'))
+  self.bridge.handle({'event':'device_components','device_id':'phone','slots_used':4,'directside':True,'developer_mode':True});APP.processEvents()
+  self.assertEqual(slots.property('text'),'4 Sideloaded apps')
+  self.bridge.handle({'event':'error','command':'device_components'});APP.processEvents()
+  self.assertEqual(self.bridge.data['slotsUsed'],-1)
+  self.assertEqual(slots.property('text'),'App slots not checked')
+  self.assertFalse(self.bridge.data['directsidePresent'])
+  self.assertIsNone(root.findChild(QObject,'sessionBadge'))
+  root.close();engine.deleteLater();APP.processEvents()
  def test_logout_stays_enabled_during_poll_and_waits_for_scan_result(self):
   self.bridge.initializing=False;self.bridge.update(busy=False,loggedIn=True)
   engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
@@ -296,7 +320,7 @@ class WindowsUIStateTests(unittest.TestCase):
   engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')));root=engine.rootObjects()[0]
   self.bridge.handle({'event':'account_quota','limit':10,'available':3,'registered':1});APP.processEvents()
   badge=root.findChild(QObject,'quotaBadge')
-  self.assertEqual(badge.property('text'),'App IDs · 7 / 10 used · 3 left')
+  self.assertEqual(badge.property('text'),'App IDs · 7 / 10 · 3 left')
   self.assertEqual(badge.property('tone'),'warning')
   self.bridge.handle({'event':'account_quota','limit':10,'available':0,'registered':1});APP.processEvents()
   self.assertEqual(badge.property('tone'),'missing')
