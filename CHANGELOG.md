@@ -2,6 +2,7 @@
 
 ## Unveröffentlicht
 
+- 0.1.1 (16): Version und Buildnummer in Windows und iPhone sichtbar, Windows-Dateieigenschaften versioniert, vier iPhone-Ansichten in der vereinfachten README.
 - iPhone: VPN-Status in Einstellungen, Installationshinweis bei getrennter Verbindung, Tastaturabschluss außerhalb von Textfeldern und verständliche Berechtigungen.
 - Entwicklermodus in Installation, Hilfe, iPhone-Einstellungen und README vor dem ersten App-Start erklärt.
 - Sideload-Apps mit Geräte-Icons; reguläre App-Store-Apps aus der Verwaltung entfernt. Löschen in Meine Apps per Wischen oder langem Drücken mit Bestätigung.

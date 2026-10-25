@@ -133,3 +133,17 @@ and referencing it from the README. The current device passed the channel probe;
 capture of the newly installed build is still pending.
 
 Windows updates stage in LocalAppData/DirectSide/updates. The staged EXE runs its own --apply-update entry point, waits for the original Qt process to stop and preserves DirectSide.previous.exe before replacing the original file. Short retries accommodate PyInstaller's outer process cleanup. If replacement or process launch fails, the previous EXE is retained/restored. Credentials and settings are not replaced. Authentication/install operations defer the restart. Locked files or an unwritable installation folder produce an update failure rather than elevation. A successful process launch is not a post-launch health guarantee. Actual release-to-release upgrades still require a hardware check after the first release is approved.
+
+
+## Version and build numbers
+
+Use a semantic app version (major.minor.patch) and a monotonically increasing
+build number. The current version is 0.1.1, build 16. Keep ui/updates.py
+(VERSION/BUILD), ios/project.yml (MARKETING_VERSION/CURRENT_PROJECT_VERSION),
+Cargo.toml and the directside-engine entry in Cargo.lock aligned.
+The version regression test rejects platform drift. Windows executable metadata
+is generated from the same VERSION/BUILD constants. iPhone settings read the
+actual installed bundle values. Do not change com.directside.app when updating.
+For a published update, increase the semantic version: the updater compares
+release versions, while the build number identifies individual test packages.
+Never replace an already published release binary with a different build.

@@ -1,5 +1,27 @@
 # Teststand vom 25. Oktober 2026
 
+## Version 0.1.1 (16) und vier README-Ansichten
+
+Windows-Titelleiste und Einstellungen zeigen Version und Build; auch die
+EXE-Dateieigenschaften sind versioniert (FileVersion 0.1.1.16,
+ProductVersion 0.1.1 (16)). iPhone-Einstellungen lesen beide Werte aus dem
+installierten Bundle. Versionsabgleich zwischen Windows, iPhone, Cargo und
+Lockdatei als Regressionstest ergänzt. 82 Python/Qt-Tests, 12 native Tests und
+Windows-Paketstart bestanden. Private iPhone-Prüfung 40200121156 für Quellstand
+c8c2477 erfolgreich. IPA geprüft: 0.1.1 (16), com.directside.app,
+14.712.801 Bytes, SHA-256
+c06812e8b38e0dc505e71d906af4d64ae0d76efb2e80f57a77685e73cbab7cc2.
+Kein Release veröffentlicht und keine Installation auf dem iPhone ausgelöst.
+
+README zeigt vier echte iPhone-Ansichten aus installiertem Build 14:
+Einführung, Meine Apps, Quelle hinzufügen und Einstellungen. Die Kontokarte
+liegt bei der Einstellungsaufnahme außerhalb des sichtbaren Bereichs.
+Persönliche Angaben nicht abgebildet; Bildmetadaten entfernt. Die sichtbare
+ältere Versionszeile wurde nicht künstlich verändert. README enthält nur
+Produktbeschreibung und Bedienung; interne Prüfdetails bleiben hier.
+Windows-UI-Steuerung wurde vom Werkzeug wegen nicht sicher bestimmbarer
+Browseradresse beendet; keine weiteren Windows-UI-Eingaben vorgenommen.
+
 ## README-Aufnahmen vom echten iPhone
 
 Zwei PNG-Aufnahmen aus der installierten Version 0.1.0 (Build 14): Meine Apps
