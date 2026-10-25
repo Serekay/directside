@@ -11,6 +11,7 @@
 - Windows settings are for language, updates and choosing Apple Account or an existing certificate. Keep technical diagnostics and redundant app shortcuts out of this page. Help shows the current next step with usable actions; call the diagnostic log “Protokoll”/“Log”, not “Aktivität”/“Activity”.
 - Keep account quotas next to the account and app counts next to the selected device. Background refreshes retain the last confirmed values while pending; clear them on device changes, disconnection or actual verification failure. Do not show idle status badges in the footer.
 - Setup polling must not replace a user-opened settings/help/log/details page. Back returns explicitly to the current setup step. Keep the manual USB recheck as a clearly named refresh icon on the disconnect screen; no generic “Check again” or “Show switch” buttons in the Developer Mode guide.
+- Setup copy describes the user's next action, not polling intervals. After an iPhone restart, explain reconnecting USB if the device is not detected and confirming Trust if prompted.
 - Use branch names beginning with codex/.
 - Build Windows locally with scripts/build-windows.ps1. GitHub Actions is only for manually requested iPhone builds; do not add Windows CI or automatic runs.
 - Preserve the compact iLoader-inspired Qt Quick desktop: custom window chrome, status badges, icon settings, inline authentication and no scrollbar in the main view.

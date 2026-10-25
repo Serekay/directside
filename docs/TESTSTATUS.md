@@ -10,7 +10,10 @@ Schritt statt kurz zur erneut installierbaren Hauptkarte.
 „Show switch“ entfällt: Der Aufruf blendet den iOS-Schalter ein, öffnet aber
 keine Einstellungsseite; dieser Aufruf erfolgt bereits bei der Installation.
 Entwicklermodus wird automatisch geprüft, ohne manuelles Check-again und ohne
-deaktivierten Warte-Button. Die USB-Neuprüfung liegt als Aktualisieren-Symbol
+deaktivierten Warte-Button. Der technische Prüfintervall-Text wurde durch den
+Handlungshinweis ersetzt: Nach dem Neustart bei fehlender Erkennung USB kurz
+abziehen und wieder einstecken sowie eine Vertrauensabfrage bestätigen.
+Die USB-Neuprüfung liegt als Aktualisieren-Symbol
 mit Tooltip „USB-Verbindung prüfen“ auf dem Disconnect-Bildschirm. Der explizite
 Start nach Teamfreigabe heißt „DirectSide starten“, Zertifikate haben eine
 konkrete Aktualisieren-Beschriftung. 78 Python/Qt-Tests bestanden, einschließlich
