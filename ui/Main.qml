@@ -371,18 +371,10 @@ ApplicationWindow {
                             ComboBox {model:["English","Deutsch"];currentIndex:s.language==="de"?1:0;onActivated:index=>backend.setLanguage(index===1?"de":"en")}
                         }
                         ColumnLayout {visible:win.settingsSection==="updates";Layout.fillWidth:true;spacing:12
-                            RowLayout {Label {text:"DirectSide · "+s.version;Layout.fillWidth:true} Badge {text:s.updateBusy?win.t("Prüfen …"):s.updateState==="empty"?win.t("Noch kein Release"):s.updateState==="available"?s.releaseVersion:s.updateState==="current"?win.t("Aktuell"):win.t("Nicht geprüft");tone:s.updateState==="current"?"ok":s.updateState==="error"?"missing":"warning"}}
+                            RowLayout {Label {text:"DirectSide · "+s.version;Layout.fillWidth:true} Badge {text:s.updateBusy?win.t("Prüfen …"):s.updateState==="empty"?win.t("Kein Update verfügbar"):s.updateState==="available"?s.releaseVersion:s.updateState==="current"?win.t("Aktuell"):s.updateState==="error"?win.t("Prüfung fehlgeschlagen"):win.t("Nicht geprüft");tone:s.updateState==="current"?"ok":s.updateState==="error"?"missing":"warning"}}
                             RowLayout {
                                 Action {text:win.t("Nach Updates suchen");enabled:!s.updateBusy;onClicked:backend.checkUpdates()}
                             }
-                            Label {text:win.t("GitHub · privates Repository");font.weight:Font.DemiBold;Layout.topMargin:8}
-                            RowLayout {Layout.fillWidth:true
-                                Field {id:githubToken;Layout.fillWidth:true;placeholderText:win.t("GitHub-Token · Contents: Read");echoMode:TextInput.Password;enabled:!s.updateBusy}
-                                Action {text:win.t("Speichern");enabled:githubToken.text.length>0 && !s.updateBusy;onClicked:{backend.saveGitHub(githubToken.text);githubToken.clear()}}
-                                IconButton {visible:s.githubSaved;text:"×";hint:win.t("GitHub-Zugang entfernen");enabled:!s.updateBusy;onClicked:backend.forgetGitHub()}
-                            }
-                            Text {text:win.t("Zugriff nur für Serekay/directside. Verschlüsselt für deinen Windows-Benutzer gespeichert.");color:win.muted;font.pixelSize:12;wrapMode:Text.WordWrap;Layout.fillWidth:true}
-                            Label {text:win.t("Automatische Prüfung beim Start und alle 6 Stunden.");color:win.muted;font.pixelSize:12;Layout.fillWidth:true}
                         }
                         Item {Layout.fillHeight:true}
                     }
@@ -542,7 +534,7 @@ ApplicationWindow {
             ColumnLayout {anchors.fill:parent;anchors.leftMargin:24;anchors.rightMargin:24;anchors.topMargin:8;anchors.bottomMargin:12;spacing:4
             RowLayout {Layout.fillWidth:true;spacing:8
                 Item {Layout.fillWidth:true}
-                Label {visible:s.updateBusy || s.updateMessage.length>0;text:s.updateBusy?win.t("GitHub …")+(s.updateProgress>0?" "+s.updateProgress+"%":""):win.t(s.updateMessage);font.pixelSize:12;color:s.updateState==="error"?"#ffb49a":win.muted;Layout.maximumWidth:parent.width*0.55;horizontalAlignment:Text.AlignRight}
+                Label {visible:s.updateBusy || s.updateMessage.length>0;text:s.updateBusy?win.t("Update prüfen …")+(s.updateProgress>0?" "+s.updateProgress+"%":""):win.t(s.updateMessage);font.pixelSize:12;color:s.updateState==="error"?"#ffb49a":win.muted;Layout.maximumWidth:parent.width*0.55;horizontalAlignment:Text.AlignRight}
                 Label {visible:!!s.error || (s.busy && !s.scanning && !s.settingUp) || s.lcPrepared || s.success;text:(s.error || (s.busy && !s.scanning?s.status:s.lcPrepared?win.t("Zertifikat übertragen · auf dem iPhone fortfahren"):s.success?s.status:"")).split("\n")[0];font.pixelSize:12;color:s.error?"#ffb49a":win.muted;Layout.maximumWidth:parent.width-150;horizontalAlignment:Text.AlignRight}
                 IconButton {visible:s.error.length>0;text:"≡";hint:win.t("Aktivität");onClicked:win.page="activity"}
                 ProgressBar {visible:s.busy && !s.scanning;Layout.preferredWidth:100;from:0;to:100;value:s.progress;indeterminate:s.progress<=0
@@ -555,7 +547,6 @@ ApplicationWindow {
                 Item {Layout.fillWidth:true}
                 Badge {visible:win.page==="settings" && win.settingsSection!=="updates" && s.email.length>0 && s.email===s.savedEmail;text:win.t("Apple-ID gespeichert")}
                 Badge {visible:win.page==="settings" && win.settingsSection!=="updates";text:win.t("Windows-Schlüsselbund")}
-                Badge {visible:win.page==="settings" && win.settingsSection==="updates" && s.githubSaved;text:win.t("GitHub gespeichert");tone:"ok"}
                 Badge {id:quotaBadge;objectName:"quotaBadge";text:win.quotaText;tone:!win.quotaKnown?"warning":s.appIdsAvailable===0?"missing":s.appIdsAvailable<=3?"warning":"ok"
                     ToolTip.visible:quotaHover.hovered;ToolTip.text:win.t("Neue App-Kennungen pro Account innerhalb von 7 Tagen. Keine installierten Apps.")+(s.appIdsRegistered>=0?"\n"+s.appIdsRegistered+" "+win.t("registrierte Kennungen"):"");HoverHandler {id:quotaHover}
                     MouseArea {anchors.fill:parent;cursorShape:Qt.PointingHandCursor;onClicked:{win.page="appids";win.appIdPage=0;backend.loadAppIds()}}

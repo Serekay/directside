@@ -117,10 +117,10 @@ class ReleaseClient:
                     with self.open(API) as response:
                         response.read(1)
                 except HTTPError:
-                    raise UpdateError('GitHub-Zugang für das private Repository erforderlich.') from None
+                    raise UpdateError('Updateprüfung vorübergehend nicht verfügbar. Bitte später erneut versuchen.') from None
                 return None
             if error.code in (401, 403):
-                raise UpdateError('GitHub-Zugriff abgelehnt. Zugang oder API-Limit prüfen.') from None
+                raise UpdateError('Updateprüfung vorübergehend nicht verfügbar. Bitte später erneut versuchen.') from None
             raise UpdateError('GitHub momentan nicht erreichbar.') from None
         if len(raw) > 1_000_000:
             raise UpdateError('Ungültige Release-Metadaten.')
