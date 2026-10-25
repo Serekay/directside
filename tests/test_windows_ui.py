@@ -334,7 +334,7 @@ class WindowsUIStateTests(unittest.TestCase):
   self.assertIn('Update bereit',self.bridge.data['updateMessage'])
 
  def test_github_and_other_ipa_controls_fit_update_settings_at_minimum_size(self):
-  self.bridge.update(busy=False,updateState='available',windowsUpdate=True,releaseVersion='v0.2.0',releaseIPA=True)
+  self.bridge.update(busy=False,updateState='available',windowsUpdate=True,releaseVersion='v0.2.0',releaseIPA=True,bundledIPAReady=False)
   engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
   engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')))
   root=engine.rootObjects()[0];root.setWidth(960);root.setHeight(680)
@@ -344,6 +344,32 @@ class WindowsUIStateTests(unittest.TestCase):
   self.assertEqual(root.findChild(QObject,'ipaVersionBadge').property('text'),'v0.2.0')
   self.assertEqual(len(root.findChildren(QObject,'windowsUpdateButton')),1)
   root.close();engine.deleteLater();APP.processEvents()
+
+ def test_primary_install_uses_current_adjacent_ipa_without_a_release(self):
+  import plistlib,zipfile
+  from unittest.mock import patch
+  folder=Path(self.folder.name);ipa=folder/'DirectSide.ipa'
+  with zipfile.ZipFile(ipa,'w') as archive:archive.writestr('Payload/DirectSide.app/Info.plist',plistlib.dumps({'CFBundleIdentifier':'com.directside.app','CFBundleShortVersionString':'0.1.0','CFBundleVersion':'14'}))
+  with patch('desktop.HOME',folder),patch('desktop.ROOT',folder):
+   self.bridge.update(busy=False,loggedIn=True,devices=[{'id':'phone'}],releaseIPA=False,releaseVersion='',customIPA='other.ipa')
+   self.bridge.installDirectSide()
+  self.assertTrue(self.bridge.data['bundledIPAReady'])
+  self.assertEqual(self.bridge.data['bundledIPAVersion'],'0.1.0 (14)')
+  self.assertEqual(self.sent[-1]['command'],'install');self.assertEqual(self.sent[-1]['path'],str(ipa))
+  self.assertEqual(self.sent[-1]['bundle_id'],'com.directside.app')
+  self.assertEqual(self.bridge.data['customIPA'],'other.ipa')
+
+ def test_adjacent_ipa_rejects_other_apps_corruption_and_older_versions(self):
+  import plistlib,zipfile
+  from unittest.mock import patch
+  folder=Path(self.folder.name);ipa=folder/'DirectSide.ipa'
+  with patch('desktop.HOME',folder),patch('desktop.ROOT',folder):
+   for identifier,local_version,raw in [('other.app','0.1.0',False),('com.directside.app','0.1.0',True),('com.directside.app','0.0.1',False)]:
+    if raw:ipa.write_bytes(b'not a zip')
+    else:
+     with zipfile.ZipFile(ipa,'w') as archive:archive.writestr('Payload/App.app/Info.plist',plistlib.dumps({'CFBundleIdentifier':identifier,'CFBundleShortVersionString':local_version,'CFBundleVersion':'14'}))
+    self.bridge.data['releaseVersion']='v0.1.0';self.bridge.refreshBundledIPA()
+    self.assertFalse(self.bridge.data['bundledIPAReady'])
 
  def test_directside_one_click_install_waits_for_usb_scan_and_keeps_custom_ipa(self):
   import plistlib,zipfile
