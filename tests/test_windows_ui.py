@@ -65,6 +65,23 @@ class WindowsUIStateTests(unittest.TestCase):
   hint=root.findChild(QObject,'setupReconnectHint');self.assertTrue(hint.property('visible'))
   self.bridge.update(devices=[{'id':'phone'}]);APP.processEvents();self.assertFalse(hint.property('visible'))
   root.close();engine.deleteLater();APP.processEvents()
+ def test_setup_check_again_rediscovers_usb_and_poll_recovers_without_reinstall(self):
+  self.bridge.initializing=False
+  self.bridge.update(busy=False,setupPending=True,developerMode='disabled',devices=[])
+  engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
+  engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')));root=engine.rootObjects()[0]
+  root.setProperty('page','developer');APP.processEvents()
+  button=root.findChild(QObject,'developerModeRefresh')
+  self.assertTrue(button.property('enabled'))
+  QMetaObject.invokeMethod(button,'clicked');APP.processEvents()
+  self.assertEqual(self.sent[-1],{'command':'devices'})
+  self.bridge.handle({'event':'devices','devices':[]})
+  self.assertTrue(self.bridge.data['deviceCheckedAt'])
+  self.bridge.auto_refresh();self.assertEqual(self.sent[-1],{'command':'devices'})
+  self.bridge.handle({'event':'devices','devices':[{'id':'phone','trusted':True}]})
+  self.assertEqual(self.sent[-1],{'command':'device_components','device_id':'phone'})
+  self.assertFalse(any(e['command']=='install' for e in self.sent))
+  root.close();engine.deleteLater();APP.processEvents()
  def test_restore_serializes_commands_and_saves_identity(self):
   self.bridge.handle({'event':'ready'})
   self.assertEqual(self.sent,[{'command':'imported_identity'},{'command':'local_auth_probe'}])

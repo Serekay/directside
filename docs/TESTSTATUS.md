@@ -1,5 +1,29 @@
 # Teststand vom 25. Oktober 2026
 
+## Erneuter Einrichtungsdurchlauf und USB-Nachprüfung
+
+Build 13 über den Dateidialog der gepackten Windows-App ausgewählt und installiert.
+Die App wechselte selbstständig zur Entwicklermodus-Anleitung; Kontingent 9/10.
+Nach Aktivierung und Neustart meldete Windows das USB-Gerät, Apples USB-Dienst
+lieferte bei unabhängiger Abfrage jedoch null Geräte. Die Wiederaufnahme ist in
+diesem Durchlauf deshalb noch nicht bestätigt. Die vorherige Vertrauensabfrage
+wurde mit einem Hilfsbefehl abgeschlossen und zählt nicht als vollständiger
+Nachweis des Vertrauensschritts über die Windows-Oberfläche.
+
+Korrigiert: Die Entwicklermodus-Anleitung erhält eine hervorgehobene Karte mit
+animiertem iPhone und großer Handlungsüberschrift. Die USB-Wiederverbindung
+nennt zusätzlich die Bestätigung von „Vertrauen“, automatische Prüfung alle drei
+Sekunden und den Zeitpunkt der letzten Antwort. „Erneut prüfen“ in der
+Entwicklermodus-Anleitung startet eine vollständige Gerätelistenabfrage statt
+einer Prüfung des alten Geräteeintrags. Fehlgeschlagene Komponentenabfragen
+verwerfen auch den alten Entwicklermodus-Status. 61 Windows-Tests bestanden,
+einschließlich manueller Neuerkennung ohne vorhandenes Gerät, automatischer
+Folgeabfrage und Komponentenprüfung nach Rückkehr ohne Neuinstallation.
+Die Änderungen beweisen keine Wiederherstellung eines hängenden Apple-Dienstes.
+Windows-Paket erfolgreich neu gebaut und Paketstartprüfung bestanden. Neue
+Wiederverbindungsansicht am laufenden Paket visuell geprüft; zeigt den
+Vertrauenshinweis und den Zeitpunkt der automatischen Geräteabfrage.
+
 ## Einführung, Kontoübernahme und LiveContainer-Icon
 
 Überflüssige Entwicklermodus-Anleitung aus der laufenden iPhone-App entfernt;

@@ -64,7 +64,7 @@ class DesktopBridge(QObject):
             if not isinstance(self.pendingSetup,dict) or not all(isinstance(self.pendingSetup.get(k),str) for k in ('device','path','mode','email')):self.pendingSetup=None
         except (OSError,ValueError):self.pendingSetup=None
         self.data.update(setupPending=bool(self.pendingSetup),setupReady=False)
-        self.data.update(usbTrustPending=False)
+        self.data.update(usbTrustPending=False,deviceCheckedAt='')
         self.data.update(usbReconnectNeeded=bool(self.pendingSetup))
         self.usbSeen=bool(self.pendingSetup)
         self.trustRejected=False
@@ -196,6 +196,7 @@ class DesktopBridge(QObject):
             self.update(busy=False,scanning=False,removal={},status='App entfernt.',success=False)
             self.componentDevice=None;self.inspectDevice()
         elif kind=='devices':
+            self.data['deviceCheckedAt']=time.strftime('%H:%M:%S')
             old=self.data['devices'];index=self.data['deviceIndex']
             selected=old[index].get('id') if old and index<len(old) else None
             devices=event.get('devices',[])
@@ -238,6 +239,7 @@ class DesktopBridge(QObject):
         elif kind=='error':
             if event.get('command')=='devices' and self.usbSeen:
                 self.componentDevice=None
+                self.data['deviceCheckedAt']=time.strftime('%H:%M:%S')
                 self.update(busy=False,scanning=False,devices=[],usbReconnectNeeded=True,usbTrustPending=False,developerMode='unknown',directsidePresent=False,slotsUsed=-1,installedApps=[],developerApps=[],vpnState='unknown',lcState='unknown')
                 return
             if event.get('command')=='trust_device':
@@ -250,7 +252,7 @@ class DesktopBridge(QObject):
                 self.append_log('App-Icons konnten nicht geladen werden.');return
             if event.get('command')=='device_components':
                 self.componentDevice=None
-                self.update(busy=False,scanning=False,vpnState='unknown',lcState='unknown',directsidePresent=False,slotsUsed=-1,developerApps=[],installedApps=[])
+                self.update(busy=False,scanning=False,developerMode='unknown',vpnState='unknown',lcState='unknown',directsidePresent=False,slotsUsed=-1,developerApps=[],installedApps=[])
                 self.append_log('App-Prüfung nicht möglich. iPhone entsperren und Vertrauen bestätigen.');return
             self.fail(event.get('message','Unbekannter Fehler'))
             if '7460' in event.get('message',''):
