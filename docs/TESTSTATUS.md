@@ -13,6 +13,12 @@ IPA-Kennung, Version/Build, CoreADI-Hash und beide Release-Prüfsummen geprüft.
 Die RSA-Upstream-Warnung bleibt dokumentiert. Kein neuer Hardwaretest behauptet.
 Details: [Sicherheitsprüfung](SECURITY-AUDIT.md).
 
+0.1.2 (17) ist als stabiler Latest-Release veröffentlicht und unveränderlich
+geschützt. Beide Downloads ohne Anmeldung mit HTTP 200 geprüft. Der Windows-
+ReleaseClient akzeptiert die öffentlichen Metadaten und lädt die IPA ohne Token
+mit erfolgreicher Größen-, Hash- und Bundle-ID-Prüfung. Nur 0.1.2 ist öffentlich.
+Lokale Dateien unter `dist/` ersetzt und gegen die Release-Prüfsummen verifiziert.
+
 Repository ist inzwischen öffentlich. 0.1.0 und 0.1.1 sind zurückgezogen;
 die folgenden Einträge dokumentieren auch frühere Entwicklungsstände.
 
