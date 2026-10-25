@@ -27,7 +27,8 @@ async fn main()->Result<(),Report> {
 async fn run()->Result<(),Report> {
     let args:Vec<_>=std::env::args().skip(1).collect();
     let focus_only=args.first().is_some_and(|a|a=="focus");
-    let target=if focus_only || args.first().is_some_and(|a|a=="press") {Some(args.get(1).ok_or_else(||report!("Use press/focus <exact accessibility label>."))?.as_str())} else {None};
+    let by_identifier=args.first().is_some_and(|a|a=="press-id");
+    let target=if focus_only || by_identifier || args.first().is_some_and(|a|a=="press") {Some(args.get(1).ok_or_else(||report!("Use press/focus/press-id <exact accessibility target>."))?.as_str())} else {None};
     let mut mux=UsbmuxdConnection::default().await?;
     let devices=mux.get_devices().await?;
     if devices.len()!=1 {bail!("Connect exactly one trusted, unlocked iPhone.");}
@@ -58,7 +59,11 @@ async fn run()->Result<(),Report> {
         if !seen.insert(identity){duplicates+=1;if duplicates>=6{break}continue}
         duplicates=0;
         println!("Element: {}",if caption.contains('@'){"[account]"}else{caption});
-        if target==Some(caption) || (target==Some("[account]") && caption.contains('@')) {
+        let identifier=field(&raw,"AccessibilityIdentifier_v1").map(unpass).and_then(Value::as_string).unwrap_or("");
+        if args.first().is_some_and(|a|a=="--identifiers") {
+            println!("Semantic identifier: {}",if identifier.contains('@'){"[account]"}else{identifier});
+        }
+        if (by_identifier && target==Some(identifier)) || (!by_identifier && (target==Some(caption) || (target==Some("[account]") && caption.contains('@')))) {
             if focus_only {pressed=true;break}
             let element=token.ok_or_else(||report!("Selected element has no activation token."))?.clone();
             let fields:plist::Dictionary=[("AttributeNameValue_v1",Value::String("AXAction-2010".into())),("DisplayAsTree_v1",0.into()),("HumanReadableNameValue_v1","Activate".into()),("IsInternal_v1",0.into()),("PerformsActionValue_v1",1.into()),("SettableValue_v1",0.into()),("ValueTypeValue_v1",1.into())].into_iter().map(|(k,v)|(k.to_string(),pass(v))).collect();

@@ -38,3 +38,7 @@ apple-codesign-quick = "0.1.0"
 [profile.release]
 strip = true
 
+[target.'cfg(windows)'.dependencies]
+idevice = { version = "0.1.61", default-features = false, features = ["dvt", "core_device_proxy"] }
+ns-keyed-archive = "0.1.5"
+

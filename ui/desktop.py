@@ -2,6 +2,10 @@
 import json
 import os
 import sys
+if '--recover-apple-usb' in sys.argv:
+    from apple_usb import restart_present_apple_usb
+    try:sys.exit(restart_present_apple_usb())
+    except Exception:sys.exit(1)
 if '--local-anisette' in sys.argv:
     from local_mac_auth import main as local_auth_main
     sys.exit(local_auth_main())
@@ -24,6 +28,7 @@ if '--release-probe' in sys.argv:
     sys.exit(0 if result['ok'] else 1)
 import threading
 import time
+from functools import wraps
 from pathlib import Path
 from PySide6.QtCore import QObject, Property, Signal, Slot, QProcess, QTimer, QUrl
 from PySide6.QtGui import QIcon
@@ -33,8 +38,23 @@ from PySide6.QtQuick import QQuickWindow  # PyInstaller includes the Qt Quick ru
 from PySide6.QtQuickControls2 import QQuickStyle
 from common import ROOT, HOME, Preferences, ipa_identity, valid_code, clean_error
 from components import usb_status, setup_apple, download_livecontainer
+from apple_usb import present_apple_usb, recover_apple_usb
 from i18n import ENGLISH, translate
 from updates import ReleaseClient, VERSION, version, digest, CACHE, UpdateError
+
+def after_scan(method):
+    """Serialize a UI action after a background scan, retaining its selected phone."""
+    @wraps(method)
+    def invoke(self,*args):
+        if self.data['busy'] and self.data['scanning']:
+            if self.pendingUserAction is None:
+                devices=self.data['devices'];index=self.data['deviceIndex']
+                device=devices[index]['id'] if devices and index<len(devices) else None
+                if method.__name__ in ('refresh','recoverUSB','loadCertificates','setSigningMode','checkComponents','setupComponents','chooseIPA'):device=None
+                self.pendingUserAction=(method,args,device)
+            return True
+        return method(self,*args)
+    return invoke
 
 
 class DesktopBridge(QObject):
@@ -65,6 +85,8 @@ class DesktopBridge(QObject):
         except (OSError,ValueError):self.pendingSetup=None
         self.data.update(setupPending=bool(self.pendingSetup),setupReady=False)
         self.data.update(usbTrustPending=False,deviceCheckedAt='')
+        self.data.update(usbRepairState='idle',settingsNavigation='idle',launchState='blocked' if self.pendingSetup and self.pendingSetup.get('phase')=='launch' else 'idle',foregroundBusy=True)
+        self.usbMissingSince=None;self.usbRecoveryAttempted=False;self.usbProbeRunning=False
         self.data.update(usbReconnectNeeded=bool(self.pendingSetup))
         self.usbSeen=bool(self.pendingSetup)
         self.trustRejected=False
@@ -76,6 +98,8 @@ class DesktopBridge(QObject):
         self.installing=False
         self.setupWasFirstInstall=False
         self.pendingLogin=None
+        self.pendingLogout=False
+        self.pendingUserAction=None
         self.pendingReleaseInstall=None
         self.componentDevice=None;self.componentTime=0
         self.process=QProcess(self)
@@ -109,8 +133,11 @@ class DesktopBridge(QObject):
             if key in values:values[key]=translate(values[key],language)
         self.data.update(values)
         self.data['canSign']=bool(self.data['importedIdentity']) and self.data['importedIdentity'].get('valid',True) if self.data['signingMode']=='imported' else self.data['loggedIn']
+        self.data['foregroundBusy']=self.data['busy'] and not self.data['scanning']
         self.changed.emit()
-        if not self.data['busy'] and self.pendingLogin is not None:QTimer.singleShot(0,self.startPendingLogin)
+        if not self.data['busy'] and self.pendingLogout:QTimer.singleShot(0,self.startPendingLogout)
+        elif not self.data['busy'] and self.pendingLogin is not None:QTimer.singleShot(0,self.startPendingLogin)
+        elif not self.data['busy'] and self.pendingUserAction is not None:QTimer.singleShot(0,self.startPendingUserAction)
         elif not self.data['busy'] and self.pendingReleaseInstall is not None:QTimer.singleShot(0,self.startPendingReleaseInstall)
 
     @Slot(str)
@@ -122,6 +149,15 @@ class DesktopBridge(QObject):
         if self.pendingLogin is None or self.data['busy']:return
         email,password=self.pendingLogin;self.pendingLogin=None
         self.login(email,password)
+
+    def startPendingUserAction(self):
+        if self.data['busy'] or self.pendingUserAction is None:return
+        method,args,device=self.pendingUserAction;self.pendingUserAction=None
+        devices=self.data['devices'];index=self.data['deviceIndex']
+        selected=devices[index]['id'] if devices and index<len(devices) else None
+        if device is not None and selected!=device:
+            self.update(error='Zielgerät hat sich geändert. Aktion erneut starten.');return
+        method(self,*args)
 
     @Slot(str)
     def setLanguage(self,language):
@@ -158,6 +194,7 @@ class DesktopBridge(QObject):
 
     def fail(self,message):
         self.installing=False
+        self.pendingUserAction=None
         self.pendingLogin=None
         self.pendingReleaseInstall=None
         if not self.data['loggedIn']:self.data['authState']='signed_out'
@@ -200,7 +237,9 @@ class DesktopBridge(QObject):
             old=self.data['devices'];index=self.data['deviceIndex']
             selected=old[index].get('id') if old and index<len(old) else None
             devices=event.get('devices',[])
-            if devices:self.usbSeen=True
+            if devices:
+                self.usbSeen=True;self.usbMissingSince=None;self.usbRecoveryAttempted=False
+                self.data['usbRepairState']='idle'
             for device in devices:device['label']=device.get('name','Apple-Gerät')+' · '+device['id'][-4:]
             index=next((i for i,d in enumerate(devices) if d.get('id')==selected),0)
             if devices and devices[index]['id']!=selected:self.update(installedApps=[],slotsUsed=-1,developerApps=[],lcPrepared=False,developerMode='unknown')
@@ -215,6 +254,7 @@ class DesktopBridge(QObject):
                 self.trustRejected=False;self.update(usbTrustPending=False)
                 self.componentDevice=None
                 self.update(vpnState='unknown',lcState='unknown',directsidePresent=False,lcPrepared=False,slotsUsed=-1,developerApps=[],installedApps=[],developerMode='unknown')
+                self.probeUSBRecovery()
         elif kind=='device_components':
             if self.data['devices'] and event.get('device_id')==self.data['devices'][self.data['deviceIndex']]['id']:
                 self.componentDevice=event['device_id'];self.componentTime=time.monotonic()
@@ -237,6 +277,8 @@ class DesktopBridge(QObject):
         elif kind=='choose_team':self.update(challenge='team',busy=True,teams=event.get('teams',[]))
         elif kind=='pairing_pin':self.update(challenge='pairing',busy=True)
         elif kind=='error':
+            if event.get('command') in ('launch_directside','open_trust_settings'):
+                self.update(busy=False,settingUp=False,launchState='blocked',setupReady=False,**({'settingsNavigation':'manual'} if event.get('command')=='open_trust_settings' else {}));return
             if event.get('command')=='devices' and self.usbSeen:
                 self.componentDevice=None
                 self.data['deviceCheckedAt']=time.strftime('%H:%M:%S')
@@ -267,29 +309,74 @@ class DesktopBridge(QObject):
                 self.setupRecord.parent.mkdir(parents=True,exist_ok=True)
                 self.setupRecord.write_text(json.dumps(self.pendingSetup),encoding='utf-8')
                 self.update(busy=False,success=False,progress=100,status='Entwicklermodus aktivieren',challenge='',directsideInstalling=False,settingUp=False,setupPhase='',setupPending=True,setupReady=False)
-            else:self.update(busy=False,success=True,progress=100,status='Installiert',challenge='',directsideInstalling=False,settingUp=False,setupPhase='',setupReady=self.setupWasFirstInstall and bool(event.get('bootstrap_ready')))
+            else:
+                self.update(busy=False,success=True,progress=100,status='Installiert',challenge='',directsideInstalling=False,settingUp=False,setupPhase='',setupReady=False)
+                if self.setupWasFirstInstall and event.get('bootstrap_ready'):
+                    self.pendingSetup={'device':event['device_id'],'path':event['path'],'mode':self.data['signingMode'],'email':self.data['email'],'phase':'launch'}
+                    self.setupRecord.parent.mkdir(parents=True,exist_ok=True)
+                    self.setupRecord.write_text(json.dumps(self.pendingSetup),encoding='utf-8')
+                    self.launchDirectSide()
             self.inspectDevice()
         elif kind=='directside_repaired':
-            self.pendingSetup=None;self.setupRecord.unlink(missing_ok=True)
-            self.update(busy=False,success=True,progress=100,settingUp=False,setupPhase='',setupPending=False,setupReady=True,status='DirectSide auf dem iPhone öffnen.')
-            self.inspectDevice()
+            if not self.pendingSetup:
+                self.pendingSetup={'device':event['device_id'],'path':event.get('path',self.data['ipa']),'mode':self.data['signingMode'],'email':self.data['email']}
+            self.pendingSetup['phase']='launch'
+            self.setupRecord.parent.mkdir(parents=True,exist_ok=True)
+            self.setupRecord.write_text(json.dumps(self.pendingSetup),encoding='utf-8')
+            self.update(busy=False,success=False,progress=100,settingUp=False,setupPhase='',setupReady=False)
+            if self.pendingSetup.get('launch_attempted'):self.update(launchState='blocked')
+            else:self.launchDirectSide()
+        elif kind=='directside_launch_result':
+            if not self.pendingSetup or event.get('device_id')!=self.pendingSetup['device']:return
+            if event.get('ok'):
+                self.pendingSetup=None;self.setupRecord.unlink(missing_ok=True)
+                self.update(busy=False,success=True,setupPending=False,setupReady=True,launchState='opened',status='DirectSide gestartet.')
+            else:
+                self.update(busy=False,success=False,setupReady=False,launchState='blocked')
+                self.openTrustSettings()
+        elif kind=='trust_settings_opened':
+            if not self.pendingSetup or event.get('device_id')!=self.pendingSetup['device']:return
+            self.update(busy=False,launchState='blocked',settingsNavigation='confirmed' if event.get('ok') else 'manual')
 
     def resumeSetup(self):
         pending=self.pendingSetup
-        if not pending or self.data['busy'] or self.data['developerMode']!='enabled' or not self.data['devices']:return
+        if not pending or self.pendingLogout or self.pendingUserAction is not None or self.data['busy'] or self.data['developerMode']!='enabled' or not self.data['devices']:return
         if self.data['devices'][self.data['deviceIndex']]['id']!=pending['device']:return
         if pending['mode']=='account' and (not self.data['loggedIn'] or self.data['email'].casefold()!=pending['email'].casefold()):return
         if pending['mode']=='imported' and not self.data['importedIdentity'].get('name'):return
+        if pending.get('phase')=='launch':
+            if self.data['launchState']=='idle':self.launchDirectSide()
+            return
         if not Path(pending['path']).is_file():self.update(error='Original-IPA auswählen.');return
         self.update(busy=True,settingUp=True,setupPhase='Einrichtung abschließen …',error='')
         self.send({'command':'repair_directside','signing_mode':pending['mode'],'device_id':pending['device'],'path':pending['path']})
 
     @Slot()
-    def acknowledgeSetup(self):self.update(setupReady=False)
+    def acknowledgeSetup(self):self.update(setupReady=False,launchState='idle')
 
     @Slot()
+    @after_scan
+    def launchDirectSide(self):
+        if self.data['busy'] or not self.pendingSetup or not self.data['devices']:return
+        if self.data['devices'][self.data['deviceIndex']]['id']!=self.pendingSetup['device']:return
+        self.pendingSetup['launch_attempted']=True
+        self.setupRecord.parent.mkdir(parents=True,exist_ok=True)
+        self.setupRecord.write_text(json.dumps(self.pendingSetup),encoding='utf-8')
+        self.update(busy=True,success=False,setupReady=False,launchState='checking')
+        self.send({'command':'launch_directside','device_id':self.pendingSetup['device']})
+
+    @Slot()
+    @after_scan
+    def openTrustSettings(self):
+        if self.data['busy'] or not self.pendingSetup or not self.data['devices']:return
+        if self.data['devices'][self.data['deviceIndex']]['id']!=self.pendingSetup['device']:return
+        self.update(busy=True,scanning=False,settingsNavigation='opening')
+        self.send({'command':'open_trust_settings','device_id':self.pendingSetup['device']})
+
+    @Slot()
+    @after_scan
     def trustDevice(self):
-        if self.data['busy'] or not self.data['devices']:return
+        if self.data['busy'] or self.pendingLogout or not self.data['devices']:return
         self.trustRejected=False
         self.update(busy=True,scanning=False,usbTrustPending=True)
         self.send({'command':'trust_device','device_id':self.data['devices'][self.data['deviceIndex']]['id']})
@@ -321,28 +408,61 @@ class DesktopBridge(QObject):
 
     @Slot()
     def logout(self):
-        if not self.data['busy']:self.update(busy=True);self.send({'command':'logout'})
+        if self.data['busy']:
+            if self.data['scanning']:self.pendingLogout=True
+            return
+        self.pendingLogout=False
+        self.update(busy=True,scanning=False);self.send({'command':'logout'})
+
+    def startPendingLogout(self):
+        if self.pendingLogout and not self.data['busy']:self.logout()
 
     @Slot()
+    @after_scan
     def refresh(self):
         if self.data['busy']:return
         self.componentDevice=None
         self.update(busy=True,scanning=True);self.send({'command':'devices'})
 
     def auto_refresh(self):
-        if not self.initializing and not self.data['busy'] and self.pendingLogin is None:
+        if not self.initializing and not self.data['busy'] and self.pendingLogin is None and not self.pendingLogout and self.pendingUserAction is None:
             self.update(busy=True,scanning=True);self.send({'command':'devices'})
 
+    def probeUSBRecovery(self):
+        if not self.usbSeen or self.usbRecoveryAttempted or self.usbProbeRunning:return
+        if self.usbMissingSince is None:self.usbMissingSince=time.monotonic();return
+        if time.monotonic()-self.usbMissingSince<8:return
+        self.usbProbeRunning=True
+        def worker():
+            try:count=len(present_apple_usb())
+            except Exception:count=0
+            self.setupEvent.emit({'type':'usb_pnp','count':count})
+        threading.Thread(target=worker,daemon=True).start()
+
+    @Slot()
+    @after_scan
+    def recoverUSB(self):
+        if self.data['busy'] or self.data['devices'] or self.data['usbRepairState']=='repairing':return
+        self.usbRecoveryAttempted=True
+        self.update(busy=True,scanning=False,usbRepairState='repairing')
+        def worker():
+            try:recover_apple_usb(self.setupEvent.emit)
+            except Exception:self.setupEvent.emit({'type':'usb_recovered','ok':False})
+        threading.Thread(target=worker,daemon=True).start()
+
     @Slot(int)
+    @after_scan
     def selectDevice(self,index):
         if not self.data['busy'] and 0<=index<len(self.data['devices']):self.update(deviceIndex=index,lcPrepared=False,installedApps=[],removal={},developerMode='unknown');self.inspectDevice()
 
     @Slot()
+    @after_scan
     def loadCertificates(self):
         if self.data['busy'] or self.data['updateBusy'] or not self.data['loggedIn']:return
         self.update(busy=True,removal={});self.send({'command':'certificates'})
 
     @Slot(str)
+    @after_scan
     def setSigningMode(self,mode):
         if self.data['busy'] or mode not in ('account','imported'):return
         try:self.preferences.save(self.data['email'],self.data['language'],mode)
@@ -362,6 +482,7 @@ class DesktopBridge(QObject):
         if paths:self.update(identityProfiles=paths)
 
     @Slot(str)
+    @after_scan
     def importIdentity(self,password):
         if self.data['busy'] or not self.data['identityP12'] or not self.data['identityProfiles']:return
         self.setSigningMode('imported')
@@ -369,17 +490,20 @@ class DesktopBridge(QObject):
         self.send({'command':'import_identity','p12_path':self.data['identityP12'],'profile_paths':self.data['identityProfiles'],'password':password})
 
     @Slot()
+    @after_scan
     def forgetIdentity(self):
         if self.data['busy']:return
         self.update(busy=True);self.send({'command':'forget_identity'})
 
     @Slot(str)
+    @after_scan
     def requestAppRemoval(self,bundle):
         if self.data['busy'] or self.data['updateBusy'] or self.data['directsideInstalling'] or not self.data['devices']:return
         app=next((app for app in self.data['installedApps'] if app['id']==bundle),None)
         if app and app.get('developer'):self.update(removal={'kind':'app','id':bundle,'name':app['name'],'device':self.data['devices'][self.data['deviceIndex']]['id']})
 
     @Slot(str)
+    @after_scan
     def requestCertificateRemoval(self,serial):
         if self.data['busy'] or self.data['updateBusy'] or self.data['directsideInstalling']:return
         cert=next((cert for cert in self.data['certificates'] if cert.get('serial')==serial),None)
@@ -389,6 +513,7 @@ class DesktopBridge(QObject):
     def cancelRemoval(self):self.update(removal={})
 
     @Slot()
+    @after_scan
     def confirmRemoval(self):
         if self.data['busy'] or self.data['updateBusy'] or self.data['directsideInstalling']:return
         removal=self.data['removal']
@@ -403,7 +528,7 @@ class DesktopBridge(QObject):
 
     @Slot('QVariantList')
     def loadAppIcons(self,bundles):
-        if self.data['busy'] or self.pendingLogin is not None or not self.data['devices']:return
+        if self.data['busy'] or self.pendingLogin is not None or self.pendingLogout or not self.data['devices']:return
         wanted={app['id'] for app in self.data['installedApps'] if not app.get('iconChecked')}
         selected=[bundle for bundle in bundles if isinstance(bundle,str) and bundle in wanted][:12]
         if not selected:return
@@ -413,17 +538,19 @@ class DesktopBridge(QObject):
 
     @Slot()
     def inspectDevice(self):
-        if self.data['busy'] or self.pendingLogin is not None or not self.data['devices']:return
+        if self.data['busy'] or self.pendingLogin is not None or self.pendingLogout or self.pendingUserAction is not None or not self.data['devices']:return
         self.update(busy=True,scanning=True,vpnState='unknown',lcState='unknown',directsidePresent=False,slotsUsed=-1,developerApps=[])
         self.send({'command':'device_components','device_id':self.data['devices'][self.data['deviceIndex']]['id']})
 
     @Slot()
+    @after_scan
     def revealDeveloperMode(self):
         if self.data['busy'] or not self.data['devices']:return
         self.update(busy=True,error='')
         self.send({'command':'reveal_developer_mode','device_id':self.data['devices'][self.data['deviceIndex']]['id']})
 
     @Slot()
+    @after_scan
     def installLiveContainer(self):
         if self.data['busy'] or not self.data['canSign'] or not self.data['devices']:return
         self.update(busy=True,setupBusy=True,error='',progress=0,status='LiveContainer vorbereiten …')
@@ -434,6 +561,7 @@ class DesktopBridge(QObject):
         threading.Thread(target=worker,daemon=True).start()
 
     @Slot()
+    @after_scan
     def prepareLiveContainer(self):
         if self.data['busy'] or not self.data['canSign'] or self.data['lcState']!='installed' or not self.data['directsidePresent']:return
         self.update(busy=True,error='',lcPrepared=False,status='Zertifikat lokal übertragen …')
@@ -461,12 +589,14 @@ class DesktopBridge(QObject):
         if kind:self.update(challenge='');self.send({'team_id':''} if kind=='team' else {'code':''} if kind=='pairing' else {'action':'cancel'})
 
     @Slot()
+    @after_scan
     def chooseIPA(self):
         if self.data['busy'] or self.data['updateBusy'] or self.data['directsideInstalling']:return
         path,_=QFileDialog.getOpenFileName(None,translate('IPA auswählen',self.data['language']),str(HOME),'iPhone app (*.ipa)')
         if path:self.update(ipa=path,ipaName=Path(path).name,customIPA=path,customIPAName=Path(path).name,ipaSource='file',success=False,error='')
 
     @Slot()
+    @after_scan
     def installCustomIPA(self):
         if self.data['busy'] or self.data['updateBusy'] or self.data['directsideInstalling'] or not self.data['customIPA']:return
         self.update(ipa=self.data['customIPA'],ipaName=self.data['customIPAName'],ipaSource='file')
@@ -582,6 +712,7 @@ class DesktopBridge(QObject):
     def dismissError(self):self.update(error='')
 
     @Slot(result=bool)
+    @after_scan
     def repairDirectSide(self):
         if self.data['busy'] or self.data['updateBusy'] or not self.data['devices']:return False
         if not self.data['canSign']:self.fail('Bitte anmelden oder ein Zertifikat importieren.');return False
@@ -596,12 +727,14 @@ class DesktopBridge(QObject):
         return True
 
     @Slot()
+    @after_scan
     def checkComponents(self):
         if self.data['busy']:return
         self.update(usbState=usb_status(),error='',busy=True)
         self.send({'command':'local_auth_probe'})
 
     @Slot()
+    @after_scan
     def setupComponents(self):
         if self.data['busy']:return
         self.update(busy=True,setupBusy=True,error='',progress=0,status='Komponenten prüfen …')
@@ -613,7 +746,14 @@ class DesktopBridge(QObject):
     @Slot(dict)
     def onSetupEvent(self,event):
         kind=event.get('type')
-        if kind=='progress':self.update(progress=event.get('value',0))
+        if kind=='usb_pnp':
+            self.usbProbeRunning=False
+            if event.get('count')==1 and not self.data['devices'] and not self.usbRecoveryAttempted and self.pendingUserAction is None:
+                self.recoverUSB()
+        elif kind=='usb_recovered':
+            self.update(busy=False,usbRepairState='waiting' if event.get('ok') else 'failed')
+            self.refresh()
+        elif kind=='progress':self.update(progress=event.get('value',0))
         elif kind=='status':self.update(status=event.get('message',''))
         elif kind=='error':self.update(setupBusy=False,usbState=usb_status());self.fail(event.get('message','Einrichtung fehlgeschlagen.'))
         elif kind=='livecontainer_downloaded':
@@ -636,6 +776,8 @@ class DesktopBridge(QObject):
 
     def close(self):
         self.closing=True
+        self.pendingUserAction=None
+        self.pendingLogout=False
         self.pendingLogin=None
         self.pendingReleaseInstall=None
         self.timer.stop()

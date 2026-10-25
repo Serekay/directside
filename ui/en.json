@@ -450,5 +450,19 @@
   "Falls gefragt: Auf dem iPhone „Vertrauen“ bestätigen.": "If prompted, confirm Trust on your iPhone.",
   "Automatische Prüfung alle 3 Sekunden": "Automatic check every 3 seconds",
   "Verbindung prüfen …": "Checking connection…",
-  "Einrichtung abgeschlossen": "Setup complete"
+  "Einrichtung abgeschlossen": "Setup complete",
+  "USB-Verbindung wird wiederhergestellt. Windows-Abfrage bestätigen.": "Restoring USB connection. Confirm the Windows prompt.",
+  "USB-Wiederherstellung nicht abgeschlossen.": "USB recovery did not complete.",
+  "Warte auf den Apple-USB-Dienst …": "Waiting for the Apple USB service…",
+  "USB wiederherstellen": "Restore USB",
+  "DirectSide gestartet.": "DirectSide opened.",
+  "DirectSide wird gestartet …": "Opening DirectSide…",
+  "Freigabe am iPhone prüfen": "Check approval on your iPhone",
+  "Falls iOS „Nicht vertrauenswürdiger Entwickler“ meldet:": "If iOS reports an untrusted developer:",
+  "Einstellungen → Allgemein → VPN & Geräteverwaltung → Entwicklungsteam → Vertrauen.": "Settings → General → VPN & Device Management → developer team → Trust.",
+  "iPhone entsperrt lassen. Danach erneut starten.": "Keep your iPhone unlocked. Then try opening again.",
+  "Einstellungen am iPhone öffnen": "Open iPhone Settings",
+  "DirectSide starten": "Open DirectSide",
+  "Zielgerät hat sich geändert. Aktion erneut starten.": "The selected device changed. Please try the action again.",
+  "Bitte am iPhone selbst öffnen:": "Please open this on your iPhone:"
 }
