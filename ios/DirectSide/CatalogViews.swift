@@ -115,7 +115,7 @@ struct DiscoverView: View {
                     }.padding(17).background(Style.surface,in:RoundedRectangle(cornerRadius:21))
                 }
             }.padding(21)
-        }.background(Style.background).toolbar(.hidden,for:.navigationBar)
+        }.background(Style.background).navigationTitle(L("Entdecken")).toolbar(.hidden,for:.navigationBar)
          .refreshable {await engine.refreshSources()}.safeAreaInset(edge:.bottom) {EngineProgress()}
     }
     private func featured(_ entry:CatalogEntry)->some View {
@@ -188,7 +188,7 @@ struct SourcesView:View {
                             Text(source.name).font(.subheadline.bold()).foregroundStyle(.primary)
                             Text(source.sourceURL?.host ?? source.identifier ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                             HStack(spacing:10) {
-                                Text(L("\(source.apps.count) Apps"))
+                                Text(L(source.apps.count==1 ? "1 App":"\(source.apps.count) Apps"))
                                 if engine.refreshingSources {ProgressView().controlSize(.mini);Text(L("Aktualisieren …"))}
                                 else {Label(L(engine.sourceFailures[source.id] != nil ? "Nicht erreichbar":source.refreshedAt == nil ? "Nicht geprüft":"Aktuell"),systemImage:engine.sourceFailures[source.id] != nil ? "exclamationmark.circle":"checkmark.circle")}
                             }.font(.caption2).foregroundStyle(engine.sourceFailures[source.id] != nil ? Color.orange:Color.secondary)
@@ -199,7 +199,7 @@ struct SourcesView:View {
                     Button(role:.destructive){withAnimation{engine.removeSource(source)}}label:{Label(L("Quelle entfernen"),systemImage:"trash")}
                 }
             }
-        }.listStyle(.plain).scrollContentBackground(.hidden).background(Style.background).toolbar(.hidden,for:.navigationBar)
+        }.listStyle(.plain).scrollContentBackground(.hidden).background(Style.background).navigationTitle(L("Quellen")).toolbar(.hidden,for:.navigationBar)
         .refreshable {await engine.refreshSources()}
     }
 }
@@ -208,5 +208,22 @@ struct SourceDetailView:View {
     @EnvironmentObject var engine:Engine
     let source:SourceCatalog
     @ObservedObject var connection:Connection
-    var body:some View {ScrollView {VStack(alignment:.leading,spacing:18){HStack(spacing:14){Image(systemName:"tray.2.fill").font(.largeTitle).foregroundStyle(Style.accent);VStack(alignment:.leading,spacing:5){Text(L(source.name)).font(.title2.bold());Text(source.sourceURL?.host ?? source.subtitle ?? "").font(.subheadline).foregroundStyle(.secondary)}};if let text=source.description {Text(L(text)).font(.subheadline).foregroundStyle(.secondary)};if let failure=engine.sourceFailures[source.id] {Label(L(failure),systemImage:"exclamationmark.circle").font(.caption).foregroundStyle(.orange)};SectionTitle(title:"Apps aus dieser Quelle");SectionTitle(title:"Apps aus dieser Quelle");ForEach(source.apps){CatalogRow(app:$0,source:source,connection:connection)};if let url=source.website,["http","https"].contains(url.scheme ?? "") {Link(L("Website der Quelle"),destination:url)}}.padding(21)}.background(Style.background).navigationTitle(L("Quelle")).navigationBarTitleDisplayMode(.inline)}
+    var body:some View {
+        ScrollView {
+            VStack(alignment:.leading,spacing:18) {
+                HStack(spacing:14) {
+                    Image(systemName:"tray.2.fill").font(.largeTitle).foregroundStyle(Style.accent)
+                    VStack(alignment:.leading,spacing:5) {
+                        Text(L(source.name)).font(.title2.bold())
+                        Text(source.sourceURL?.host ?? source.subtitle ?? "").font(.subheadline).foregroundStyle(.secondary)
+                    }
+                }
+                if let text=source.description {Text(L(text)).font(.subheadline).foregroundStyle(.secondary)}
+                if let failure=engine.sourceFailures[source.id] {Label(L(failure),systemImage:"exclamationmark.circle").font(.caption).foregroundStyle(.orange)}
+                SectionTitle(title:"Apps aus dieser Quelle")
+                ForEach(source.apps){CatalogRow(app:$0,source:source,connection:connection)}
+                if let url=source.website,["http","https"].contains(url.scheme ?? "") {Link(L("Website der Quelle"),destination:url)}
+            }.padding(21)
+        }.background(Style.background).navigationTitle(L("Quelle")).navigationBarTitleDisplayMode(.inline)
+    }
 }

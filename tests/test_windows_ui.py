@@ -353,4 +353,26 @@ class WindowsUIStateTests(unittest.TestCase):
   self.assertFalse(button.property('enabled'))
   root.close();engine.deleteLater();APP.processEvents()
 
+ def test_app_id_details_do_not_block_or_finish_an_installation(self):
+  self.bridge.update(loggedIn=True,busy=True)
+  self.assertTrue(self.bridge.loadAppIds())
+  self.assertEqual(self.sent,[{'command':'app_ids'}])
+  self.assertTrue(self.bridge.data['busy'])
+  self.assertTrue(self.bridge.loadAppIds())
+  self.assertEqual(len(self.sent),1)
+  self.bridge.handle({'event':'app_ids','limit':10,'available':1,'ids':[
+   {'name':'Widget','identifier':'example.main.TEST.Widget','parent_name':'Main','expires_at':'2026-10-30T12:00:00Z'},
+   {'name':'Main','identifier':'example.main.TEST','parent_name':None,'expires_at':'2026-10-30T12:00:00Z'}]})
+  self.assertTrue(self.bridge.data['busy'])
+  self.assertFalse(self.bridge.data['appIdsLoading'])
+  self.assertEqual(self.bridge.data['appIds'][1]['parent_name'],'Main')
+  self.assertEqual(self.bridge.data['appIdsAvailable'],1)
+  self.bridge.handle({'event':'error','command':'app_ids','message':'Temporary failure'})
+  self.assertTrue(self.bridge.data['busy'])
+  self.assertTrue(self.bridge.data['loggedIn'])
+  self.assertTrue(self.bridge.data['appIdsError'])
+  self.assertFalse(self.bridge.data['error'])
+  self.bridge.handle({'event':'logged_out'})
+  self.assertEqual(self.bridge.data['appIds'],[])
+
 if __name__=='__main__':unittest.main()

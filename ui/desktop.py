@@ -57,6 +57,7 @@ class DesktopBridge(QObject):
         self.data.update(version=VERSION,updateBusy=False,updateProgress=0,updateState='unchecked',updateMessage='',releaseVersion='',windowsUpdate=False,releaseIPA=False,directsideInstalling=False,customIPA='',customIPAName='',ipaSource='file',githubSaved=(CACHE/'github.dpapi').is_file())
         self.data.update(certificates=[],certificatesLoaded=False,certificateTeam='',certificateLimit=False,removal={},developerMode='unknown',settingUp=False,setupPhase='')
         self.data.update(signingMode=saved.get('signing_mode','account'),importedIdentity={},identityP12='',identityProfiles=[],canSign=False)
+        self.data.update(appIds=[],appIdsLoading=False,appIdsError='')
         self.releaseClient=ReleaseClient(HOME if getattr(sys,'frozen',False) else ROOT)
         self.release=None
         self.buffer=bytearray()
@@ -157,6 +158,7 @@ class DesktopBridge(QObject):
         elif kind=='local_auth_ready':self.update(authLocal=True);self.send({'command':'restore'})
         elif kind in ('logged_in','logged_out'):
             self.data.update(certificates=[],certificatesLoaded=False,certificateTeam='',certificateLimit=False,removal={})
+            self.data.update(appIds=[],appIdsLoading=False,appIdsError='')
             logged=kind=='logged_in'
             email=event.get('email') or self.data['email']
             state='signed_in' if logged else event.get('reason','signed_out')
@@ -168,6 +170,11 @@ class DesktopBridge(QObject):
             self.update(importedIdentity=identity,busy=False,status='Zertifikat geprüft.' if identity else 'Kein Zertifikat importiert.')
         elif kind=='account_quota':
             self.update(appIdsLimit=event.get('limit') if event.get('limit') is not None else -1,appIdsAvailable=event.get('available') if event.get('available') is not None else -1,appIdsRegistered=event.get('registered',-1))
+        elif kind=='app_ids':
+            ids=sorted(event.get('ids',[]),key=lambda item:item.get('name','').casefold())
+            names={'ShareExtension':'Teilen','LaunchAppExtension':'App-Start','LiveProcess':'App-Ausführung','AltWidgetExtension':'Widget'}
+            ids=[dict(item,displayName=names.get(item.get('name'),item.get('name',''))) for item in ids]
+            self.update(appIds=ids,appIdsLoading=False,appIdsError='',appIdsRegistered=len(ids),appIdsLimit=event.get('limit') if event.get('limit') is not None else -1,appIdsAvailable=event.get('available') if event.get('available') is not None else -1)
         elif kind=='certificates':self.update(certificates=event.get('certificates',[]),certificatesLoaded=True,certificateTeam=event.get('team_id',''),busy=False,scanning=False)
         elif kind=='certificate_revoked':self.update(removal={},certificateLimit=False,status='Zertifikat widerrufen. Zugehörige Apps erneut installieren.')
         elif kind=='developer_mode_revealed':self.update(busy=False,status='Entwicklermodus in den iPhone-Einstellungen aktivieren.')
@@ -208,6 +215,8 @@ class DesktopBridge(QObject):
         elif kind=='choose_team':self.update(challenge='team',busy=True,teams=event.get('teams',[]))
         elif kind=='pairing_pin':self.update(challenge='pairing',busy=True)
         elif kind=='error':
+            if event.get('command')=='app_ids':
+                self.update(appIdsLoading=False,appIdsError='App-Kennungen konnten nicht geladen werden. Bitte erneut versuchen.');return
             if event.get('command')=='app_icons':
                 apps=[dict(app,iconChecked=True) if app['id'] in getattr(self,'requestedIcons',[]) else app for app in self.data['installedApps']]
                 self.update(busy=False,scanning=False,installedApps=apps)
@@ -224,6 +233,14 @@ class DesktopBridge(QObject):
             if event.get('command')=='local_auth_probe' and self.initializing:self.initializing=False;self.refresh()
         elif kind=='installed':self.installing=False;self.update(busy=False,success=True,progress=100,status='Installiert',challenge='',directsideInstalling=False,settingUp=False,setupPhase='');self.inspectDevice()
         elif kind=='directside_repaired':self.update(busy=False,success=True,progress=100,settingUp=False,setupPhase='',status='Einrichtung repariert. DirectSide auf dem iPhone erneut öffnen.');self.inspectDevice()
+
+    @Slot(result=bool)
+    def loadAppIds(self):
+        if not self.data['loggedIn']:return False
+        if self.data['appIdsLoading']:return True
+        self.update(appIdsLoading=True,appIdsError='')
+        self.send({'command':'app_ids'})
+        return True
 
     def persist(self,email):
         try:self.preferences.save(email,self.data['language']);self.data['savedEmail']=email.strip();return True

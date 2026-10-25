@@ -55,3 +55,22 @@ var signedApp=legacyApp;signedApp.installedBundleID="example.app.TEAM"
 let restoredSignedApp=try JSONDecoder().decode(ManagedApp.self,from:JSONEncoder().encode(signedApp))
 check(restoredSignedApp.installedBundleID=="example.app.TEAM","Persist real installed identifier")
 print("Release version comparisons and installed identity migration: passed")
+
+let publicAsset:[String:Any] = ["name":"DirectSide.ipa","state":"uploaded","size":100,
+    "browser_download_url":"https://github.com/Serekay/directside/releases/download/v0.2.0/DirectSide.ipa",
+    "digest":"sha256:"+String(repeating:"a",count:64)]
+var publicRelease:[String:Any] = ["draft":false,"prerelease":false,"tag_name":"v0.2.0","assets":[publicAsset]]
+let offered=try AppRelease.decode(publicRelease,installed:"0.1.0")
+check(offered?.version=="0.2.0","Offer public release without GitHub credentials")
+let alreadyInstalled=try AppRelease.decode(publicRelease,installed:"0.2.0")
+check(alreadyInstalled==nil,"Do not offer installed release")
+for invalidURL in ["http://github.com/Serekay/directside/releases/download/v0.2.0/DirectSide.ipa","https://github.com/other/project/releases/download/v0.2.0/DirectSide.ipa","https://example.com/DirectSide.ipa"] {
+    var invalidAsset=publicAsset;invalidAsset["browser_download_url"]=invalidURL
+    publicRelease["assets"]=[invalidAsset]
+    do {_=try AppRelease.decode(publicRelease,installed:"0.1.0");fatalError("Accepted foreign update URL")}catch{}
+}
+var noDigest=publicAsset;noDigest.removeValue(forKey:"digest");publicRelease["assets"]=[noDigest]
+do {_=try AppRelease.decode(publicRelease,installed:"0.1.0");fatalError("Accepted unverified update")}catch{}
+let idRecord=try JSONDecoder().decode(RegisteredAppID.self,from:Data("{\"identifier\":\"example.app.TEST.Widget\",\"name\":\"Widget\",\"parent_name\":\"Example\",\"expires_at\":\"2026-10-30T12:00:00Z\"}".utf8))
+check(idRecord.parent_name=="Example" && idRecord.expiration != nil,"Explain extension ownership and expiry")
+print("Public release validation and registered App ID details: passed")

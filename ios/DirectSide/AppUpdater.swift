@@ -1,33 +1,11 @@
 import Foundation
 import CryptoKit
-import Security
 import Combine
-
-/// A scoped token is never embedded in the IPA or forwarded to an asset CDN.
-enum UpdateCredential {
-    private static var query:[String:Any] {[kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:"com.directside.updates",kSecAttrAccount as String:"github"]}
-    static func read()->String? {
-        var request=query;request[kSecReturnData as String]=true
-        var result:CFTypeRef?
-        guard SecItemCopyMatching(request as CFDictionary,&result)==errSecSuccess,let data=result as? Data else {return nil}
-        return String(data:data,encoding:.utf8)
-    }
-    static func save(_ value:String) throws {
-        guard value.range(of:"^[A-Za-z0-9_]{20,255}$",options:.regularExpression) != nil else {throw DirectSideError.message("Ungültiger GitHub-Zugang.")}
-        let bytes=Data(value.utf8)
-        let status=SecItemUpdate(query as CFDictionary,[kSecValueData as String:bytes] as CFDictionary)
-        if status==errSecItemNotFound {
-            var item=query;item[kSecValueData as String]=bytes;item[kSecAttrAccessible as String]=kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-            guard SecItemAdd(item as CFDictionary,nil)==errSecSuccess else {throw DirectSideError.message("Zugang konnte nicht sicher gespeichert werden.")}
-        } else if status != errSecSuccess {throw DirectSideError.message("Zugang konnte nicht sicher gespeichert werden.")}
-    }
-    static func forget(){SecItemDelete(query as CFDictionary)}
-}
 
 final class UpdateTransport:NSObject,URLSessionDownloadDelegate,@unchecked Sendable {
     static let limit=500*1024*1024
     func urlSession(_ session:URLSession,task:URLSessionTask,willPerformHTTPRedirection response:HTTPURLResponse,newRequest request:URLRequest,completionHandler:@escaping (URLRequest?)->Void) {
-        guard let url=request.url,url.scheme=="https",["api.github.com","release-assets.githubusercontent.com","objects.githubusercontent.com"].contains(url.host ?? ""),url.user==nil,url.password==nil,url.port==nil || url.port==443 else {completionHandler(nil);return}
+        guard let url=request.url,url.scheme=="https",["github.com","api.github.com","release-assets.githubusercontent.com","objects.githubusercontent.com"].contains(url.host ?? ""),url.user==nil,url.password==nil,url.port==nil || url.port==443 else {completionHandler(nil);return}
         var next=request
         if url.host != "api.github.com" {next.setValue(nil,forHTTPHeaderField:"Authorization")}
         completionHandler(next)
@@ -43,7 +21,6 @@ final class UpdateTransport:NSObject,URLSessionDownloadDelegate,@unchecked Senda
     @Published var checking=false
     @Published var downloading=false
     @Published var message=""
-    @Published var hasCredential=UpdateCredential.read() != nil
     @Published var showOffer=false
     private let transport=UpdateTransport()
     private lazy var session:URLSession = {
@@ -52,21 +29,16 @@ final class UpdateTransport:NSObject,URLSessionDownloadDelegate,@unchecked Senda
         return URLSession(configuration:config,delegate:transport,delegateQueue:nil)
     }()
     private var lastCheck:Date?
-    private func request(_ path:String,asset:Bool=false)->URLRequest {
+    private func request(_ path:String)->URLRequest {
         var request=URLRequest(url:URL(string:"https://api.github.com/repos/Serekay/directside/"+path)!)
-        request.setValue(asset ? "application/octet-stream":"application/vnd.github+json",forHTTPHeaderField:"Accept")
+        request.setValue("application/vnd.github+json",forHTTPHeaderField:"Accept")
         request.setValue("2022-11-28",forHTTPHeaderField:"X-GitHub-Api-Version")
         request.setValue("DirectSide-iOS",forHTTPHeaderField:"User-Agent")
-        if let token=UpdateCredential.read(){request.setValue("Bearer "+token,forHTTPHeaderField:"Authorization")}
         return request
     }
-    func saveCredential(_ value:String) {
-        do {try UpdateCredential.save(value.trimmingCharacters(in:.whitespacesAndNewlines));hasCredential=true;lastCheck=nil;message="Zugang gespeichert."}
-        catch {message=error.localizedDescription}
-    }
-    func forgetCredential(){UpdateCredential.forget();hasCredential=false;available=nil;lastCheck=nil;message=""}
     func check(manual:Bool=false) async {
         guard !checking,!downloading else {return}
+        if !manual,UserDefaults.standard.object(forKey:"automaticUpdates") as? Bool == false {return}
         if !manual,let lastCheck,Date().timeIntervalSince(lastCheck)<21600 {return}
         checking=true;defer{checking=false}
         message="Nach Updates suchen …"
@@ -74,19 +46,16 @@ final class UpdateTransport:NSObject,URLSessionDownloadDelegate,@unchecked Senda
             let (bytes,response)=try await session.bytes(for:request("releases/latest"))
             guard let http=response as? HTTPURLResponse else {throw DirectSideError.message("Updateprüfung fehlgeschlagen.")}
             if http.statusCode==404 {
-                // A private repository and an empty release history both return 404.
-                let (_,repoResponse)=try await session.data(for:request(""))
-                if (repoResponse as? HTTPURLResponse)?.statusCode==200 {available=nil;message="Noch keine veröffentlichte Version verfügbar.";lastCheck=Date();return}
-                throw DirectSideError.message("Für Updates aus dem privaten Repository einen GitHub-Zugang mit Leserechten hinterlegen.")
+                available=nil;message="Noch kein öffentliches Update verfügbar.";lastCheck=Date();return
             }
-            guard http.statusCode==200 else {throw DirectSideError.message("GitHub-Zugang oder Verbindung prüfen und erneut versuchen.")}
+            if http.statusCode==403 || http.statusCode==429 {throw DirectSideError.message("Updateprüfung vorübergehend nicht verfügbar. Bitte später erneut versuchen.")}
+            guard http.statusCode==200 else {throw DirectSideError.message("Updateprüfung nicht möglich. Bitte die Internetverbindung prüfen.")}
             var data=Data()
             for try await byte in bytes {data.append(byte);if data.count>2_000_000 {throw DirectSideError.message("Ungültige Updateantwort.")}}
-            guard let release=try JSONSerialization.jsonObject(with:data) as? [String:Any],release["draft"] as? Bool==false,release["prerelease"] as? Bool==false,let tag=release["tag_name"] as? String,UpdateVersion.parts(tag) != nil else {throw DirectSideError.message("Ungültige Updateantwort.")}
+            guard let metadata=try JSONSerialization.jsonObject(with:data) as? [String:Any] else {throw DirectSideError.message("Ungültige Updateantwort.")}
             let installed=Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
-            guard UpdateVersion.newer(tag,than:installed) else {available=nil;message="DirectSide ist aktuell.";lastCheck=Date();return}
-            guard let assets=release["assets"] as? [[String:Any]],let asset=assets.first(where:{$0["name"] as? String=="DirectSide.ipa"}),asset["state"] as? String=="uploaded",let id=asset["id"] as? Int,id>0,let size=asset["size"] as? Int,size>0,size<=UpdateTransport.limit,let digest=asset["digest"] as? String,digest.range(of:"^sha256:[a-fA-F0-9]{64}$",options:.regularExpression) != nil else {throw DirectSideError.message("Das iPhone-Update ist noch nicht vollständig veröffentlicht.")}
-            available=AppRelease(version:tag.hasPrefix("v") ? String(tag.dropFirst()):tag,notes:release["body"] as? String ?? "",assetID:id,size:size,sha256:String(digest.dropFirst(7)).lowercased())
+            guard let release=try AppRelease.decode(metadata,installed:installed) else {available=nil;message="DirectSide ist aktuell.";lastCheck=Date();return}
+            available=release
             message="Update verfügbar";lastCheck=Date();showOffer=true
         }catch {message=error.localizedDescription}
     }
@@ -98,7 +67,7 @@ final class UpdateTransport:NSObject,URLSessionDownloadDelegate,@unchecked Senda
         var staged:URL?
         do {
             message="Update herunterladen …"
-            let (file,response)=try await session.download(for:request("releases/assets/\(release.assetID)",asset:true))
+            let (file,response)=try await session.download(from:release.downloadURL)
             defer{try? FileManager.default.removeItem(at:file)}
             guard (response as? HTTPURLResponse)?.statusCode==200 else {throw DirectSideError.message("Update-Download fehlgeschlagen.")}
             let size=(try file.resourceValues(forKeys:[.fileSizeKey])).fileSize

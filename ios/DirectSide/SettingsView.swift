@@ -11,12 +11,19 @@ struct SettingsView:View {
                     HStack(spacing:14) {BrandIcon(size:48);VStack(alignment:.leading,spacing:4){Text(L(engine.loggedIn ? engine.teamName:L("Apple Account"))).font(.headline);Text(L(engine.loggedIn ? engine.accountEmail:L("Nicht angemeldet"))).font(.caption).foregroundStyle(.secondary)}}.padding(.vertical,5)
                 }
             }
-            Section(L("Gerät & Signierung")) {
+            Section {
                 VPNStatusView(connection:connection)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top:0,leading:0,bottom:0,trailing:0))
+            }
+            Section(L("Gerät & Signierung")) {
                 NavigationLink {DeveloperModeHelp()} label:{Label(L("Entwicklermodus · vor dem ersten Start"),systemImage:"hammer")}
                 NavigationLink {ConnectionSettings(connection:connection)} label:{SettingsRow(title:"Verbindung",icon:"network",value:engine.pairingReady ? "Gekoppelt":"Einrichten",ok:engine.pairingReady)}
                 NavigationLink {ImportedSigningSettings()} label:{Label(L("Signierung · Account oder Zertifikat"),systemImage:"checkmark.seal")}
                 NavigationLink {CertificateManagementView()} label:{Label(L("Zertifikate"),systemImage:"signature")}.disabled(!engine.loggedIn)
+                NavigationLink {AppIDsView()} label:{
+                    HStack {Label(L("App-Kennungen"),systemImage:"app.badge.checkmark");Spacer();if let limit=engine.appIDsLimit,let free=engine.appIDsAvailable {Text("\(max(0,limit-free)) / \(limit)").font(.caption.weight(.semibold)).foregroundStyle(.secondary)}}
+                }
                 NavigationLink {LiveContainerSettings(connection:connection)} label:{SettingsRow(title:"LiveContainer",icon:"square.stack.3d.up",value:LiveContainerBridge.available ? "Installiert":"Optional",ok:LiveContainerBridge.available)}
             }
             Section(L("Darstellung")) {
