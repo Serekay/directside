@@ -25,6 +25,18 @@ class WindowsUIStateTests(unittest.TestCase):
   self.bridge.submitCode('012345')
   self.assertEqual(self.sent,[{'action':'code','code':'012345'}])
   self.assertEqual(self.bridge.data['challenge'],'')
+ def test_expected_shutdown_does_not_report_engine_failure(self):
+  self.bridge.update(error='')
+  self.bridge.close();self.bridge.exited();self.bridge.processError()
+  self.assertEqual(self.bridge.data['error'],'')
+ def test_pending_setup_reconnect_hint_only_when_disconnected(self):
+  engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
+  engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')));root=engine.rootObjects()[0]
+  root.setProperty('page','developer')
+  self.bridge.update(setupPending=True,devices=[]);APP.processEvents()
+  hint=root.findChild(QObject,'setupReconnectHint');self.assertTrue(hint.property('visible'))
+  self.bridge.update(devices=[{'id':'phone'}]);APP.processEvents();self.assertFalse(hint.property('visible'))
+  root.close();engine.deleteLater();APP.processEvents()
  def test_restore_serializes_commands_and_saves_identity(self):
   self.bridge.handle({'event':'ready'})
   self.assertEqual(self.sent,[{'command':'imported_identity'},{'command':'local_auth_probe'}])
