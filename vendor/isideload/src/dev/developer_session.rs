@@ -35,7 +35,8 @@ pub struct DeveloperSession {
 
 impl DeveloperSession {
     /// DirectSide: export only the existing app session for protected keychain persistence.
-    /// The caller must never put this material in logs, files or source control.
+    /// Never log or commit it. DirectSide's one-shot trusted USB handoff uses
+    /// a private cache file, consumed into the iPhone keychain and then removed.
     pub fn session_credentials(&self) -> (AppToken, String) {
         (self.token.clone(), self.adsid.clone())
     }
