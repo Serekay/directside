@@ -57,7 +57,8 @@ ApplicationWindow {
     property bool authenticating: restoringSession || s.authState==="signing_in"
     property string accountStatus: s.loggedIn ? t("Angemeldet") : s.authState==="checking" ? t("Sitzung prüfen …") : s.authState==="signing_in" ? t("Bei Apple anmelden …") : s.authState==="expired" ? t("Sitzung abgelaufen") : t("Nicht angemeldet")
     property bool quotaKnown: s.appIdsLimit>0 && s.appIdsAvailable>=0
-    property string quotaText: quotaKnown ? "App IDs · "+Math.max(0,s.appIdsLimit-s.appIdsAvailable)+" / "+s.appIdsLimit+" "+t("verbraucht")+" · "+s.appIdsAvailable+" "+t("frei") : "App IDs · "+(s.loggedIn ? t("Nicht verfügbar") : t("Anmelden"))
+    property string quotaText: quotaKnown ? "App IDs · "+Math.max(0,s.appIdsLimit-s.appIdsAvailable)+" / "+s.appIdsLimit+" · "+s.appIdsAvailable+" "+t("frei") : "App IDs · "+t("Nicht verfügbar")
+    property bool operationVisible: s.updateBusy || s.updateMessage.length>0 || s.error.length>0 || (s.busy && !s.scanning) || s.lcPrepared || s.success
 
     component Label: Text {
         color: win.ink; font.family: win.font.family; font.pixelSize: 14
@@ -167,6 +168,11 @@ ApplicationWindow {
                             Action {visible:s.challenge==="team";Layout.fillWidth:true;text:win.t("Team verwenden");primary:true;enabled:team.currentIndex>=0;onClicked:backend.selectTeam(s.teams[team.currentIndex].id)}
                             Action {Layout.fillWidth:true;text:win.t("Abbrechen");quiet:true;onClicked:backend.cancelChallenge()}
                         }
+                        Badge {id:quotaBadge;objectName:"quotaBadge";visible:s.loggedIn && s.signingMode==="account" && !s.challenge.length;text:win.quotaText;tone:!win.quotaKnown?"warning":s.appIdsAvailable===0?"missing":s.appIdsAvailable<=3?"warning":"ok"
+                            ToolTip.visible:quotaHover.hovered;ToolTip.text:win.t("App-Kennungen");HoverHandler {id:quotaHover}
+                            MouseArea {anchors.fill:parent;cursorShape:Qt.PointingHandCursor;onClicked:{win.page="appids";win.appIdPage=0;backend.loadAppIds()}}
+                        }
+                        Badge {visible:s.signingMode==="imported";text:win.t(s.canSign?"Zertifikat bereit":"Zertifikat fehlt");tone:s.canSign?"ok":"missing"}
                     }
                 }
                 Card {
@@ -232,6 +238,7 @@ ApplicationWindow {
                         }
                         ColumnLayout {Layout.fillWidth:true;spacing:6
                             Label {text:s.devices.length ? s.devices[s.deviceIndex].name:win.t("iPhone verbinden");font.pixelSize:19;font.weight:Font.DemiBold;Layout.fillWidth:true}
+                            Badge {objectName:"deviceSlotsBadge";visible:s.devices.length>0;text:s.slotsUsed>=0?s.slotsUsed+" "+win.t("Sideload-Apps"):win.t("App-Plätze nicht geprüft");tone:s.slotsUsed<0?"warning":"neutral"}
                         }
                         ComboBox {visible:s.devices.length>1;model:s.devices;textRole:"label";currentIndex:s.deviceIndex;enabled:!s.foregroundBusy;onActivated:index=>backend.selectDevice(index);Layout.maximumWidth:210}
                         IconButton {text:"↻";implicitWidth:44;implicitHeight:44;hint:win.t("Geräte aktualisieren");enabled:!s.foregroundBusy;onClicked:backend.refresh()}
@@ -510,7 +517,7 @@ ApplicationWindow {
             }
         }
         Rectangle {
-            id:footer;anchors{left:parent.left;right:parent.right;bottom:parent.bottom;margins:1} height:88;color:"#17191e";radius:18
+            id:footer;objectName:"operationFooter";anchors{left:parent.left;right:parent.right;bottom:parent.bottom;margins:1} visible:win.operationVisible;height:visible?56:0;color:"#17191e";radius:18
             Rectangle {anchors.top:parent.top;width:parent.width;height:18;color:parent.color}
             ColumnLayout {anchors.fill:parent;anchors.leftMargin:24;anchors.rightMargin:24;anchors.topMargin:8;anchors.bottomMargin:12;spacing:4
             RowLayout {Layout.fillWidth:true;spacing:8
@@ -523,15 +530,6 @@ ApplicationWindow {
                     contentItem:Item {Rectangle{width:parent.width*(s.progress>0?s.progress/100:0.4);height:4;radius:2;color:win.accent}}
                 }
                 IconButton {visible:s.error.length>0;text:"×";hint:win.t("Fehler ausblenden");onClicked:backend.dismissError()}
-            }
-            RowLayout {Layout.fillWidth:true;spacing:8
-                Item {Layout.fillWidth:true}
-                Badge {id:quotaBadge;objectName:"quotaBadge";text:win.quotaText;tone:!win.quotaKnown?"warning":s.appIdsAvailable===0?"missing":s.appIdsAvailable<=3?"warning":"ok"
-                    ToolTip.visible:quotaHover.hovered;ToolTip.text:win.t("Neue App-Kennungen pro Account innerhalb von 7 Tagen. Keine installierten Apps.")+(s.appIdsRegistered>=0?"\n"+s.appIdsRegistered+" "+win.t("registrierte Kennungen"):"");HoverHandler {id:quotaHover}
-                    MouseArea {anchors.fill:parent;cursorShape:Qt.PointingHandCursor;onClicked:{win.page="appids";win.appIdPage=0;backend.loadAppIds()}}
-                }
-                Badge {visible:win.page==="install" || win.page==="apps";text:s.slotsUsed>=0?s.slotsUsed+win.t(" Entwickler-Apps"):win.t("App-Plätze nicht geprüft");tone:s.slotsUsed<0?"warning":"ok"}
-                Badge {objectName:"sessionBadge";text:s.signingMode==="imported"?win.t(s.canSign?"Zertifikat bereit":"Zertifikat fehlt"):win.accountStatus;tone:s.canSign?"ok":s.authState==="expired" || s.authState==="rejected"?"missing":"warning"}
             }
             }
         }

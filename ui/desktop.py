@@ -243,7 +243,7 @@ class DesktopBridge(QObject):
                 self.data['usbRepairState']='idle'
             for device in devices:device['label']=device.get('name','Apple-Gerät')+' · '+device['id'][-4:]
             index=next((i for i,d in enumerate(devices) if d.get('id')==selected),0)
-            if devices and devices[index]['id']!=selected:self.update(installedApps=[],slotsUsed=-1,developerApps=[],lcPrepared=False,developerMode='unknown')
+            if devices and devices[index]['id']!=selected:self.update(installedApps=[],slotsUsed=-1,developerApps=[],lcPrepared=False,developerMode='unknown',directsidePresent=False,vpnState='unknown',lcState='unknown')
             pending_here=bool(self.pendingSetup and (not devices or devices[index]['id']==self.pendingSetup['device']))
             self.update(devices=devices,deviceIndex=index,busy=False,scanning=False,setupPending=pending_here,usbReconnectNeeded=self.usbSeen and not devices)
             if devices:
@@ -454,7 +454,10 @@ class DesktopBridge(QObject):
     @Slot(int)
     @after_scan
     def selectDevice(self,index):
-        if not self.data['busy'] and 0<=index<len(self.data['devices']):self.update(deviceIndex=index,lcPrepared=False,installedApps=[],removal={},developerMode='unknown');self.inspectDevice()
+        if self.data['busy'] or not 0<=index<len(self.data['devices']):return
+        if index!=self.data['deviceIndex']:
+            self.update(deviceIndex=index,lcPrepared=False,installedApps=[],removal={},developerMode='unknown',slotsUsed=-1,developerApps=[],directsidePresent=False,vpnState='unknown',lcState='unknown')
+        self.inspectDevice()
 
     @Slot()
     @after_scan
@@ -542,7 +545,7 @@ class DesktopBridge(QObject):
     @Slot()
     def inspectDevice(self):
         if self.data['busy'] or self.pendingLogin is not None or self.pendingLogout or self.pendingUserAction is not None or not self.data['devices']:return
-        self.update(busy=True,scanning=True,vpnState='unknown',lcState='unknown',directsidePresent=False,slotsUsed=-1,developerApps=[])
+        self.update(busy=True,scanning=True)
         self.send({'command':'device_components','device_id':self.data['devices'][self.data['deviceIndex']]['id']})
 
     @Slot()
