@@ -31,7 +31,7 @@ struct UpdateSettings:View {
             Section {
                 Toggle(L("Automatisch nach Updates suchen"),isOn:$automaticUpdates)
             } footer:{Text(L("Prüft beim Öffnen der App, höchstens alle sechs Stunden. Ein verfügbares Update kannst du direkt auf dem iPhone installieren."))}
-        }.navigationTitle(L("DirectSide-Updates"))
+        }.navigationTitle(L("DirectSide-Updates")).toolbarRole(.editor)
     }
 }
 

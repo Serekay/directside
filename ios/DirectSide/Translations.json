@@ -583,5 +583,6 @@
   "Prüft beim Öffnen der App, höchstens alle sechs Stunden. Ein verfügbares Update kannst du direkt auf dem iPhone installieren.": "Checks when you open the app, at most once every six hours. You can install an available update directly on your iPhone.",
   "App-Start": "App launch",
   "App-Ausführung": "App runtime",
-  "Teilen": "Sharing"
+  "Teilen": "Sharing",
+  "1 Kennung frei": "1 App ID available"
 }

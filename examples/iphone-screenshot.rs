@@ -22,19 +22,22 @@ async fn main()->Result<(),Report> {
     let args:Vec<_>=std::env::args().skip(1).collect();
     let probe=args.first().is_some_and(|a|a=="--probe");
     let version_only=args.first().is_some_and(|a|a=="--installed-version");
+    let launch=args.first().is_some_and(|a|a=="--launch");
     if !probe && args.len()!=1 {bail!("Use --probe or an output .png path. Open DirectSide on the unlocked iPhone before capture.");}
     let mut mux=UsbmuxdConnection::default().await?;
     let devices=mux.get_devices().await?;
     if devices.len()!=1 {bail!("Connect exactly one unlocked, trusted iPhone (found {}).",devices.len());}
     let provider=devices[0].to_provider(UsbmuxdAddr::from_env_var()?,"DirectSide README screenshot");
-    if version_only {
+    let mut launch_bundle=None;
+    if version_only || launch {
         let apps=idevice::installation_proxy::InstallationProxyClient::connect(&provider).await?.get_apps(Some("User"),None).await?;
         for (id,info) in apps.iter().filter(|(id,_)|*id=="com.directside.app" || id.starts_with("com.directside.app.")) {
-            let _=id;
+            if launch {if launch_bundle.is_some(){bail!("Multiple DirectSide apps found.");}launch_bundle=Some(id.clone());}
             let info=info.as_dictionary().ok_or_else(||report!("App metadata is missing."))?;
             println!("DirectSide installed: version {}, build {}",info.get("CFBundleShortVersionString").and_then(plist::Value::as_string).unwrap_or("unknown"),info.get("CFBundleVersion").and_then(plist::Value::as_string).unwrap_or("unknown"));
         }
-        return Ok(())
+        if version_only {return Ok(())}
+        if launch_bundle.is_none(){bail!("DirectSide is not installed.");}
     }
     let mut lockdown=LockdownClient::connect(&provider).await?;
     let pairing=provider.get_pairing_file().await?;
@@ -58,6 +61,11 @@ async fn main()->Result<(),Report> {
         capabilities.insert("com.apple.private.DTXConnection".into(),plist::Value::Integer(1.into()));
         use idevice::dvt::message::AuxValue;
         client.call_method(0,Some(plist::Value::String("_notifyOfPublishedCapabilities:".into())),Some(vec![AuxValue::archived_value(plist::Value::Dictionary(capabilities))]),false).await?;
+    }
+    if let Some(bundle)=launch_bundle {
+        let mut process=idevice::dvt::process_control::ProcessControlClient::new(&mut client).await?;
+        tokio::time::timeout(Duration::from_secs(15),process.launch_app(&bundle,None,None,false,false)).await??;
+        println!("DirectSide launch requested. Verify the foreground screen with a screenshot.");return Ok(())
     }
     if probe {
         let _=tokio::time::timeout(Duration::from_secs(10),ScreenshotClient::new(&mut client)).await??;
