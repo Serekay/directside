@@ -118,12 +118,8 @@ ApplicationWindow {
                 IconButton {text:"⚙";hint:win.t("Einstellungen");onClicked:win.page=win.page==="settings" ? "install":"settings"}
                 IconButton {id:moreButton;text:"?";hint:win.t("Hilfe & Aktivität");onClicked:moreMenu.popup()
                     Menu {id:moreMenu;y:moreButton.height
-                        MenuItem {text:win.t("Hilfe");onTriggered:win.page="help"}
-                        MenuItem {text:win.t("Entwicklermodus");onTriggered:win.page="developer"}
+                        MenuItem {text:win.t("Einrichtung");onTriggered:win.page="help"}
                         MenuItem {text:win.t("Aktivität");onTriggered:win.page="activity"}
-                        MenuItem {text:win.t("Updates");onTriggered:{win.page="settings";win.settingsSection="updates";backend.checkUpdates()}}
-                        MenuItem {text:win.t("Zertifikate");enabled:s.loggedIn;onTriggered:{win.page="certificates";backend.loadCertificates()}}
-                        MenuItem {text:win.t("App-Kennungen");onTriggered:{win.page="appids";win.appIdPage=0;backend.loadAppIds()}}
                     }
                 }
                 Rectangle {width:1;height:20;color:"#34373e";Layout.leftMargin:6;Layout.rightMargin:6}
@@ -226,7 +222,7 @@ ApplicationWindow {
                 }
                 RowLayout {visible:win.page!=="reconnect";Layout.preferredHeight:30
                     IconButton {visible:win.page!=="install";text:"‹";hint:win.t("Zurück");onClicked:win.page="install"}
-                    Label {text:win.page==="appids"?win.t("App-Kennungen"):win.page==="identity"?win.t("Signierung"):win.page==="developer"?win.t("Entwicklermodus"):win.page==="certificates"?win.t("Zertifikate"):win.page==="confirm"?win.t("Entfernen bestätigen"):win.page==="settings"?win.t("Einstellungen"):win.page==="activity"?win.t("Aktivität"):win.page==="help"?win.t("Hilfe"):win.page==="apps"?win.t("Installierte Apps"):win.t("DEIN GERÄT");font.pixelSize:win.page==="install"?10:17;font.letterSpacing:win.page==="install"?1.6:0;color:win.page==="install"?win.muted:win.ink;font.weight:Font.DemiBold}
+                    Label {text:win.page==="customipa"?win.t("Andere App installieren"):win.page==="appids"?win.t("App-Kennungen"):win.page==="identity"?win.t("Signierung"):win.page==="developer"?win.t("Entwicklermodus"):win.page==="certificates"?win.t("Zertifikate"):win.page==="confirm"?win.t("Entfernen bestätigen"):win.page==="settings"?win.t("Einstellungen"):win.page==="activity"?win.t("Aktivität"):win.page==="help"?win.t("Hilfe"):win.page==="apps"?win.t("Installierte Apps"):win.t("DEIN GERÄT");font.pixelSize:win.page==="install"?10:17;font.letterSpacing:win.page==="install"?1.6:0;color:win.page==="install"?win.muted:win.ink;font.weight:Font.DemiBold}
                     Item {Layout.fillWidth:true}
                     Action {visible:win.page==="activity";text:win.t("Kopieren");enabled:s.logs.length>0;onClicked:backend.copyActivity()}
                 }
@@ -242,9 +238,9 @@ ApplicationWindow {
                             Label {text:s.devices.length ? s.devices[s.deviceIndex].name:win.t("iPhone verbinden");font.pixelSize:19;font.weight:Font.DemiBold;Layout.fillWidth:true}
                         }
                         ComboBox {visible:s.devices.length>1;model:s.devices;textRole:"label";currentIndex:s.deviceIndex;enabled:!s.foregroundBusy;onActivated:index=>backend.selectDevice(index);Layout.maximumWidth:210}
-                        Badge {visible:s.devices.length>0;text:s.developerMode==="enabled"?"Dev ✓":s.developerMode==="disabled"?"Dev ✕":"Dev ?";tone:s.developerMode==="enabled"?"ok":s.developerMode==="disabled"?"missing":"warning";MouseArea {anchors.fill:parent;cursorShape:Qt.PointingHandCursor;onClicked:win.page="developer"}}
                         IconButton {text:"↻";implicitWidth:44;implicitHeight:44;hint:win.t("Geräte aktualisieren");enabled:!s.foregroundBusy;onClicked:backend.refresh()}
                         IconButton {text:"▦";implicitWidth:44;implicitHeight:44;hint:win.t("Installierte Apps");enabled:s.devices.length>0;onClicked:{win.appPage=0;win.page="apps"}}
+                        IconButton {objectName:"addAppButton";text:"+";iconName:"plus";implicitWidth:44;implicitHeight:44;hint:win.t("Andere App installieren");enabled:!s.foregroundBusy && !s.directsideInstalling;onClicked:win.page="customipa"}
                     }
                 }
                 Card {
@@ -314,22 +310,27 @@ ApplicationWindow {
                             Text {objectName:"deviceSetupProgressText";text:win.t(s.setupPhase);color:win.accent;wrapMode:Text.WordWrap;Layout.fillWidth:true;font.pixelSize:13}
                         }
                         Action {objectName:"installDirectSideButton";text:s.directsideInstalling?win.t("Bitte warten …"):win.t("DirectSide installieren");primary:true;Layout.fillWidth:true;implicitHeight:48;enabled:s.canSign && s.devices.length>0 && (!s.foregroundBusy || s.scanning) && !s.updateBusy && !s.directsideInstalling && (s.bundledIPAReady || s.releaseIPA);onClicked:backend.installDirectSide()}
-                        Label {visible:s.developerMode!=="enabled";text:win.t("Vor dem ersten Start:")+" <a href='developer'>"+win.t("Entwicklermodus einrichten")+"</a>";textFormat:Text.RichText;linkColor:win.accent;font.pixelSize:12;color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true;onLinkActivated:win.page="developer"}
-                        RowLayout {objectName:"customIPARow";Layout.fillWidth:true;spacing:8
-                        Rectangle {Layout.fillWidth:true;implicitHeight:44;radius:12;color:"#15171b";border.color:"#30343b"
-                            RowLayout {anchors.fill:parent;anchors.leftMargin:15;anchors.rightMargin:8;spacing:12
-                                Label {text:"↳";color:win.muted;font.pixelSize:19}
-                                Label {text:s.customIPAName || win.t("Eigene IPA");Layout.fillWidth:true;color:s.customIPAName?win.ink:win.muted}
-                                IconButton {text:"…";hint:win.t("IPA auswählen");enabled:!s.foregroundBusy && !s.updateBusy && !s.directsideInstalling;onClicked:backend.chooseIPA()}
-                            }
-                        }
-                        Action {objectName:"installCustomIPAButton";text:win.t("IPA installieren");enabled:s.canSign && s.devices.length>0 && s.customIPA.length>0 && !s.foregroundBusy && !s.updateBusy && !s.directsideInstalling;onClicked:backend.installCustomIPA()}
-                        }
                         Item {Layout.fillHeight:true}
                     }
                 }
                 Card {
-                    visible:win.page==="settings";Layout.fillWidth:true;Layout.fillHeight:true
+                    objectName:"customIPACard";visible:win.page==="customipa";Layout.fillWidth:true;Layout.fillHeight:true;Layout.minimumHeight:220
+                    ColumnLayout {anchors.fill:parent;anchors.margins:24;spacing:18
+                        Label {text:win.t("IPA-Datei");font.pixelSize:20;font.weight:Font.DemiBold}
+                        RowLayout {objectName:"customIPARow";Layout.fillWidth:true;spacing:8
+                        Rectangle {Layout.fillWidth:true;implicitHeight:44;radius:12;color:"#15171b";border.color:"#30343b"
+                            RowLayout {anchors.fill:parent;anchors.leftMargin:15;anchors.rightMargin:8;spacing:12
+                                Label {text:s.customIPAName || win.t("Keine Datei ausgewählt");Layout.fillWidth:true;color:s.customIPAName?win.ink:win.muted;elide:Text.ElideMiddle}
+                            }
+                        }
+                        Action {text:win.t("IPA auswählen");enabled:!s.foregroundBusy && !s.updateBusy && !s.directsideInstalling;onClicked:backend.chooseIPA()}
+                        }
+                        Action {objectName:"installCustomIPAButton";text:win.t("Installieren");primary:true;Layout.fillWidth:true;enabled:s.canSign && s.devices.length>0 && s.customIPA.length>0 && !s.foregroundBusy && !s.updateBusy && !s.directsideInstalling;onClicked:backend.installCustomIPA()}
+                        Item {Layout.fillHeight:true}
+                    }
+                }
+                Card {
+                    objectName:"settingsCard";visible:win.page==="settings";Layout.fillWidth:true;Layout.fillHeight:true
                     ColumnLayout {anchors.fill:parent;anchors.margins:24;spacing:16
                         RowLayout {
                             Action {text:win.t("Komponenten");quiet:win.settingsSection!=="system";onClicked:win.settingsSection="system"}
@@ -341,11 +342,18 @@ ApplicationWindow {
                         RowLayout {Label {text:win.t("Apple USB-Treiber");Layout.fillWidth:true} Badge {text:s.usbState==="ready"?win.t("Installiert"):s.usbState==="stopped"?win.t("Gestoppt"):s.usbState==="missing"?win.t("Fehlt"):win.t("Nicht geprüft");tone:s.usbState==="ready"?"ok":s.usbState==="missing"?"missing":"warning"}}
                         RowLayout {Label {text:win.t("Apple-Anmeldung · lokal");Layout.fillWidth:true} Badge {text:s.authLocal?win.t("Bereit"):win.t("Prüfen");tone:s.authLocal?"ok":"warning"}}
                         Action {visible:s.usbState!=="ready";text:s.usbState==="stopped"?win.t("Apple USB starten"):win.t("Apple USB / iTunes installieren");primary:true;enabled:!s.foregroundBusy;onClicked:backend.setupComponents()}
+                        RowLayout {Layout.fillWidth:true
                         Action {text:win.t("Erneut prüfen");enabled:!s.foregroundBusy;onClicked:backend.checkComponents()}
                         Action {objectName:"repairDirectSideButton";text:win.t("DirectSide-Einrichtung reparieren");enabled:s.devices.length>0 && !s.foregroundBusy && !s.updateBusy;onClicked:if(backend.repairDirectSide())win.page="install"}
+                        }
+                        RowLayout {Layout.fillWidth:true
                         Action {text:s.slotsUsed>=0?win.t("Apps ansehen · ")+s.slotsUsed+win.t(" Entwickler-Apps"):win.t("Apps ansehen");enabled:s.devices.length>0;onClicked:{win.appPage=0;win.page="apps"}}
                         Action {text:win.t("Signierung · Account oder Zertifikat");enabled:!s.foregroundBusy;onClicked:win.page="identity"}
+                        }
+                        RowLayout {Layout.fillWidth:true
                         Action {text:win.t("Zertifikate verwalten");enabled:s.loggedIn && !s.foregroundBusy;onClicked:{win.page="certificates";backend.loadCertificates()}}
+                        Action {objectName:"settingsAppIDsButton";text:win.t("App-Kennungen");enabled:s.loggedIn && !s.foregroundBusy;onClicked:{win.page="appids";win.appIdPage=0;backend.loadAppIds()}}
+                        }
                         }
                         ColumnLayout {visible:win.settingsSection==="livecontainer";Layout.fillWidth:true;spacing:16
                         RowLayout {Label {text:"LiveContainer";Layout.fillWidth:true} Badge {text:"Optional"} Badge {text:s.lcState==="installed"?win.t("Installiert"):s.lcState==="missing"?win.t("Fehlt"):win.t("Nicht geprüft");tone:s.lcState==="installed"?"ok":s.lcState==="missing"?"missing":"warning"}}
