@@ -464,5 +464,17 @@
   "Einstellungen am iPhone öffnen": "Open iPhone Settings",
   "DirectSide starten": "Open DirectSide",
   "Zielgerät hat sich geändert. Aktion erneut starten.": "The selected device changed. Please try the action again.",
-  "Bitte am iPhone selbst öffnen:": "Please open this on your iPhone:"
+  "Bitte am iPhone selbst öffnen:": "Please open this on your iPhone:",
+  "Fertig": "Done",
+  "Entwicklermodus ist aktiviert": "Developer Mode is enabled",
+  "Entwicklermodus aktivieren": "Enable Developer Mode",
+  "Entwicklermodus prüfen": "Check Developer Mode",
+  "Du musst hier nichts mehr tun.": "No further action is needed here.",
+  "Fehlt der Schalter: zuerst DirectSide installieren, dann erneut nachsehen.": "If the switch is missing, install DirectSide first, then check again.",
+  "iPhone entsperren und per USB verbinden. Dann erneut prüfen.": "Unlock your iPhone and connect it by USB. Then check again.",
+  "Anmelden und DirectSide installieren. Falls verlangt: Entwicklermodus unter Einstellungen → Datenschutz & Sicherheit einschalten, neu starten und Aktivieren bestätigen. Fehlt der Schalter, nach der Installation erneut nachsehen.": "Sign in and install DirectSide. If required, enable Developer Mode in Settings → Privacy & Security, restart and confirm Turn On. If the switch is missing, check again after installation.",
+  "3   Entwicklungsteam vertrauen": "3   Trust your developer team",
+  "Falls iOS danach fragt: Einstellungen → Allgemein → VPN & Geräteverwaltung → Entwicklungsteam → Vertrauen. Anschließend in Windows erneut prüfen.": "If prompted by iOS: Settings → General → VPN & Device Management → developer team → Trust. Then check again in Windows.",
+  "4   Einrichtung auf dem iPhone": "4   Continue setup on your iPhone",
+  "In DirectSide der Einführung folgen: LocalDevVPN installieren, dort einrichten und verbinden. Danach zu DirectSide zurückkehren. LiveContainer kannst du im nächsten Schritt optional installieren und einrichten.": "Follow the introduction in DirectSide: install LocalDevVPN, set it up there and connect. Then return to DirectSide. You can optionally install and set up LiveContainer in the next step."
 }
