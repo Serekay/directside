@@ -1,4 +1,6 @@
 pub mod core;
+#[cfg(windows)]
+mod iphone_setup;
 use std::{collections::VecDeque, ffi::{CStr,CString,c_char}, sync::{Mutex,OnceLock,mpsc}};
 
 pub(crate) struct Bridge {

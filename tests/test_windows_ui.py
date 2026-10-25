@@ -137,6 +137,77 @@ class WindowsUIStateTests(unittest.TestCase):
   self.bridge.initializing=False;self.bridge.update(busy=False,devices=[{'id':'phone'}])
   self.bridge.auto_refresh()
   self.assertEqual(self.sent[-1],{'command':'devices'})
+ def test_logout_stays_enabled_during_poll_and_waits_for_scan_result(self):
+  self.bridge.initializing=False;self.bridge.update(busy=False,loggedIn=True)
+  engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
+  engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')));root=engine.rootObjects()[0]
+  self.bridge.auto_refresh();APP.processEvents()
+  button=root.findChild(QObject,'logoutButton');self.assertTrue(button.property('enabled'))
+  self.bridge.logout();self.assertTrue(self.bridge.pendingLogout)
+  self.bridge.handle({'event':'devices','devices':[{'id':'phone','trusted':True}]});APP.processEvents()
+  self.assertEqual([event['command'] for event in self.sent],['devices','logout'])
+  self.assertFalse(button.property('enabled'))
+  root.close();engine.deleteLater();APP.processEvents()
+ def test_usb_recovery_acts_once_and_never_when_device_is_available(self):
+  from unittest.mock import patch
+  self.bridge.update(busy=False,usbReconnectNeeded=True,devices=[])
+  with patch('desktop.threading.Thread') as worker:
+   self.bridge.onSetupEvent({'type':'usb_pnp','count':2});worker.assert_not_called()
+   self.bridge.onSetupEvent({'type':'usb_pnp','count':1});self.assertEqual(worker.call_count,1)
+   self.bridge.onSetupEvent({'type':'usb_pnp','count':1});self.assertEqual(worker.call_count,1)
+   self.bridge.onSetupEvent({'type':'usb_recovered','ok':False})
+   self.assertEqual(self.sent[-1],{'command':'devices'})
+   self.bridge.onSetupEvent({'type':'usb_pnp','count':1});self.assertEqual(worker.call_count,1)
+  self.assertEqual(self.bridge.data['usbRepairState'],'failed')
+ def test_launch_failure_keeps_setup_open_and_ignores_another_device(self):
+  self.bridge.pendingSetup={'device':'phone','path':'fixture','mode':'account','email':'fixture@example.com','phase':'launch'}
+  self.bridge.update(busy=False,devices=[{'id':'phone'}],launchState='checking')
+  self.bridge.handle({'event':'directside_launch_result','device_id':'other','ok':True})
+  self.assertFalse(self.bridge.data['setupReady'])
+  self.bridge.handle({'event':'directside_launch_result','device_id':'phone','ok':False})
+  self.assertFalse(self.bridge.data['success']);self.assertEqual(self.bridge.data['launchState'],'blocked')
+  self.assertEqual(self.sent[-1],{'command':'open_trust_settings','device_id':'phone'})
+  self.bridge.handle({'event':'trust_settings_opened','device_id':'phone','ok':True})
+  self.assertFalse(self.bridge.data['setupReady'])
+  self.bridge.update(developerMode='enabled');self.sent.clear();self.bridge.resumeSetup()
+  self.assertEqual(self.sent,[]) # Do not repeatedly pull the user out of Settings.
+ def test_buttons_stay_stable_and_actions_are_serialized_during_usb_scan(self):
+  self.bridge.initializing=False;self.bridge.update(busy=False,loggedIn=True,devices=[{'id':'phone','trusted':True}])
+  engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
+  engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')));root=engine.rootObjects()[0]
+  root.setProperty('page','developer');APP.processEvents()
+  button=root.findChild(QObject,'developerModeRefresh');before=(button.property('text'),button.property('opacity'),button.property('enabled'))
+  self.bridge.auto_refresh();APP.processEvents()
+  self.assertEqual((button.property('text'),button.property('opacity'),button.property('enabled')),before)
+  self.bridge.revealDeveloperMode();self.bridge.revealDeveloperMode()
+  self.bridge.handle({'event':'devices','devices':[{'id':'phone','trusted':True}]});APP.processEvents()
+  self.assertEqual([item['command'] for item in self.sent],['devices','reveal_developer_mode'])
+  self.assertTrue(self.bridge.data['foregroundBusy'])
+  root.close();engine.deleteLater();APP.processEvents()
+ def test_queued_scan_action_cannot_switch_to_another_phone(self):
+  self.bridge.update(busy=True,scanning=True,devices=[{'id':'phone'}])
+  self.bridge.revealDeveloperMode()
+  self.bridge.handle({'event':'devices','devices':[{'id':'other','trusted':True}]});APP.processEvents()
+  self.assertFalse(any(item['command']=='reveal_developer_mode' for item in self.sent))
+  self.assertTrue(self.bridge.data['error'])
+ def test_untrusted_app_is_not_relaunched_after_poll_reconnect_or_desktop_restart(self):
+  import json
+  self.bridge.pendingSetup={'device':'phone','path':'fixture','mode':'account','email':'fixture@example.com','phase':'launch'}
+  self.bridge.update(busy=False,devices=[{'id':'phone'}])
+  self.bridge.launchDirectSide()
+  self.assertTrue(json.loads(self.bridge.setupRecord.read_text())['launch_attempted'])
+  restored=DesktopBridge(start=False,preferences=self.bridge.preferences);sent=[];restored.send=sent.append
+  try:
+   self.assertEqual(restored.data['launchState'],'blocked')
+   restored.update(busy=False,loggedIn=True,email='fixture@example.com',devices=[{'id':'phone'}],developerMode='enabled')
+   restored.resumeSetup();self.assertEqual(sent,[])
+   restored.handle({'event':'devices','devices':[]})
+   restored.handle({'event':'devices','devices':[{'id':'phone','trusted':True}]})
+   restored.handle({'event':'device_components','device_id':'phone','developer_mode':True,'directside':True})
+   self.assertFalse(any(item['command']=='launch_directside' for item in sent))
+   restored.update(busy=False);restored.launchDirectSide()
+   self.assertEqual(sent[-1],{'command':'launch_directside','device_id':'phone'})
+  finally:restored.timer.stop()
  def test_app_status_and_slots_belong_to_selected_device(self):
   self.bridge.update(busy=False,devices=[{'id':'phone'},{'id':'tablet'}])
   self.bridge.handle({'event':'device_components','device_id':'phone','localdevvpn':True,'livecontainer':True,'slots_used':3,'developer_apps':[{'name':'DirectSide'},{'name':'EUP Dev'},{'name':'EUP Test'}]})
@@ -450,8 +521,31 @@ class WindowsUIStateTests(unittest.TestCase):
   self.assertEqual(self.sent,[{'command':'repair_directside','signing_mode':'account','device_id':'phone','path':str(ipa)}])
   self.assertTrue(self.bridge.data['settingUp'])
   self.bridge.handle({'event':'directside_repaired','device_id':'phone'})
+  self.assertFalse(self.bridge.data['setupReady']);self.assertTrue(self.bridge.setupRecord.exists())
+  self.assertEqual(self.sent[-1],{'command':'launch_directside','device_id':'phone'})
+  self.bridge.handle({'event':'directside_launch_result','device_id':'phone','ok':False})
+  self.assertFalse(self.bridge.data['setupReady']);self.assertFalse(self.bridge.data['success'])
+  self.assertEqual(self.sent[-1],{'command':'open_trust_settings','device_id':'phone'})
+  self.bridge.handle({'event':'trust_settings_opened','device_id':'phone','ok':False})
+  self.assertEqual(self.bridge.data['settingsNavigation'],'manual')
+  self.bridge.launchDirectSide()
+  self.bridge.handle({'event':'directside_launch_result','device_id':'phone','ok':True})
   self.assertFalse(self.bridge.data['setupPending']);self.assertTrue(self.bridge.data['setupReady'])
   self.assertFalse(self.bridge.setupRecord.exists())
+
+ def test_failed_settings_navigation_shows_manual_fallback_at_same_step(self):
+  self.bridge.pendingSetup={'device':'phone','path':'fixture','mode':'account','email':'fixture@example.com','phase':'launch'}
+  self.bridge.update(busy=False,devices=[{'id':'phone'}],launchState='blocked')
+  engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
+  engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')));root=engine.rootObjects()[0]
+  self.bridge.handle({'event':'trust_settings_opened','device_id':'phone','ok':False});APP.processEvents()
+  fallback=root.findChild(QObject,'manualTrustFallback')
+  self.assertTrue(fallback.property('visible'));self.assertEqual(root.property('page'),'launch')
+  self.assertFalse(self.bridge.data['setupReady'])
+  self.assertEqual(fallback.property('text'),'Please open this on your iPhone:')
+  self.bridge.setLanguage('de');APP.processEvents()
+  self.assertEqual(fallback.property('text'),'Bitte am iPhone selbst öffnen:')
+  root.close();engine.deleteLater();APP.processEvents()
 
  def test_pending_setup_survives_restart_and_cannot_target_another_phone(self):
   ipa=Path(self.folder.name)/'DirectSide.ipa';ipa.write_bytes(b'pending fixture')

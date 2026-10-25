@@ -1,5 +1,73 @@
 # Teststand vom 25. Oktober 2026
 
+## USB-Wiederherstellung und tatsächlicher erster App-Start
+
+Windows erkennt im aktuellen Ausfall genau ein Apple-USB-Composite-Gerät,
+während Apples USB-Dienst null Geräte meldet. Neuer Wiederherstellungspfad:
+Nach acht Sekunden anhaltender Diskrepanz und vorher gesehenem iPhone wird
+einmal pro Ausfall die gezielte PnP-Neuinitialisierung dieses einen Geräts
+angeboten/angestoßen. Dafür verwendet das Paket seine eigene begrenzte
+Hilfsfunktion mit normaler Windows-Administratorabfrage und Microsofts
+`pnputil /restart-device`. Keine Hub-Neustarts, keine Treiberdeinstallation,
+kein globaler Gerätescan und keine Änderung an Apple-Kennungen oder Zertifikaten.
+Fehlende oder mehrere passende Geräte werden nicht neu gestartet. Abbruch
+führt nicht zu wiederholten automatischen Administratorabfragen.
+
+Abgeschlossene Konto-/Kopplungsübertragung ist künftig noch kein grüner
+Einrichtungsabschluss. Windows fordert danach den Start der eindeutigen
+DirectSide-Installation über den nativen iPhone-Startdienst an. Nur ein
+positiver Prozessbezeichner zählt als bestätigter Start. Bei fehlender
+Bestätigung bleibt der Einrichtungsschritt gespeichert und die Oberfläche
+zeigt die noch nötige iPhone-Freigabe an. Sie versucht, Einstellungen und
+anschließend Allgemein → VPN und Geräteverwaltung über vorhandene native
+Accessibility-Dienste zu öffnen. Die endgültige Vertrauensbestätigung wird
+nicht automatisiert. Die Steuerung nutzt ausschließlich semantische Kennungen,
+keine übersetzten Zeilentexte, Koordinaten oder festen Zeilennummern. Am Gerät
+ausgelesen: `com.apple.settings.general`,
+`com.apple.settings.general.vpnAndDeviceManagement`, `BackButton`; auf der
+Zielseite die Kombination `VPN` und `BackButton`. Der iOS-Lesedienst funktioniert,
+Fernaktivierung der Systemzeilen wurde auf diesem iPhone jedoch nicht
+ausgeführt. Automatische Navigation ist deshalb weiterhin nicht vollständig
+nativ belegt. Die manuelle Navigation des Betreibers zählt nur zur Prüfung
+der Kennungen. Bei nicht bestätigtem Ziel erscheint im selben Schritt die
+lokalisierte manuelle Anleitung. Die Fallback-Pflicht steht auch in AGENTS.md.
+Der sichtbare Pfad und erneuter Start bleiben dann verfügbar. Es gibt keinen
+behaupteten universellen Einstellungen-Deep-Link und keine Garantie, dass ein
+angeforderter Prozessstart auch einen späteren App-Absturz ausschließt.
+
+Abmelden bleibt während normaler USB-Hintergrundabfragen bedienbar; ein Klick
+während einer Abfrage wird anschließend ausgeführt, statt still ignoriert zu
+werden. Dadurch flackert der Button nicht mehr bei jedem Prüfzyklus.
+71 Python-/Qt-Tests und zwölf Kern-Tests bestanden. Hintergrundscans beeinflussen nun generell
+weder sichtbare Button-Aktivierung noch deren Beschriftung. Während einer
+Abfrage angeklickte Aktionen werden einmal anschließend ausgeführt; ein
+inzwischen gewechseltes Zielgerät verhindert gerätespezifische Aktionen.
+Native Wiederherstellung noch nicht belegt: Nach dem Paketneustart war das
+iPhone bereits wieder verfügbar; ob der PnP-Neustart dafür verantwortlich war,
+ist ohne bestätigten Reparaturdurchlauf nicht nachgewiesen.
+
+Nativer Startversuch über „Einrichtung reparieren“ in der Windows-App hat
+tatsächlich den iOS-Dialog „Entwicklungsteam, dem nicht vertraut wird“ gezeigt.
+Windows blieb korrekt ohne grünen Abschluss. Dieser Dialog blockierte zunächst
+das automatische Öffnen der Einstellungen. Die endgültige Fassung enthält
+keine sprachabhängige Erkennung oder automatische Bestätigung dieses Dialogs.
+Der erste Startversuch wird persistent markiert. Ein noch offener Startschritt
+wird nach Neustart der Windows-App oder USB-Wiederkehr nicht erneut automatisch
+gestartet. Auch ältere gespeicherte Startschritte gelten beim Laden vorsorglich
+als bereits versucht. Dadurch wiederholt sich der Untrusted-Developer-Dialog
+nicht wegen App-Neustarts; ein erneuter Versuch benötigt einen bewussten Klick.
+Paket danach mit gespeicherter offener Freigabe gestartet: Die Windows-App
+zeigt direkt die neutrale Freigabe-Anleitung, keine neue Startanforderung.
+Der einmalige Klick auf „Einstellungen am iPhone öffnen“ landete auf der von
+iOS wiederhergestellten Batterie-Unterseite. Die korrigierte Fassung versucht
+den Rückweg über `BackButton` und bestätigt Folgeseiten anhand ihrer semantischen
+Kennungen. Eine angeforderte Aktivierung wird nicht als Navigationserfolg
+gewertet. Direkte URL-Startparameter wurden ebenfalls nicht als funktionierend
+bestätigt und sind nicht im Produkt enthalten.
+
+Protokollgrundlagen: [Microsoft PnPUtil](https://learn.microsoft.com/en-us/windows-hardware/drivers/devtest/pnputil-command-syntax),
+[Apple Entwicklervertrauen](https://help.apple.com/xcode/mac/current/en.lproj/dev96a12fb84.html).
+
 ## Erneuter Einrichtungsdurchlauf und USB-Nachprüfung
 
 Build 13 über den Dateidialog der gepackten Windows-App ausgewählt und installiert.

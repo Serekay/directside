@@ -78,6 +78,21 @@ async fn trust_device(request:&Value)->Result<(),Report> {
     emit(json!({"event":"device_trusted","device_id":id}));Ok(())
 }
 
+#[cfg(windows)]
+async fn setup_launch(request:&Value,settings:bool)->Result<(),Report> {
+    let id=text(request,"device_id")?;
+    let mut mux=UsbmuxdConnection::default().await?;
+    let dev=mux.get_devices().await?.into_iter().find(|d|d.udid==id).ok_or_else(||report!("iPhone nicht verbunden."))?;
+    let provider=dev.to_provider(UsbmuxdAddr::from_env_var()?,"DirectSide setup");
+    let result=tokio::time::timeout(Duration::from_secs(35),async {
+        if settings {crate::iphone_setup::open_trust_settings(&provider).await}
+        else {crate::iphone_setup::launch_directside(&provider).await}
+    }).await;
+    let ok=matches!(result,Ok(Ok(())));
+    emit(json!({"event":if settings {"trust_settings_opened"}else{"directside_launch_result"},"device_id":id,"ok":ok}));
+    Ok(())
+}
+
 async fn device_components(request:&Value)->Result<(),Report> {
     let id=text(request,"device_id")?;
     let mut mux=UsbmuxdConnection::default().await?;
@@ -506,7 +521,7 @@ async fn repair_directside(engine:Option<&mut Engine>,request:&Value)->Result<()
     let targets:Vec<_>=apps.keys().filter(|id|*id=="com.directside.app" || id.starts_with("com.directside.app.")).collect();
     if targets.len()!=1 {bail!("Eine eindeutige DirectSide-Installation ist erforderlich.");}
     bootstrap(engine,&provider,&path,targets[0]).await?;
-    emit(json!({"event":"directside_repaired","device_id":id}));Ok(())
+    emit(json!({"event":"directside_repaired","device_id":id,"path":request["path"]}));Ok(())
 }
 
 async fn bootstrap(engine:Option<&mut Engine>, provider:&impl idevice::provider::IdeviceProvider, ipa:&std::path::Path,bundle:&str) -> Result<(),Report> {
@@ -744,6 +759,10 @@ pub async fn run() {
                 Err(_) => Err(report!("Die Geräteerkennung antwortet nicht. Apple-USB-Verbindung prüfen.")),
             },
             "trust_device"=>match tokio::time::timeout(Duration::from_secs(90),trust_device(&request)).await {Ok(result)=>result,Err(_)=>Err(report!("iPhone entsperren und Vertrauen bestätigen. Dann erneut versuchen."))},
+            #[cfg(windows)]
+            "launch_directside"=>setup_launch(&request,false).await,
+            #[cfg(windows)]
+            "open_trust_settings"=>setup_launch(&request,true).await,
             "local_auth_probe" => match tokio::time::timeout(Duration::from_secs(45),probe_local_auth()).await {Ok(r)=>r,Err(_)=>Err(report!("Lokale Apple-Einrichtung hat zu lange gedauert."))},
             "device_components" => match tokio::time::timeout(Duration::from_secs(20),device_components(&request)).await {Ok(r)=>r,Err(_)=>Err(report!("App-Prüfung nicht möglich. iPhone entsperren und Vertrauen bestätigen."))},
             "app_icons" => match tokio::time::timeout(Duration::from_secs(25),app_icons(&request)).await {Ok(r)=>r,Err(_)=>Err(report!("Icons konnten nicht geladen werden."))},
