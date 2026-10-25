@@ -186,4 +186,4 @@ Check for updates in **Settings**. The updater offers newer published versions. 
 
 ## Project links
 
-[Build guide](docs/DEVELOPMENT.md) | [Architecture](docs/ARCHITECTURE.md) | [Changelog](CHANGELOG.md) | [Third-party notices](THIRD_PARTY.md) | [License](LICENSE)
+[Build guide](docs/DEVELOPMENT.md) | [Architecture](docs/ARCHITECTURE.md) | [Changelog](CHANGELOG.md) | [Security](SECURITY.md) | [Third-party notices](THIRD_PARTY.md) | [License](LICENSE)

@@ -26,10 +26,11 @@ use zip::ZipArchive;
 pub fn inspect_ipa(path:&std::path::Path)->Result<plist::Dictionary,Report> {
     use std::io::Read;
     let mut archive=ZipArchive::new(std::fs::File::open(path)?)?;
-    let main:Vec<String>=archive.file_names().filter(|name|{
+    let names=archive.file_names().collect::<Result<Vec<_>,_>>()?;
+    let main:Vec<String>=names.into_iter().filter(|name|{
         let parts:Vec<_>=name.split('/').collect();
         parts.len()==3 && parts[0]=="Payload" && parts[1].ends_with(".app") && parts[2]=="Info.plist"
-    }).map(str::to_string).collect();
+    }).map(|name|name.into_owned()).collect();
     if main.len()!=1 {bail!("Die IPA enthält keine eindeutige Haupt-App.");}
     let entry=archive.by_name(&main[0])?;
     if entry.size()>2_000_000 {bail!("Die App-Metadaten sind zu groß.");}
@@ -41,6 +42,51 @@ pub fn inspect_ipa(path:&std::path::Path)->Result<plist::Dictionary,Report> {
 }
 
 static ALT_PAIRING_FILE: &str = "ALTPairingFile.dat";
+
+#[cfg(test)]
+mod archive_security_tests {
+    use super::inspect_ipa;
+    use std::{fs, io::Write, path::PathBuf};
+    use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};
+
+    struct TestDirectory(PathBuf);
+    impl TestDirectory {
+        fn new() -> Self {
+            let path=std::env::temp_dir().join(format!("directside-archive-test-{}",uuid::Uuid::new_v4()));
+            fs::create_dir(&path).unwrap();
+            Self(path)
+        }
+    }
+    impl Drop for TestDirectory {
+        fn drop(&mut self) {let _=fs::remove_dir_all(&self.0);}
+    }
+
+    #[test]
+    fn imported_ipa_metadata_survives_zip_upgrade() {
+        let folder=TestDirectory::new();
+        let path=folder.0.join("app.ipa");
+        let mut archive=ZipWriter::new(fs::File::create(&path).unwrap());
+        archive.start_file("Payload/Test.app/Info.plist",SimpleFileOptions::default()).unwrap();
+        archive.write_all(br#"<?xml version="1.0"?><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>com.example.test</string></dict></plist>"#).unwrap();
+        archive.finish().unwrap();
+        assert_eq!(inspect_ipa(&path).unwrap().get("CFBundleIdentifier").and_then(plist::Value::as_string),Some("com.example.test"));
+    }
+
+    #[test]
+    fn ipa_symlink_cannot_escape_extraction_directory() {
+        let folder=TestDirectory::new();
+        let path=folder.0.join("malicious.ipa");
+        let outside=folder.0.join("outside");
+        fs::write(&outside,b"unchanged").unwrap();
+        let mut writer=ZipWriter::new(fs::File::create(&path).unwrap());
+        writer.add_symlink("Payload/Test.app/escape","../../../outside",SimpleFileOptions::default()).unwrap();
+        writer.finish().unwrap();
+        let mut archive=ZipArchive::new(fs::File::open(path).unwrap()).unwrap();
+        assert!(archive.extract(folder.0.join("extracted")).is_err());
+        assert_eq!(fs::read(outside).unwrap(),b"unchanged");
+        assert!(!folder.0.join("extracted/Payload/Test.app/escape").exists());
+    }
+}
 
 pub struct Application {
     pub bundle: Bundle,
