@@ -33,7 +33,7 @@ struct OnboardingView:View {
         VStack(alignment:.leading,spacing:15) {
             if step==0 {BrandIcon(size:82)}
             else if step==1 {Image(systemName:"checkmark.shield.fill").font(.system(size:54)).foregroundStyle(Style.accent).padding(.vertical,8)}
-            else {Image("livecontainer-directside").resizable().scaledToFit().frame(width:82,height:82).clipShape(RoundedRectangle(cornerRadius:19))}
+            else {LiveContainerIntroIcon()}
             if step==0 {
                 Text(L("Willkommen bei")).font(.title2.weight(.semibold)).foregroundStyle(.secondary)
                 Text("DirectSide").font(.largeTitle.bold()).lineLimit(1).minimumScaleFactor(0.75)
@@ -82,5 +82,18 @@ struct OnboardingView:View {
                 }
             }
         }.frame(maxWidth:.infinity)
+    }
+}
+
+private struct LiveContainerIntroIcon:View {
+    private var artwork:UIImage? {
+        guard let path=Bundle.main.path(forResource:"livecontainer-directside",ofType:"png") else {return nil}
+        return UIImage(contentsOfFile:path)
+    }
+    var body:some View {
+        Group {
+            if let artwork {Image(uiImage:artwork).renderingMode(.original).resizable().scaledToFit()}
+            else {Image(systemName:"square.stack.3d.up.fill").font(.system(size:54)).foregroundStyle(Style.accent)}
+        }.frame(width:82,height:82).clipShape(RoundedRectangle(cornerRadius:19))
     }
 }

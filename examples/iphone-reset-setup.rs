@@ -13,7 +13,7 @@ async fn main()->Result<(),Report> {
 }
 async fn run()->Result<(),Report> {
     let action=std::env::args().nth(1).unwrap_or_else(||"--inventory".into());
-    if !["--inventory","--remove-test-apps","--remove-directside","--account-transfer-status","--forget-pairing"].contains(&action.as_str()){bail!("Unknown scoped setup action.");}
+    if !["--inventory","--remove-test-apps","--remove-directside","--account-transfer-status","--livecontainer-icon","--forget-pairing"].contains(&action.as_str()){bail!("Unknown scoped setup action.");}
     let mut mux=UsbmuxdConnection::default().await?;
     let devices=mux.get_devices().await?;
     if devices.len()!=1 {bail!("Exactly one trusted, unlocked iPhone is required.");}
@@ -37,6 +37,15 @@ async fn run()->Result<(),Report> {
             let bytes=file.read_entire().await?;file.close().await?;
             if bytes.len()<=8192 {let value:serde_json::Value=serde_json::from_slice(&bytes)?;println!("Account handoff: {}",value);}
         }
+    } else if action=="--livecontainer-icon" {
+        let ids:Vec<_>=targets.iter().filter(|(id,_)|id=="com.kdt.livecontainer" || id.starts_with("com.kdt.livecontainer.")).collect();
+        if ids.len()!=1 {bail!("Exactly one LiveContainer is required.");}
+        let output=std::path::Path::new("build/iphone-livecontainer-icon.png");
+        if output.exists(){bail!("Icon capture already exists.");}
+        let mut spring=idevice::springboardservices::SpringBoardServicesClient::connect(&provider).await?;
+        let png=spring.get_icon_pngdata(ids[0].0.clone()).await?;
+        if png.len()>1048576 || !png.starts_with(b"\x89PNG\r\n\x1a\n"){bail!("Invalid icon response.");}
+        std::fs::write(output,png)?;println!("LiveContainer home screen icon captured locally.");
     } else if action=="--remove-directside" {
         for (id,name) in &targets {
             if id=="com.directside.app" || id.starts_with("com.directside.app.") {
