@@ -523,5 +523,10 @@
   "iPhone weiterhin nicht erreichbar. PC neu starten und erneut verbinden.": "iPhone still unavailable. Restart your PC and reconnect.",
   "Windows erkennt dein iPhone. Zur Reparatur wird der Apple-Verbindungsdienst neu gestartet. In der folgenden Windows-Abfrage bitte Ja auswählen.": "Windows detects your iPhone. Repair restarts the Apple connection service. Please select Yes in the Windows prompt that follows.",
   "Verbindung reparieren startet den Apple-Verbindungsdienst neu. In der Windows-Abfrage bitte Ja auswählen.": "Repair connection restarts the Apple connection service. Please select Yes in the Windows prompt.",
-  "Verbindung reparieren": "Repair connection"
+  "Verbindung reparieren": "Repair connection",
+  "DirectSide am iPhone freigeben": "Trust DirectSide on your iPhone",
+  "Am iPhone:": "On your iPhone:",
+  "1. Einstellungen > Allgemein > VPN & Geräteverwaltung.": "1. Settings > General > VPN & Device Management.",
+  "2. Entwicklungsteam auswählen und Vertrauen bestätigen.": "2. Select your developer team and confirm Trust.",
+  "3. DirectSide auf dem iPhone öffnen.": "3. Open DirectSide on your iPhone."
 }

@@ -19,3 +19,5 @@
 - Desktop defaults to English; persist optional German selection. Missing states are red, warnings/unknown states yellow, successful checks green. Keep setup help in the overflow menu and app/device state scoped to the selected device.
 - No remote Anisette fallback. The local Windows provider must not be presented as a working local iOS implementation.
 - Every automated setup step must have a clear, localized manual fallback shown at that step if automation fails or its result cannot be verified (including different iOS versions/layouts). Never imply that an unverified step is complete. Use semantic identifiers for native navigation, not localized captions or fixed row indexes. Do not repeatedly reopen an untrusted app while waiting for the user's approval.
+
+- The developer-team trust step is instructions only. Never remotely launch DirectSide or open/navigate iPhone Settings from the Windows setup, including retries, polling, reconnects and restored setup. Finishing this guide is a user acknowledgement, not proof of successful launch.

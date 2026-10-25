@@ -1,5 +1,18 @@
 # Teststand vom 25. Oktober 2026
 
+## Entwicklerteam: Anleitung statt iPhone-Fernsteuerung
+
+Die Windows-Einrichtung sendet keine Befehle zum Start von DirectSide oder
+zum Navigieren der iPhone-Einstellungen mehr. Nach Installation und
+Konto-/Zertifikatsuebertragung erscheint ausschliesslich die manuelle Anleitung:
+Geraeteverwaltung, Entwicklungsteam vertrauen, DirectSide selbst oeffnen.
+Auch Polling, USB-Wiederverbindung und Wiederaufnahme eines gespeicherten
+Einrichtungsschritts loesen keinen App-Start aus. Fertig beendet die Anleitung
+als Bestaetigung des Nutzers; es wird kein verifizierter App-Start behauptet.
+81 Python/Qt-Tests bestanden. Kein Eingriff in iPhone-Einstellungen und kein
+weiterer nativer Startversuch bei dieser Aenderung.
+
+
 ## USB-Ausfall nach iPhone-Neustart: Reparatur und Windows-Zustimmung
 
 Am angeschlossenen Gerät erkennt Windows genau ein Apple-USB-Gerät; Apples

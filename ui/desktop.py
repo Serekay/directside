@@ -333,8 +333,7 @@ class DesktopBridge(QObject):
                 self.pendingSetup=None;self.setupRecord.unlink(missing_ok=True)
                 self.update(busy=False,success=True,setupPending=False,setupReady=True,launchState='opened',status='DirectSide gestartet.')
             else:
-                self.update(busy=False,success=False,setupReady=False,launchState='blocked')
-                self.openTrustSettings()
+                self.update(busy=False,success=False,setupReady=False,launchState='blocked',settingsNavigation='manual')
         elif kind=='trust_settings_opened':
             if not self.pendingSetup or event.get('device_id')!=self.pendingSetup['device']:return
             self.update(busy=False,launchState='blocked',settingsNavigation='confirmed' if event.get('ok') else 'manual')
@@ -353,26 +352,24 @@ class DesktopBridge(QObject):
         self.send({'command':'repair_directside','signing_mode':pending['mode'],'device_id':pending['device'],'path':pending['path']})
 
     @Slot()
-    def acknowledgeSetup(self):self.update(setupReady=False,launchState='idle')
+    def acknowledgeSetup(self):
+        # User finishes the guide; this is not a verified remote app launch.
+        self.pendingSetup=None
+        self.setupRecord.unlink(missing_ok=True)
+        self.update(setupPending=False,setupReady=False,launchState='idle',success=False,status='Installiert')
 
     @Slot()
-    @after_scan
     def launchDirectSide(self):
-        if self.data['busy'] or not self.pendingSetup or not self.data['devices']:return
-        if self.data['devices'][self.data['deviceIndex']]['id']!=self.pendingSetup['device']:return
-        self.pendingSetup['launch_attempted']=True
+        # Manual guide only: never launch apps or navigate iOS from Windows.
+        if not self.pendingSetup:return
+        self.pendingSetup['phase']='launch'
         self.setupRecord.parent.mkdir(parents=True,exist_ok=True)
         self.setupRecord.write_text(json.dumps(self.pendingSetup),encoding='utf-8')
-        self.update(busy=True,success=False,setupReady=False,launchState='checking')
-        self.send({'command':'launch_directside','device_id':self.pendingSetup['device']})
+        self.update(busy=False,success=False,setupReady=False,launchState='blocked',settingsNavigation='manual')
 
     @Slot()
-    @after_scan
     def openTrustSettings(self):
-        if self.data['busy'] or not self.pendingSetup or not self.data['devices']:return
-        if self.data['devices'][self.data['deviceIndex']]['id']!=self.pendingSetup['device']:return
-        self.update(busy=True,scanning=False,settingsNavigation='opening')
-        self.send({'command':'open_trust_settings','device_id':self.pendingSetup['device']})
+        if self.pendingSetup:self.update(launchState='blocked',settingsNavigation='manual')
 
     @Slot()
     @after_scan
