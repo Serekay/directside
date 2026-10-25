@@ -1,5 +1,34 @@
 # Teststand vom 25. Oktober 2026
 
+## Oberflächenkorrektur und App-ID-Übersicht, Build 7
+
+USB-Screenshots und echte Accessibility-Navigation auf dem iPhone eingerichtet.
+Die vorhandene App wurde durch Entdecken, Meine Apps, Quellenliste/-details,
+App-Details samt Berechtigungen, Quelle hinzufügen sowie Einstellungen,
+Updateprüfung, Entwicklermodus, Verbindung, Signierung und LiveContainer
+navigiert und ausgelesen. Screenshots bleiben lokal; Accountangaben und
+private Quellen werden nicht in die README übernommen. Keine App installiert,
+entfernt oder Signatur erneuert, keine zusätzliche App-ID angelegt.
+
+Korrigiert: Geräteprüfung im Hintergrund ohne allgemeines Busy/Progress-Banner,
+kurzer Cache gegen Prüfungen bei jedem Tabwechsel, Wisch-Erklärung entfernt,
+Quellenüberschrift nur einmal, keine technischen Berechtigungsangaben,
+LocalDevVPN als eigene Karte mit Status-Badge. iPhone-Updater für öffentliche
+Releases ohne Token-/Accountoberfläche, mit automatischer/manueller Prüfung,
+festem Release-Downloadpfad und Größen-/SHA256-Prüfung. Das Repository wird
+dadurch nicht öffentlich gemacht; derzeit ist kein öffentliches Update abrufbar.
+
+App-ID-Details: Windows-Zähler anklickbar, zusätzlich im Hilfemenü;
+iPhone unter Einstellungen → App-Kennungen. Name, Ablauf, Zuordnung von
+Erweiterungen und Kontingent kommen nur lesend von Apple. Neun Einträge
+einschließlich Erweiterungszuordnung real abgefragt. Die Windows-Ansicht mit
+Beispieldaten in Deutsch/Englisch bei 960 × 680 visuell geprüft.
+
+52 Python-/Qt-Tests, acht Kern-Tests und drei Signierkennungs-Tests bestanden.
+Swift-Syntax lokal geprüft; neuer iPhone-Build und Gerätetest der Änderungen
+stehen noch aus. Die bereits geprüften Gerätescreenshots zeigen den vorherigen
+App-Stand, nicht die neuen Oberflächen.
+
 ## App-ID-Prüfung und feste Kennung
 
 Apple-Konto nur lesend geprüft: neun registrierte IDs, davon DirectSide eine,

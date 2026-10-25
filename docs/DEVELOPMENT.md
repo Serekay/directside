@@ -78,6 +78,22 @@ iPhone build is triggered by these changes.
 
 ## iPhone screenshots for the README
 
+`iphone-control` additionally inspects the foreground app's accessibility
+elements over the trusted USB connection and activates an exact label. It uses
+the accessibility audit daemon's RSD check-in and DTX protocol, without
+installing an automation app or registering another App ID. Protocol reference:
+[pymobiledevice3 accessibility audit](https://github.com/doronz88/pymobiledevice3/blob/master/pymobiledevice3/services/accessibilityaudit.py).
+
+```powershell
+cargo run --release --example iphone-control --features iphone-control -- list
+cargo run --release --example iphone-control --features iphone-control -- press 'Quellen, Button, Tab'
+```
+
+Open DirectSide on the unlocked phone first. Inspect labels before activating
+them and verify navigation with a screenshot. A successfully sent activation
+alone does not prove that the view changed. This helper is separate from the
+shipped app; coordinate swipes and text input are not implemented.
+
 The optional development example `iphone-screenshot` captures one PNG over the
 trusted USB connection. It uses the Instruments screenshot channel, including
 CoreDeviceProxy/RSD on newer iOS versions. It does not install a developer image,

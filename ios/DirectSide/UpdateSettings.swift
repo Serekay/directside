@@ -4,26 +4,33 @@ struct UpdateSettings:View {
     @EnvironmentObject var updater:AppUpdater
     @EnvironmentObject var engine:Engine
     @ObservedObject var connection:Connection
-    @State private var token=""
+    @AppStorage("automaticUpdates") private var automaticUpdates=true
     var body:some View {
         Form {
             Section {
-                LabeledContent(L("Installierte Version"),value:Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "–")
-                Button(L("Nach Updates suchen")){Task{await updater.check(manual:true)}}.disabled(updater.checking || updater.downloading)
-                if !updater.message.isEmpty {Text(L(updater.message)).font(.subheadline).foregroundStyle(.secondary)}
-            } footer:{Text(L("DirectSide prüft beim Start und anschließend höchstens alle sechs Stunden auf veröffentlichte Updates."))}
+                HStack(spacing:16) {
+                    BrandIcon(size:60)
+                    VStack(alignment:.leading,spacing:5) {
+                        Text("DirectSide").font(.title2.bold())
+                        Text(L("Version")+" "+(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "–")).foregroundStyle(.secondary)
+                    }
+                }.padding(.vertical,8)
+                if updater.checking {ProgressView(L("Nach Updates suchen …"))}
+                else if !updater.message.isEmpty {Label(L(updater.message),systemImage:updater.available == nil ? "info.circle":"arrow.down.circle.fill").font(.subheadline).foregroundStyle(.secondary)}
+                Button {Task{await updater.check(manual:true)}}label:{Label(L("Nach Updates suchen"),systemImage:"arrow.clockwise").frame(maxWidth:.infinity)}
+                    .buttonStyle(.borderedProminent).disabled(updater.checking || updater.downloading)
+            }
             if let release=updater.available {
                 Section {
                     Label(L("Neue Version verfügbar")+" · "+release.version,systemImage:"sparkles").font(.headline)
                     if !release.notes.isEmpty {Text(release.notes).font(.subheadline)}
-                    Button(L("Update installieren")){Task{await updater.install(engine:engine,connection:connection)}}.buttonStyle(.borderedProminent).disabled(engine.busy || updater.downloading)
+                    if updater.downloading {ProgressView(L("Update wird installiert …"))}
+                    else {Button(L("Update installieren")){Task{await updater.install(engine:engine,connection:connection)}}.buttonStyle(.borderedProminent).disabled(engine.busy)}
                 }
             }
             Section {
-                SecureField(L("GitHub-Zugang"),text:$token).textInputAutocapitalization(.never).autocorrectionDisabled()
-                Button(L("Zugang speichern")){updater.saveCredential(token);token=""}.disabled(token.isEmpty || updater.downloading || updater.checking)
-                if updater.hasCredential {Button(L("Zugang entfernen"),role:.destructive){updater.forgetCredential()}.disabled(updater.downloading || updater.checking)}
-            } header:{Text(L("Privates Repository"))} footer:{Text(L("Für Serekay/directside einen auf dieses Repository beschränkten GitHub-Zugang mit Contents: Read verwenden. Er wird nur im Schlüsselbund dieses iPhones gespeichert."))}
+                Toggle(L("Automatisch nach Updates suchen"),isOn:$automaticUpdates)
+            } footer:{Text(L("Prüft beim Öffnen der App, höchstens alle sechs Stunden. Ein verfügbares Update kannst du direkt auf dem iPhone installieren."))}
         }.navigationTitle(L("DirectSide-Updates"))
     }
 }

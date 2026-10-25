@@ -84,7 +84,7 @@ struct ContentView:View {
             Form {
                 TextField("http(s)://…/source.json",text:$sourceURL).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
                 Button(L("Quelle prüfen")){sheet=nil;Task{await engine.previewSource(sourceURL)}}.buttonStyle(.borderedProminent).disabled(sourceURL.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty)
-                Button {Task {let allowed=await AVCaptureDevice.requestAccess(for:.video);if allowed && DataScannerViewController.isSupported && DataScannerViewController.isAvailable {sheet = .scan}else{engine.error="Die Kamera ist nicht verfügbar. Du kannst die Quellen-Adresse direkt eingeben."}}}label:{Image(systemName:"qrcode.viewfinder").font(.title2).frame(maxWidth:.infinity)}.buttonStyle(.bordered).accessibilityLabel(L("QR-Code scannen")).buttonStyle(.bordered).accessibilityLabel(L("QR-Code scannen"))
+                Button {Task {let allowed=await AVCaptureDevice.requestAccess(for:.video);if allowed && DataScannerViewController.isSupported && DataScannerViewController.isAvailable {sheet = .scan}else{engine.error="Die Kamera ist nicht verfügbar. Du kannst die Quellen-Adresse direkt eingeben."}}}label:{Image(systemName:"qrcode.viewfinder").font(.title2).frame(maxWidth:.infinity)}.buttonStyle(.bordered).accessibilityLabel(L("QR-Code scannen"))
             }.navigationTitle(L("Quelle hinzufügen")).toolbar{Button(L("Schließen")){sheet=nil}}
         case .scan:
             QRScanner {raw in sheet=nil;Task{await engine.previewSource(raw)}}.ignoresSafeArea(edges:.bottom).navigationTitle(L("Quelle scannen")).toolbar{Button(L("Schließen")){sheet=nil}}

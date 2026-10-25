@@ -9,12 +9,18 @@ crate-type = ["staticlib", "rlib"]
 
 [features]
 iphone-screenshots = ["idevice/dvt", "idevice/core_device_proxy"]
+iphone-control = ["iphone-screenshots", "dep:ns-keyed-archive"]
 
 [[example]]
 name = "iphone-screenshot"
 required-features = ["iphone-screenshots"]
 
+[[example]]
+name = "iphone-control"
+required-features = ["iphone-control"]
+
 [dependencies]
+ns-keyed-archive = { version = "0.1.5", optional = true }
 isideload = { path = "vendor/isideload" }
 idevice = { version = "0.1.61", default-features = false, features = ["usbmuxd", "ring", "tcp", "tunnel_tcp_stack", "house_arrest", "springboardservices", "amfi"] }
 base64 = "0.22"

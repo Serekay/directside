@@ -18,11 +18,13 @@ ApplicationWindow {
     property string settingsSection: "system"
     property int appPage: 0
     property int certificatePage: 0
+    property int appIdPage: 0
     property bool certificateLimitShown: false
     property string developerHelpDevice: ""
     onSChanged: {
         if(s.developerMode==="disabled" && !s.busy && s.devices.length && page==="install" && developerHelpDevice!==s.devices[s.deviceIndex].id) {developerHelpDevice=s.devices[s.deviceIndex].id;page="developer"}
         if(certificatePage*3>=s.certificates.length) certificatePage=0
+        if(appIdPage*3>=s.appIds.length) appIdPage=0
         if(s.certificateLimit && !certificateLimitShown) {certificateLimitShown=true;page="certificates";backend.loadCertificates()}
         if(!s.certificateLimit) certificateLimitShown=false
     }
@@ -106,6 +108,7 @@ ApplicationWindow {
                         MenuItem {text:win.t("Aktivität");onTriggered:win.page="activity"}
                         MenuItem {text:win.t("Updates");onTriggered:{win.page="settings";win.settingsSection="updates";backend.checkUpdates()}}
                         MenuItem {text:win.t("Zertifikate");enabled:s.loggedIn;onTriggered:{win.page="certificates";backend.loadCertificates()}}
+                        MenuItem {text:win.t("App-Kennungen");onTriggered:{win.page="appids";win.appIdPage=0;backend.loadAppIds()}}
                     }
                 }
                 Rectangle {width:1;height:20;color:"#34373e";Layout.leftMargin:6;Layout.rightMargin:6}
@@ -173,7 +176,7 @@ ApplicationWindow {
                 Layout.fillWidth:true;Layout.fillHeight:true;spacing:16
                 RowLayout {Layout.preferredHeight:30
                     IconButton {visible:win.page!=="install";text:"‹";hint:win.t("Zurück");onClicked:win.page="install"}
-                    Label {text:win.page==="identity"?win.t("Signierung"):win.page==="developer"?win.t("Entwicklermodus"):win.page==="certificates"?win.t("Zertifikate"):win.page==="confirm"?win.t("Entfernen bestätigen"):win.page==="settings"?win.t("Einstellungen"):win.page==="activity"?win.t("Aktivität"):win.page==="help"?win.t("Hilfe"):win.page==="apps"?win.t("Installierte Apps"):win.t("DEIN GERÄT");font.pixelSize:win.page==="install"?10:17;font.letterSpacing:win.page==="install"?1.6:0;color:win.page==="install"?win.muted:win.ink;font.weight:Font.DemiBold}
+                    Label {text:win.page==="appids"?win.t("App-Kennungen"):win.page==="identity"?win.t("Signierung"):win.page==="developer"?win.t("Entwicklermodus"):win.page==="certificates"?win.t("Zertifikate"):win.page==="confirm"?win.t("Entfernen bestätigen"):win.page==="settings"?win.t("Einstellungen"):win.page==="activity"?win.t("Aktivität"):win.page==="help"?win.t("Hilfe"):win.page==="apps"?win.t("Installierte Apps"):win.t("DEIN GERÄT");font.pixelSize:win.page==="install"?10:17;font.letterSpacing:win.page==="install"?1.6:0;color:win.page==="install"?win.muted:win.ink;font.weight:Font.DemiBold}
                     Item {Layout.fillWidth:true}
                     Action {visible:win.page==="activity";text:win.t("Kopieren");enabled:s.logs.length>0;onClicked:backend.copyActivity()}
                 }
@@ -365,6 +368,41 @@ ApplicationWindow {
                     }
                 }
                 Card {
+                    visible:win.page==="appids";Layout.fillWidth:true;Layout.fillHeight:true
+                    ColumnLayout {anchors.fill:parent;anchors.margins:16;spacing:8
+                        RowLayout {Layout.fillWidth:true
+                            Label {text:win.quotaText;Layout.fillWidth:true;font.pixelSize:16;font.weight:Font.DemiBold}
+                            IconButton {objectName:"refreshAppIdsButton";text:"↻";hint:win.t("Aktualisieren");enabled:s.loggedIn && !s.appIdsLoading;onClicked:backend.loadAppIds()}
+                        }
+                        Label {text:win.t("Bei Apple registrierte Kennungen einschließlich App-Erweiterungen. Updates derselben App verwenden ihre Kennung wieder.");Layout.fillWidth:true;wrapMode:Text.Wrap;color:win.muted;font.pixelSize:12}
+                        Label {visible:s.appIdsLoading;text:win.t("App-Kennungen laden …");color:win.muted}
+                        Label {visible:s.appIdsError.length>0;text:win.t(s.appIdsError);Layout.fillWidth:true;wrapMode:Text.Wrap;color:"#f2c45a"}
+                        Label {visible:!s.loggedIn;text:win.t("Zum Nachsehen mit deinem Apple Account anmelden.");color:win.muted}
+                        Repeater {model:s.appIds.slice(win.appIdPage*3,win.appIdPage*3+3)
+                            delegate:Rectangle {required property var modelData;Layout.fillWidth:true;implicitHeight:50;radius:12;color:"#25282e"
+                                RowLayout {anchors.fill:parent;anchors.margins:10;spacing:10
+                                    Label {text:modelData.parent_name?"+":"•";color:win.accent;font.pixelSize:18}
+                                    ColumnLayout {Layout.fillWidth:true;spacing:3
+                                        Label {text:win.t(modelData.displayName || modelData.name);Layout.fillWidth:true;elide:Text.ElideRight;font.weight:Font.DemiBold}
+                                        Label {visible:!!modelData.parent_name;text:win.t("Erweiterung für")+" "+(modelData.parent_name || "");font.pixelSize:11;color:win.muted}
+                                    }
+                                    Label {text:modelData.expires_at?win.t("Läuft ab am")+" "+Qt.formatDateTime(new Date(modelData.expires_at),"dd.MM.yyyy HH:mm"):win.t("Kein Ablaufdatum gemeldet");font.pixelSize:11;color:win.muted}
+                                }
+                            }
+                        }
+                        Label {visible:s.loggedIn && !s.appIdsLoading && !s.appIdsError && s.appIds.length===0;text:win.t("Keine registrierten Kennungen.");color:win.muted}
+                        Item {Layout.fillHeight:true}
+                        Label {text:win.t("Keine Liste installierter Apps. Gast-Apps in LiveContainer benötigen keine zusätzlichen Kennungen.");Layout.fillWidth:true;wrapMode:Text.Wrap;color:win.muted;font.pixelSize:11}
+                        RowLayout {Layout.fillWidth:true
+                            IconButton {text:"‹";hint:win.t("Vorherige Seite");enabled:win.appIdPage>0;onClicked:win.appIdPage--}
+                            Item {Layout.fillWidth:true}
+                            Label {text:(win.appIdPage+1)+" / "+Math.max(1,Math.ceil(s.appIds.length/3));font.pixelSize:12;color:win.muted}
+                            Item {Layout.fillWidth:true}
+                            IconButton {text:"›";hint:win.t("Nächste Seite");enabled:(win.appIdPage+1)*3<s.appIds.length;onClicked:win.appIdPage++}
+                        }
+                    }
+                }
+                Card {
                     visible:win.page==="certificates";Layout.fillWidth:true;Layout.fillHeight:true
                     ColumnLayout {anchors.fill:parent;anchors.margins:24;spacing:12
                         RowLayout {Label {text:s.team;Layout.fillWidth:true} Badge {objectName:"certificateCountBadge";text:win.t("Zertifikate")+" · "+(s.certificatesLoaded?String(s.certificates.length):"?");tone:s.certificateLimit?"missing":"neutral"} IconButton {text:"↻";hint:win.t("Erneut prüfen");enabled:s.loggedIn && !s.busy;onClicked:backend.loadCertificates()}}
@@ -436,6 +474,7 @@ ApplicationWindow {
                 Badge {visible:win.page==="settings" && win.settingsSection==="updates" && s.githubSaved;text:win.t("GitHub gespeichert");tone:"ok"}
                 Badge {id:quotaBadge;objectName:"quotaBadge";text:win.quotaText;tone:!win.quotaKnown?"warning":s.appIdsAvailable===0?"missing":s.appIdsAvailable<=3?"warning":"ok"
                     ToolTip.visible:quotaHover.hovered;ToolTip.text:win.t("Neue App-Kennungen pro Account innerhalb von 7 Tagen. Keine installierten Apps.")+(s.appIdsRegistered>=0?"\n"+s.appIdsRegistered+" "+win.t("registrierte Kennungen"):"");HoverHandler {id:quotaHover}
+                    MouseArea {anchors.fill:parent;cursorShape:Qt.PointingHandCursor;onClicked:{win.page="appids";win.appIdPage=0;backend.loadAppIds()}}
                 }
                 Badge {visible:win.page==="install" || win.page==="apps";text:s.slotsUsed>=0?s.slotsUsed+win.t(" Entwickler-Apps"):win.t("App-Plätze nicht geprüft");tone:s.slotsUsed<0?"warning":"ok"}
                 Badge {objectName:"sessionBadge";text:s.signingMode==="imported"?win.t(s.canSign?"Zertifikat bereit":"Zertifikat fehlt"):win.accountStatus;tone:s.canSign?"ok":s.authState==="expired" || s.authState==="rejected"?"missing":"warning"}

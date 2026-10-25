@@ -2,16 +2,21 @@ import SwiftUI
 
 struct VPNStatusView:View {
     @ObservedObject var connection:Connection
+    private var tone:Color {connection.vpnReachable ? .green:connection.vpnInstalled ? .orange:.red}
     var body:some View {
-        HStack(spacing:8) {
-            Circle().fill(connection.vpnReachable ? Color.green:connection.vpnInstalled ? Color.orange:Color.red).frame(width:7,height:7)
-            Text(L(connection.vpnReachable ? "LocalDevVPN verbunden":connection.vpnInstalled ? "LocalDevVPN verbinden":"LocalDevVPN fehlt")).font(.caption.weight(.semibold))
-            Spacer()
-            if !connection.vpnInstalled {
-                Link(L("Installieren"),destination:URL(string:"https://apps.apple.com/app/id6755608044")!).font(.caption.bold())
-            } else if !connection.vpnReachable {
-                Button(L("Verbinden")){connection.openVPN()}.font(.caption.bold()).disabled(!connection.vpnInstalled)
+        VStack(alignment:.leading,spacing:14) {
+            HStack {
+                Label("LocalDevVPN",systemImage:"network").font(.subheadline.bold())
+                Spacer()
+                Label(L(connection.vpnReachable ? "Verbunden":connection.vpnInstalled ? "Nicht verbunden":"Nicht installiert"),systemImage:connection.vpnReachable ? "checkmark.circle.fill":"exclamationmark.circle.fill")
+                    .font(.caption.weight(.semibold)).foregroundStyle(tone)
+                    .padding(.horizontal,11).padding(.vertical,7).background(tone.opacity(0.12),in:Capsule())
             }
-        }.padding(.horizontal,18).padding(.vertical,9).background(.ultraThinMaterial)
+            if !connection.vpnInstalled {
+                Link(L("LocalDevVPN installieren"),destination:URL(string:"https://apps.apple.com/app/id6755608044")!).font(.subheadline.bold())
+            } else if !connection.vpnReachable {
+                Button(L("Verbinden")){connection.openVPN()}.font(.subheadline.bold())
+            }
+        }.padding(18).background(Style.surface,in:RoundedRectangle(cornerRadius:18))
     }
 }

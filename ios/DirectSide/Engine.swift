@@ -58,6 +58,15 @@ import CryptoKit
     private let sourceRefresh=SourceRefreshCoordinator()
     @Published var selfExpiration:Date?
     @Published var slotsUsed:Int?
+    @Published var appIDs:[RegisteredAppID]=[]
+    @Published var appIDsLimit:Int?
+    @Published var appIDsAvailable:Int?
+    @Published var loadingAppIDs=false
+    @Published var appIDsError:String?
+    func loadAppIDs() {
+        guard loggedIn,!busy,!loadingAppIDs else {return}
+        loadingAppIDs=true;appIDsError=nil;send(["command":"app_ids"])
+    }
     @Published var developerApps:[String]=[]
     @Published var deviceApps:[DeviceApp]=[]
     @Published var signingCertificates:[SigningCertificate]=[]
@@ -65,6 +74,8 @@ import CryptoKit
     @Published var certificateTeam=""
     private var removalConnection:(String,Int)?
     private var inspectionConnection:(String,Int)?
+    private var inspecting=false
+    private var lastInspection:Date?
     @Published var importedIPA:ImportedIPA?
     @Published var needsPairingCode=false
     private var importingPath:URL?
@@ -152,11 +163,12 @@ import CryptoKit
         send(["command":"remove_local_app","bundle_id":app.id,"peer":peer,"port":port,"pairing_path":Paths.pairing.path,"confirmed":true])
     }
     var slotsText:String {slotsUsed.map{"\($0) Entwickler-Apps"} ?? "App-Plätze noch nicht geprüft"}
-    func inspectConnection(peer:String,port:Int) {
-        guard !busy,port>0,pairingReady else {return}
-        busy=true;message="Apps werden gelesen …";inspectionConnection=(peer,port)
+    func inspectConnection(peer:String,port:Int,force:Bool=false) {
+        guard !busy,!inspecting,port>0,pairingReady else {return}
+        if !force,let lastInspection,inspectionConnection?.0==peer,inspectionConnection?.1==port,Date().timeIntervalSince(lastInspection)<60 {return}
+        inspecting=true;inspectionConnection=(peer,port)
         Task {
-            guard await InstallConnection().reachable(peer:peer,port:port) else {busy=false;return}
+            guard await InstallConnection().reachable(peer:peer,port:port),!busy else {inspecting=false;return}
             send(["command":"inspect_local","peer":peer,"port":port,"pairing_path":Paths.pairing.path])
         }
     }
@@ -267,15 +279,19 @@ import CryptoKit
             case "signing_imported": signingImportPending=false;if let email=event["email"] as? String {accountEmail=email;UserDefaults.standard.set(email,forKey:"accountEmail")}
             case "profile": if let raw=event["expires_at"] as? String {selfExpiration=ISO8601DateFormatter().date(from:raw)}
             case "slots": slotsUsed=event["used"] as? Int;developerApps=(event["apps"] as? [[String:String]] ?? []).compactMap{$0["name"]}
+            case "account_quota":appIDsLimit=event["limit"] as? Int;appIDsAvailable=event["available"] as? Int
+            case "app_ids":
+                loadingAppIDs=false;appIDsLimit=event["limit"] as? Int;appIDsAvailable=event["available"] as? Int
+                if let bytes=try? JSONSerialization.data(withJSONObject:event["ids"] ?? []),let ids=try? JSONDecoder().decode([RegisteredAppID].self,from:bytes) {appIDs=ids.sorted{$0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending}}
             case "local_app_icons":
                 for icon in event["icons"] as? [[String:String]] ?? [] {if let id=icon["id"],let raw=icon["png"],let data=Data(base64Encoded:raw),data.count<=1_048_576 {deviceIcons[id]=data}}
             case "local_apps":
+                inspecting=false;lastInspection=Date()
                 if let bytes=try? JSONSerialization.data(withJSONObject:event["apps"] ?? []),let apps=try? JSONDecoder().decode([DeviceApp].self,from:bytes) {deviceApps=apps.filter{$0.developer}.sorted{($0.developer ? "0":"1")+$0.name.lowercased()<($1.developer ? "0":"1")+$1.name.lowercased()}}
                 for index in managed.indices where managed[index].installedBundleID==nil {
                     if let device=deviceApp(for:managed[index]) {managed[index].installedBundleID=device.id}
                 }
                 save(managed,"apps.json")
-                busy=false
                 if let (peer,port)=inspectionConnection {
                     let ids=deviceApps.map(\.id).filter{deviceIcons[$0]==nil}
                     for index in stride(from:0,to:ids.count,by:12) {send(["command":"local_app_icons","peer":peer,"port":port,"pairing_path":Paths.pairing.path,"bundles":Array(ids[index..<min(index+12,ids.count)])])}
@@ -302,7 +318,7 @@ import CryptoKit
                 if let bytes=try? JSONSerialization.data(withJSONObject:event["certificates"] ?? []),let items=try? JSONDecoder().decode([SigningCertificate].self,from:bytes) {signingCertificates=items}
                 certificateTeam=event["team_id"] as? String ?? "";certificatesLoaded=true;busy=false
             case "certificate_revoked":message="Zertifikat widerrufen. Zugehörige Apps neu signieren."
-            case "logged_out": restoring=false;loggedIn=false; busy=false;signingCertificates=[];certificatesLoaded=false;certificateTeam=""
+            case "logged_out": restoring=false;loggedIn=false; busy=false;signingCertificates=[];certificatesLoaded=false;certificateTeam="";appIDs=[];appIDsLimit=nil;appIDsAvailable=nil;loadingAppIDs=false;appIDsError=nil
             case "two_factor": codeNumbers=event["numbers"] as? [[String:Any]] ?? [];codeError=event["last_error"] == nil || event["last_error"] is NSNull ? "":"Code nicht akzeptiert. Bitte erneut versuchen.";needsCode=true;message="Apple-Bestätigung erforderlich"
             case "choose_team": teams=(event["teams"] as? [[String:Any]] ?? []).map { ["id":$0["id"] as? String ?? "", "name":$0["name"] as? String ?? "Developer-Team"] }
             case "installed":
@@ -320,7 +336,9 @@ import CryptoKit
                 pendingApp=nil
                 let continuation=installContinuation; installContinuation=nil; continuation?.resume()
             case "error":
+                if event["command"] as? String == "app_ids" {loadingAppIDs=false;appIDsError="App-Kennungen konnten nicht geladen werden. Bitte erneut versuchen.";continue}
                 if event["command"] as? String == "local_app_icons" {continue}
+                if event["command"] as? String == "inspect_local" {inspecting=false;lastInspection=nil;continue}
                 if event["command"] as? String == "import_signing" {signingImportPending=false}
                 if event["command"] as? String == "import_identity" {importedArchivePending=false}
                 fail(event["message"] as? String ?? "Unbekannter Fehler")

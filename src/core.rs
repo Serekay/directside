@@ -620,12 +620,15 @@ pub async fn run() {
             "remove_local_app"=>match tokio::time::timeout(Duration::from_secs(45),remove_local_app(&request)).await {Ok(r)=>r,Err(_)=>Err(report!("App konnte nicht rechtzeitig entfernt werden. Verbindung erneut prüfen."))},
             "certificates"=>match engine.as_mut() {Some(e)=>certificates(e).await,None=>Err(report!("Bitte zuerst anmelden."))},
             "app_ids"=>match engine.as_mut() {
-                Some(e)=>async {
+                Some(e)=>match tokio::time::timeout(Duration::from_secs(20),async {
                     let team=e.get_team().await?;
                     let q=e.get_dev_session().list_app_ids(&team,None).await?;
-                    emit(json!({"event":"app_ids","limit":q.max_quantity,"available":q.available_quantity,"ids":q.app_ids.iter().map(|id|json!({"name":id.name,"identifier":id.identifier,"expires_at":id.expiration_date.map(|d|d.to_xml_format())})).collect::<Vec<_>>()}));
+                    emit(json!({"event":"app_ids","limit":q.max_quantity,"available":q.available_quantity,"ids":q.app_ids.iter().map(|id| {
+                        let parent=q.app_ids.iter().filter(|other|id.identifier.starts_with(&format!("{}.",other.identifier))).max_by_key(|other|other.identifier.len());
+                        json!({"name":id.name,"identifier":id.identifier,"parent_name":parent.map(|p|&p.name),"expires_at":id.expiration_date.map(|d|d.to_xml_format())})
+                    }).collect::<Vec<_>>()}));
                     Ok(())
-                }.await,
+                }).await {Ok(result)=>result,Err(_)=>Err(report!("App-Kennungen konnten nicht rechtzeitig geladen werden. Bitte erneut versuchen."))},
                 None=>Err(report!("Bitte zuerst anmelden.")),
             },
             "revoke_certificate"=>match engine.as_mut() {Some(e)=>revoke_certificate(e,&request).await,None=>Err(report!("Bitte zuerst anmelden."))},

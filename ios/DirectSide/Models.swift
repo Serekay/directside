@@ -1,5 +1,15 @@
 import Foundation
 
+struct RegisteredAppID:Decodable,Identifiable {
+    var id:String {identifier}
+    let identifier:String
+    let name:String
+    let parent_name:String?
+    let expires_at:String?
+    var displayName:String {["ShareExtension":"Teilen","LaunchAppExtension":"App-Start","LiveProcess":"App-Ausführung","AltWidgetExtension":"Widget"][name] ?? name}
+    var expiration:Date? {expires_at.flatMap{ISO8601DateFormatter().date(from:$0)}}
+}
+
 struct SourceCatalog: Codable, Identifiable {
     var name: String
     var identifier: String?

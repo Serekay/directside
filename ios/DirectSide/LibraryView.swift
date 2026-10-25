@@ -40,11 +40,11 @@ struct LibraryView:View {
                     HStack(spacing:12) {DeviceArtwork(data:engine.deviceIcons[app.id],name:app.name);VStack(alignment:.leading,spacing:4){Text(app.name).font(.subheadline.bold());Text(L("Entwickler-App · auf diesem Gerät")).font(.caption).foregroundStyle(.secondary)}}.padding(.vertical,8)
                     .swipeActions(edge:.trailing,allowsFullSwipe:false){deleteButton(app)}.contextMenu{deleteButton(app)}
                 }
-            } header:{HStack{Text(L("Installiert"));Spacer();if let slots=engine.slotsUsed {Text(L("\(slots) Entwickler-Apps"))}}} footer:{Text(L("Zum Entfernen nach links wischen oder eine App gedrückt halten. Die App und ihre Daten werden gelöscht. Reguläre App-Store-Apps verwaltest du in iOS."))}
+            } header:{HStack{Text(L("Installiert"));Spacer();if let slots=engine.slotsUsed {Text(L("\(slots) Entwickler-Apps"))}}}
         }.listStyle(.insetGrouped).scrollContentBackground(.hidden).background(Style.background).toolbar(.hidden,for:.navigationBar)
         .scrollDismissesKeyboard(.interactively)
         .task{engine.inspectConnection(peer:connection.peer,port:connection.port)}
-        .refreshable{await engine.refreshSources();engine.inspectConnection(peer:connection.peer,port:connection.port)}
+        .refreshable{await engine.refreshSources();engine.inspectConnection(peer:connection.peer,port:connection.port,force:true)}
         .safeAreaInset(edge:.bottom){EngineProgress()}
         .confirmationDialog(L("App und Daten löschen?"),isPresented:Binding(get:{selected != nil},set:{if !$0 {selected=nil}}),titleVisibility:.visible) {
             if let app=selected {Button(L("\(app.name) entfernen"),role:.destructive){engine.removeDeviceApp(app,peer:connection.peer,port:connection.port);selected=nil}}

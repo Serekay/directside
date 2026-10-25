@@ -24,7 +24,6 @@ struct PermissionsView: View {
                 if let reason=permissions.privacy?[key],!reason.isEmpty {
                     Text(L("Angabe des Anbieters:")+" "+reason).font(.caption).foregroundStyle(.secondary)
                 }
-                DisclosureGroup(L("Technische Angabe")) {Text(key).font(.caption2).textSelection(.enabled)}.font(.caption)
             }
         }
     }
@@ -61,6 +60,6 @@ enum PermissionDescription {
             ("application-identifier",Item(title:"App-Identität",detail:"Die App ihrem Signierzertifikat zuordnen.",icon:"checkmark.seal")),
             ("team-identifier",Item(title:"Entwicklerteam",detail:"Das für die Signierung verantwortliche Team zuordnen.",icon:"person.2"))
         ]
-        return entries.first(where:{value.contains($0.0)})?.1 ?? Item(title:privacy ? "Weiterer Datenzugriff":"Weitere App-Funktion",detail:"Die Quelle nennt eine zusätzliche Funktion. Öffne die technische Angabe für Details.",icon:"info.circle")
+        return entries.first(where:{value.contains($0.0)})?.1 ?? Item(title:privacy ? "Weiterer Datenzugriff":"Weitere App-Funktion",detail:"Die Quelle nennt eine zusätzliche Funktion dieser App.",icon:"info.circle")
     }
 }
