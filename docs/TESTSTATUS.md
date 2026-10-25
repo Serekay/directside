@@ -1,5 +1,14 @@
 # Teststand vom 25. Oktober 2026
 
+## LocalDevVPN ausschließlich auf dem iPhone einrichten
+
+Windows zeigt keinen LocalDevVPN-Installationsbereich, QR-Code oder fehlenden
+VPN-Status mehr. Die DirectSide-Karte mit Versionsanzeige bleibt auch ohne
+installiertes LocalDevVPN sichtbar und ihr Installationsbutton benutzbar.
+Die Windows-Hilfe verweist auf die Einführung am iPhone. 74 Python/Qt-Tests
+bestanden, einschließlich Installationsansicht ohne VPN in beiden Sprachen.
+Keine Änderung oder Zurücksetzung des iPhones für diesen Windows-Fix.
+
 ## Vorbereiteter frischer Ablauf mit iPhone-Build 14
 
 Private iPhone-Aktion 40163435691 erfolgreich, Artefakt lokal als
