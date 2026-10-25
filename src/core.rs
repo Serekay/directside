@@ -324,6 +324,18 @@ fn import_session(request:&Value)->Result<(),Report> {
     result
 }
 
+fn session_diagnostic(stage:&str,detail:&str) {
+    let mut clean=detail.to_string();
+    if let Ok(Some(bytes))=KeyringStorage::new("DirectSide.session".into()).retrieve_data("active") {
+        if let Ok(saved)=serde_json::from_slice::<Value>(&bytes) {
+            for key in ["email","token","adsid","refresh","team_id"] {
+                if let Some(secret)=saved[key].as_str().filter(|value|value.len()>3){clean=clean.replace(secret,"[redacted]");}
+            }
+        }
+    }
+    emit(json!({"event":"session_diagnostic","stage":stage,"detail":clean.chars().take(1600).collect::<String>()}));
+}
+
 async fn refresh_account_quota(engine:&mut Engine) {
     let result=tokio::time::timeout(Duration::from_secs(12),async {
         let team=engine.get_team().await?;
@@ -763,9 +775,10 @@ pub async fn run() {
             "repair_directside"=>match engine.as_mut() {Some(e)=>repair_directside(Some(e),&request).await,None=>Err(report!("Zum Übertragen des Signierschlüssels bitte am PC anmelden."))},
             "restore" => {
                 match tokio::time::timeout(Duration::from_secs(45),restore()).await {
-                    Ok(Ok(Some(e)))=>{engine=Some(e);Ok(())},
-                    Ok(Err(e))=>{let detail=format!("{e}");let reason=if detail.contains("1100") {"expired"}else{"signed_out"};emit(json!({"event":"status","message":format!("Gespeicherte Sitzung konnte lokal nicht übernommen werden: {detail}")}));emit(json!({"event":"logged_out","reason":reason}));Ok(())},
-                    _=>{emit(json!({"event":"logged_out"}));Ok(())},
+                    Ok(Ok(Some(e)))=>{engine=Some(e);session_diagnostic("restored","");Ok(())},
+                    Ok(Err(e))=>{let detail=format!("{e}");let reason=if detail.contains("1100") {"expired"}else{"signed_out"};session_diagnostic("restore_failed",&detail);emit(json!({"event":"status","message":format!("Gespeicherte Sitzung konnte lokal nicht übernommen werden: {detail}")}));emit(json!({"event":"logged_out","reason":reason}));Ok(())},
+                    Ok(Ok(None))=>{session_diagnostic("missing_session","");emit(json!({"event":"logged_out"}));Ok(())},
+                    Err(_)=>{session_diagnostic("restore_timeout","");emit(json!({"event":"logged_out"}));Ok(())},
                 }
             },
             "profile"=>{emit(json!({"event":"profile","expires_at":profile_expiry(std::path::Path::new(text(&request,"path").unwrap_or("")))}));Ok(())},
@@ -785,7 +798,7 @@ pub async fn run() {
                     emit(json!({"event":"signing_imported","email":email}));Ok(())
                 })();result
             },
-            "import_session"=>{let result=import_session(&request);if result.is_ok(){engine=None;}result},
+            "import_session"=>{let result=import_session(&request);if result.is_ok(){engine=None;session_diagnostic("imported","");}else if let Err(error)=&result{session_diagnostic("import_failed",&error.to_string());}result},
             "inspect_local"=>match tokio::time::timeout(Duration::from_secs(25),inspect_local(&request)).await {Ok(r)=>r,Err(_)=>Err(report!("Verbindung zum lokalen Gerät hat zu lange gedauert. LocalDevVPN prüfen."))},
             "login" => {
                 engine = None;

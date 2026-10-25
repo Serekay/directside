@@ -285,6 +285,9 @@ import CryptoKit
             ds_free(pointer)
             guard let data = string.data(using: .utf8), let event = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any], let type = event["event"] as? String else { continue }
             switch type {
+            case "session_diagnostic":
+                let report:[String:String]=["stage":event["stage"] as? String ?? "unknown","detail":event["detail"] as? String ?? ""]
+                if let data=try? JSONSerialization.data(withJSONObject:report) {try? data.write(to:Paths.sessionImport.deletingLastPathComponent().appendingPathComponent("DirectSide-account-status.json"),options:[.atomic,.completeFileProtection])}
             case "imported_identity":
                 if let value=event["identity"],!(value is NSNull),let bytes=try? JSONSerialization.data(withJSONObject:value) {importedIdentity=try? JSONDecoder().decode(ImportedSigningIdentity.self,from:bytes)} else {importedIdentity=nil}
                 if !identityImportFiles.isEmpty || importedArchivePending {signingMode="imported";UserDefaults.standard.set(signingMode,forKey:"signingMode");cleanupIdentityImport();importedArchivePending=false}
