@@ -297,9 +297,9 @@ ApplicationWindow {
                     }
                 }
                 Card {
-                    id:installCard;objectName:"installCard";visible:win.page==="install";Layout.fillWidth:true;Layout.fillHeight:true;Layout.minimumHeight:272;border.color:s.vpnState==="missing"?"#805440":"#30333a"
+                    id:installCard;objectName:"installCard";visible:win.page==="install";Layout.fillWidth:true;Layout.fillHeight:true;Layout.minimumHeight:272
                     ColumnLayout {anchors.fill:parent;anchors.margins:24;spacing:8
-                        RowLayout {visible:s.vpnState!=="missing" || s.settingUp;spacing:8
+                        RowLayout {spacing:8
                             Image {source:s.icon;Layout.preferredWidth:56;Layout.preferredHeight:56;sourceSize.width:112;sourceSize.height:112}
                             ColumnLayout {spacing:6
                                 RowLayout {spacing:8
@@ -307,16 +307,6 @@ ApplicationWindow {
                                     Badge {objectName:"ipaVersionBadge";visible:s.bundledIPAReady || s.releaseVersion.length>0;text:s.bundledIPAReady?s.bundledIPAVersion:s.releaseVersion}
                                 }
                                 Label {text:"iOS 17+ · "+win.t("Pairing inklusive");font.pixelSize:12;color:win.muted}
-                            }
-                        }
-                        RowLayout {objectName:"vpnInstallPrompt";visible:s.vpnState==="missing" && !s.settingUp;Layout.fillWidth:true;spacing:20
-                            Rectangle {property real codeSize:Math.max(96,Math.min(156,installCard.height-180));Layout.preferredWidth:codeSize;Layout.preferredHeight:codeSize;radius:12;color:"white"
-                                Image {anchors.fill:parent;anchors.margins:6;source:s.vpnQr;fillMode:Image.PreserveAspectFit;smooth:false}
-                            }
-                            ColumnLayout {Layout.fillWidth:true;spacing:12
-                                Badge {text:win.t("LocalDevVPN fehlt");tone:"missing"}
-                                Text {text:win.t("Auf dem ausgewählten Gerät installieren");font.pixelSize:18;font.weight:Font.DemiBold;color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
-                                Text {text:win.t("Der Anleitung in der App folgen.");color:win.muted;font.pixelSize:13;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                             }
                         }
                         RowLayout {objectName:"deviceSetupProgress";visible:s.settingUp;Layout.fillWidth:true;spacing:10
@@ -350,7 +340,6 @@ ApplicationWindow {
                         ColumnLayout {visible:win.settingsSection==="system";Layout.fillWidth:true;spacing:16
                         RowLayout {Label {text:win.t("Apple USB-Treiber");Layout.fillWidth:true} Badge {text:s.usbState==="ready"?win.t("Installiert"):s.usbState==="stopped"?win.t("Gestoppt"):s.usbState==="missing"?win.t("Fehlt"):win.t("Nicht geprüft");tone:s.usbState==="ready"?"ok":s.usbState==="missing"?"missing":"warning"}}
                         RowLayout {Label {text:win.t("Apple-Anmeldung · lokal");Layout.fillWidth:true} Badge {text:s.authLocal?win.t("Bereit"):win.t("Prüfen");tone:s.authLocal?"ok":"warning"}}
-                        RowLayout {Label {text:win.t("LocalDevVPN · dieses Gerät");Layout.fillWidth:true} Badge {text:s.vpnState==="installed"?win.t("Installiert"):s.vpnState==="missing"?win.t("Fehlt"):win.t("Nicht geprüft");tone:s.vpnState==="installed"?"ok":s.vpnState==="missing"?"missing":"warning"}}
                         Action {visible:s.usbState!=="ready";text:s.usbState==="stopped"?win.t("Apple USB starten"):win.t("Apple USB / iTunes installieren");primary:true;enabled:!s.foregroundBusy;onClicked:backend.setupComponents()}
                         Action {text:win.t("Erneut prüfen");enabled:!s.foregroundBusy;onClicked:backend.checkComponents()}
                         Action {objectName:"repairDirectSideButton";text:win.t("DirectSide-Einrichtung reparieren");enabled:s.devices.length>0 && !s.foregroundBusy && !s.updateBusy;onClicked:if(backend.repairDirectSide())win.page="install"}
@@ -404,7 +393,7 @@ ApplicationWindow {
                         Label {text:win.t("3   Entwicklungsteam vertrauen");font.weight:Font.DemiBold}
                         Text {text:win.t("Falls iOS danach fragt: Einstellungen → Allgemein → VPN & Geräteverwaltung → Entwicklungsteam → Vertrauen. Anschließend in Windows erneut prüfen.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                         Label {text:win.t("4   Einrichtung auf dem iPhone");font.weight:Font.DemiBold}
-                        Text {text:win.t("In DirectSide der Einführung folgen: LocalDevVPN installieren, dort einrichten und verbinden. Danach zu DirectSide zurückkehren. LiveContainer kannst du im nächsten Schritt optional installieren und einrichten.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Text {text:win.t("DirectSide auf dem iPhone öffnen und der Einführung folgen. Dort richtest du die Verbindung ein und kannst LiveContainer optional installieren.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                         Item {Layout.fillHeight:true}
                         RowLayout {Label {text:win.t("Kostenlos");color:win.muted;font.pixelSize:12} Badge {text:win.t("3 Apps / Gerät")} Badge {text:win.t("10 App-IDs / Account")} Badge {text:win.t("Max. 3 Geräte / Account")}}
                     }

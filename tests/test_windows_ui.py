@@ -413,6 +413,8 @@ class WindowsUIStateTests(unittest.TestCase):
     top=card.mapToScene(QPointF(0,0));position=row.mapToScene(QPointF(0,0))
     self.assertLessEqual(position.y()+row.height(),top.y()+card.height()-20)
     self.assertLessEqual(position.x()+row.width(),top.x()+card.width()-20)
+    self.assertIsNone(root.findChild(QObject,'vpnInstallPrompt'))
+    self.assertTrue(root.findChild(QObject,'installDirectSideButton').property('enabled'))
   root.close();engine.deleteLater();APP.processEvents()
 
  def test_app_removal_needs_confirmation_and_remains_device_scoped(self):
@@ -457,7 +459,7 @@ class WindowsUIStateTests(unittest.TestCase):
   engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')));root=engine.rootObjects()[0]
   self.bridge.handle({'event':'status','phase':'device_setup','message':'USB-Kopplung automatisch bestätigen …'});APP.processEvents()
   self.assertTrue(root.findChild(QObject,'deviceSetupProgress').property('visible'))
-  self.assertFalse(root.findChild(QObject,'vpnInstallPrompt').property('visible'))
+  self.assertIsNone(root.findChild(QObject,'vpnInstallPrompt'))
   self.assertEqual(self.bridge.data['challenge'],'')
   self.assertEqual(root.findChild(QObject,'deviceSetupProgressText').property('text'),'Completing USB pairing automatically …')
   self.bridge.handle({'event':'error','message':'Pairing timed out'});APP.processEvents()

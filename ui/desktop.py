@@ -70,7 +70,7 @@ class DesktopBridge(QObject):
         self.data=dict(email=saved.get('email',''),authLocal=False,usbState=usb_status(),setupBusy=False,vpnState='unknown',lcState='unknown',directsidePresent=False,lcPrepared=False,slotsUsed=-1,developerApps=[],installedApps=[],
             loggedIn=False,authState='checking',appIdsLimit=-1,appIdsAvailable=-1,appIdsRegistered=-1,busy=True,scanning=False,team='',devices=[],deviceIndex=0,ipa='',ipaName='',
             status='Sitzung prüfen …',error='',progress=0,challenge='',numbers=[],teams=[],
-            challengeError='',success=False,logs=[],icon=QUrl.fromLocalFile(str(ROOT/'assets'/'brand-128.png')).toString(),vpnQr=QUrl.fromLocalFile(str(ROOT/'assets'/'localdevvpn-qr.png')).toString())
+            challengeError='',success=False,logs=[],icon=QUrl.fromLocalFile(str(ROOT/'assets'/'brand-128.png')).toString())
         for path in [HOME/'DirectSide.ipa',ROOT/'dist'/'DirectSide.ipa']:
             if path.is_file(): self.data.update(ipa=str(path),ipaName=path.name);break
         self.data.update(language=language,savedEmail=saved.get('email',''),translations=ENGLISH,status=translate(self.data['status'],language))
