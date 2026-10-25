@@ -57,13 +57,14 @@ class WindowsUIStateTests(unittest.TestCase):
   self.assertFalse(card.property('visible'));self.assertEqual(root.property('page'),'appids')
   self.assertFalse(pulse.property('running'))
   root.close();engine.deleteLater();APP.processEvents()
- def test_pending_setup_reconnect_hint_only_when_disconnected(self):
+ def test_setup_reconnect_hint_is_visible_before_restart_and_disappears_when_done(self):
   engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
   engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')));root=engine.rootObjects()[0]
   root.setProperty('page','developer')
   self.bridge.update(setupPending=True,devices=[]);APP.processEvents()
   hint=root.findChild(QObject,'setupReconnectHint');self.assertTrue(hint.property('visible'))
-  self.bridge.update(devices=[{'id':'phone'}]);APP.processEvents();self.assertFalse(hint.property('visible'))
+  self.bridge.update(devices=[{'id':'phone'}]);APP.processEvents();self.assertTrue(hint.property('visible'))
+  self.bridge.update(developerMode='enabled',setupPending=False);APP.processEvents();self.assertFalse(hint.property('visible'))
   root.close();engine.deleteLater();APP.processEvents()
  def test_developer_help_distinguishes_enabled_pending_disabled_and_unknown(self):
   engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
@@ -244,7 +245,7 @@ class WindowsUIStateTests(unittest.TestCase):
   engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
   engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')));root=engine.rootObjects()[0]
   root.setProperty('page','developer');APP.processEvents()
-  button=root.findChild(QObject,'developerAutoCheck');before=(button.property('text'),button.property('opacity'),button.property('visible'))
+  button=root.findChild(QObject,'setupReconnectHint');before=(button.property('text'),button.property('opacity'),button.property('visible'))
   self.bridge.auto_refresh();APP.processEvents()
   self.assertEqual((button.property('text'),button.property('opacity'),button.property('visible')),before)
   self.bridge.revealDeveloperMode();self.bridge.revealDeveloperMode()
