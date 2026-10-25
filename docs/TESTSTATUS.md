@@ -1,6 +1,6 @@
 # Teststand vom 25. Oktober 2026
 
-## Einführung, Kontoübernahme und LiveContainer-Icon (Build 12 in Vorbereitung)
+## Einführung, Kontoübernahme und LiveContainer-Icon
 
 Überflüssige Entwicklermodus-Anleitung aus der laufenden iPhone-App entfernt;
 die Einrichtung vor dem ersten Start bleibt in Windows. Neue überspringbare
@@ -20,12 +20,13 @@ bei abgelehnter Sitzung bleibt die Anmeldung mit vorausgefüllter Apple-ID mögl
 Neue Kern-Tests prüfen Feldfreigabe, Größenbegrenzung und fremde Accountdaten.
 Build 10 und 11 wurden erfolgreich gebaut und über dieselbe Kennung installiert.
 Einführung, Weiter/Zurück, Überspringen, vorhandene VPN-Verbindung und Entfernung
-der Entwicklermodus-Anleitung nativ geprüft. Die Übergabedatei wird verarbeitet,
-Apple lehnt die Sitzung jedoch mit Fehler 1100 ab. Kontoübernahme ist daher noch
-nicht erfolgreich belegt. Build 12 übernimmt zusätzlich den zugehörigen lokalen
+der Entwicklermodus-Anleitung nativ geprüft. Die erste reine Sitzungsübernahme
+scheiterte mit Fehler 1100. Build 12 übernimmt zusätzlich den zugehörigen lokalen
 Authentifizierungskontext aus dem geschützten Windows-Speicher in den iOS-
 Schlüsselbund; er wird vor dem Sitzungsaufruf im echten Interpreter validiert.
-Native Wiederprüfung steht aus.
+Native Wiederprüfung erfolgreich: automatisch angemeldet, Kontingent 9/10 direkt
+in der iPhone-App geladen, Übergabedateien entfernt, Diagnose `restored`.
+Keine zweite Passworteingabe. Nachfolgende Windows-Abfrage funktioniert ebenfalls.
 
 Neues LiveContainer-Icon mit dem Bildwerkzeug erstellt und in
 `assets/livecontainer-directside.png` gespeichert. Die Signierung ersetzt nur
@@ -33,7 +34,27 @@ das Icon der eigenständigen App mit exakt passender Bundle-ID. Passende deckend
 iPhone-/iPad-PNGs und die Icon-Metadaten werden vor dem Signieren erzeugt. Name,
 Kennung und Erweiterungen bleiben erhalten. Ein Integrationstest prüft die
 Abgrenzung zu ähnlich benannten Apps sowie Größe, Deckkraft und Identität.
-Die Anzeige auf dem iPhone ist noch offen.
+LiveContainer anschließend direkt aus der Einführung über VPN installiert.
+Native Rückkehr meldet „Installiert“; Zertifikat automatisch an LiveContainer
+übergeben, dort „Zertifikat entfernen“ im JIT-less-Bereich vorhanden. Das neue
+Homescreen-Icon über SpringBoard ausgelesen und visuell bestätigt. App-IDs nach
+der Installation weiterhin 9/10. Gast-App-Start ist damit noch nicht belegt.
+Ein fehlendes Bild in der Einführung ist in Build 13 korrigiert und durch einen
+erneuten nativen Screenshot bestätigt. Build 13 erfolgreich gebaut, installiert
+und gestartet; Kontoübernahme erneut ohne Passwort bestätigt. Einführung mit
+bereits installiertem LiveContainer erkennt ihn und bietet „Fertig“, ohne eine
+zweite Installation zu starten. Zwei geprüfte iPhone-Screenshots ohne Accountdaten
+sind in der README eingebunden.
+
+Aktuelle IPA: 0.1.0 Build 13, 14.716.511 Bytes,
+SHA256 `262492e70ff47ee851552e143c8f69e70ff09f2d8f5a6e31bcf9dba405763f83`.
+Privater Build: [40156691407](https://github.com/Serekay/directside/actions/runs/40156691407).
+Keine Veröffentlichung und keine neue App-Kennung.
+
+Windows mit 60 Python-/Qt-Tests, zehn Kern-Tests und Paketstartprüfung bestanden.
+Zusätzlicher Icon-Integrationstest bestanden. Die private Sitzung wird nur mit
+ihrem zugehörigen lokalen Authentifizierungskontext übertragen; keine entfernte
+Anisette und kein gespeichertes Passwort.
 
 ## USB-Verbindungsverlust
 

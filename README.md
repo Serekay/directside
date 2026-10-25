@@ -20,7 +20,11 @@ Sideload with your own Apple ID. Set up your iPhone or iPad from Windows, then b
 |:---:|:---:|
 | [![Windows setup in English](docs/screenshots/windows-setup.png)](docs/screenshots/windows-setup.png) | [![Installed apps in English](docs/screenshots/windows-apps.png)](docs/screenshots/windows-apps.png) |
 
-*Screenshots use demonstration account and device data.*
+*Windows screenshots use demonstration account and device data.*
+
+| iPhone introduction | LiveContainer setup |
+|:---:|:---:|
+| <img src="docs/screenshots/iphone-introduction.png" alt="DirectSide welcome screen on iPhone" width="260"> | <img src="docs/screenshots/iphone-livecontainer.png" alt="Optional LiveContainer setup with the custom icon" width="260"> |
 
 ## Get started
 
@@ -28,8 +32,8 @@ Sideload with your own Apple ID. Set up your iPhone or iPad from Windows, then b
 2. Sign in with your Apple ID and select your device. For an existing certificate, use **Settings > Components > Signing** to import the P12 file and matching `.mobileprovision` files instead.
 3. Select **Install DirectSide**. The latest released IPA is downloaded, signed and installed; pairing, the original IPA and signing files are transferred automatically. Use **Other IPA** for a local file.
 4. **Follow the Windows setup screen before opening DirectSide.** It detects whether Developer Mode is needed and prepares the switch automatically. On the iPhone, open **Settings > Privacy & Security > Developer Mode**, turn it on, restart, unlock and confirm **Turn On**. Windows detects the reconnect and finishes pairing automatically; do not reinstall the app. If requested, trust the developer profile under **Settings > General > VPN & Device Management**. Distribution profiles may not require Developer Mode.
-5. Install **LocalDevVPN** using the displayed QR code and follow its setup instructions. Connect it before on-device installation or signature renewal. Its status is in DirectSide **Settings**; an installation attempt without a connection explains what to do.
-6. Open DirectSide on your device. The short introduction helps connect LocalDevVPN and offers optional LiveContainer installation; you can skip it. Windows prepares your existing account session in the background. If Apple requires another sign-in, use **Settings > Apple Account**; imported certificates are also supported. Add a source using **+**.
+5. Open DirectSide and follow the short introduction. It opens the App Store if **LocalDevVPN** is missing. Install it, confirm its VPN setup and select **Connect**. If it is already connected, continue. The introduction also offers optional **LiveContainer** installation and can be skipped.
+6. Add a source using **+** and choose an app. Your Windows sign-in is carried over automatically. If Apple requires another sign-in, use **Settings > Apple Account**.
 
 On iPhone, pull down to refresh sources and swipe left to remove one. **My Apps** shows signature days remaining and updates on the affected app rows. Swipe left or touch and hold an installed app to delete it and its data; this frees a free-account app slot. Regular App Store apps remain managed by iOS. Windows also lists only sideloaded apps. **Settings** holds your account, signing method, language, connection and updates, plus **View introduction**. Developer Mode is guided in Windows before the first app launch. Windows help is under **?**.
 
@@ -49,6 +53,6 @@ The iPhone updater is prepared for public DirectSide releases and needs no GitHu
 
 ## Project
 
-The published release remains **0.1.0, build 5**. The current **0.1.0, build 9** test IPA is available locally at dist/DirectSide.ipa and has been checked on the iPhone; it has not been published as a release. It includes the interface polish, App ID overview and setup corrections. To test it, choose that file using **Other IPA** in Windows. The release-install button continues to download the published release. Signature renewal on iPhone reuses its stored original IPA; it does not fetch a new app version. Installing the new IPA over the existing app with the same signing team updates it while normally preserving its data. Previous Windows and iPhone sign-in, installation and USB setup transfer were confirmed on hardware. The new self-updater, imported signing and automatic LiveContainer handoff still require owner verification; see [test status](docs/TESTSTATUS.md).
+The published release remains **0.1.0, build 5**. The current **0.1.0, build 13** test IPA is available locally at dist/DirectSide.ipa and has been checked on the iPhone; it has not been published as a release. Windows account handoff without another password, the introduction, VPN installation of LiveContainer, automatic certificate handoff and its custom icon were checked on hardware. To test it, choose that file using **Other IPA** in Windows. The release-install button continues to download the published release. Signature renewal on iPhone reuses its stored original IPA; it does not fetch a new app version. Installing the new IPA over the existing app with the same signing team updates it while normally preserving its data. The new self-updater, imported signing and LiveContainer guest compatibility still require owner verification; see [test status](docs/TESTSTATUS.md).
 
 [Build guide](docs/DEVELOPMENT.md) | [Architecture](docs/ARCHITECTURE.md) | [Changelog](CHANGELOG.md) | [Third-party notices](THIRD_PARTY.md) | [License](LICENSE)
