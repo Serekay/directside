@@ -408,4 +408,20 @@ class WindowsUIStateTests(unittest.TestCase):
    self.assertEqual(sent[0]['device_id'],'original')
   finally:restored.timer.stop()
 
+ def test_usb_trust_is_guided_once_and_existing_trust_is_reused(self):
+  self.bridge.initializing=False
+  self.bridge.handle({'event':'devices','devices':[{'id':'fresh','name':'iPhone','trusted':False}]})
+  self.assertEqual(self.sent,[{'command':'trust_device','device_id':'fresh'}])
+  self.assertTrue(self.bridge.data['usbTrustPending'])
+  self.bridge.handle({'event':'error','command':'trust_device','message':'UserDeniedPairing'})
+  self.sent.clear()
+  self.bridge.handle({'event':'devices','devices':[{'id':'fresh','name':'iPhone','trusted':False}]})
+  self.assertEqual(self.sent,[])
+  self.bridge.trustDevice();self.assertEqual(self.sent,[{'command':'trust_device','device_id':'fresh'}])
+  self.bridge.handle({'event':'device_trusted','device_id':'fresh'})
+  self.assertFalse(self.bridge.data['usbTrustPending'])
+  self.sent.clear()
+  self.bridge.handle({'event':'devices','devices':[{'id':'fresh','name':'iPhone','trusted':True}]})
+  self.assertFalse(any(e['command']=='trust_device' for e in self.sent))
+
 if __name__=='__main__':unittest.main()

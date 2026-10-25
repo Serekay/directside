@@ -22,7 +22,9 @@ ApplicationWindow {
     property bool certificateLimitShown: false
     property string developerHelpDevice: ""
     onSChanged: {
-        if(s.setupPending) page="developer"
+        if(s.usbTrustPending) page="trust"
+        else if(page==="trust") page="install"
+        else if(s.setupPending) page="developer"
         else if(s.setupReady) page="developer"
         else if(s.developerMode==="disabled" && s.directsidePresent && !s.busy && s.devices.length && page==="install" && developerHelpDevice!==s.devices[s.deviceIndex].id) {developerHelpDevice=s.devices[s.deviceIndex].id;page="developer"}
         if(certificatePage*3>=s.certificates.length) certificatePage=0
@@ -197,6 +199,16 @@ ApplicationWindow {
                         Badge {visible:s.devices.length>0;text:s.developerMode==="enabled"?"Dev ✓":s.developerMode==="disabled"?"Dev ✕":"Dev ?";tone:s.developerMode==="enabled"?"ok":s.developerMode==="disabled"?"missing":"warning";MouseArea {anchors.fill:parent;cursorShape:Qt.PointingHandCursor;onClicked:win.page="developer"}}
                         IconButton {text:"↻";implicitWidth:44;implicitHeight:44;hint:win.t("Geräte aktualisieren");enabled:!s.busy;onClicked:backend.refresh()}
                         IconButton {text:"▦";implicitWidth:44;implicitHeight:44;hint:win.t("Installierte Apps");enabled:s.devices.length>0;onClicked:{win.appPage=0;win.page="apps"}}
+                    }
+                }
+                Card {
+                    objectName:"usbTrustGuide";visible:win.page==="trust";Layout.fillWidth:true;Layout.fillHeight:true
+                    ColumnLayout {anchors.fill:parent;anchors.margins:24;spacing:18
+                        Label {text:win.t("iPhone verbinden");font.pixelSize:20;font.weight:Font.DemiBold}
+                        Label {text:win.t("1. iPhone entsperren");font.pixelSize:16}
+                        Label {text:win.t("2. Auf dem iPhone Vertrauen bestätigen");font.pixelSize:16}
+                        Item {Layout.fillHeight:true}
+                        Action {text:win.t(s.busy?"Warte auf das iPhone …":"Erneut versuchen");primary:true;enabled:!s.busy;onClicked:backend.trustDevice()}
                     }
                 }
                 Card {

@@ -64,6 +64,8 @@ class DesktopBridge(QObject):
             if not isinstance(self.pendingSetup,dict) or not all(isinstance(self.pendingSetup.get(k),str) for k in ('device','path','mode','email')):self.pendingSetup=None
         except (OSError,ValueError):self.pendingSetup=None
         self.data.update(setupPending=bool(self.pendingSetup),setupReady=False)
+        self.data.update(usbTrustPending=False)
+        self.trustRejected=False
         self.releaseClient=ReleaseClient(HOME if getattr(sys,'frozen',False) else ROOT)
         self.release=None
         self.buffer=bytearray()
@@ -186,6 +188,7 @@ class DesktopBridge(QObject):
         elif kind=='certificates':self.update(certificates=event.get('certificates',[]),certificatesLoaded=True,certificateTeam=event.get('team_id',''),busy=False,scanning=False)
         elif kind=='certificate_revoked':self.update(removal={},certificateLimit=False,status='Zertifikat widerrufen. Zugehörige Apps erneut installieren.')
         elif kind=='developer_mode_revealed':self.update(busy=False,status='Entwicklermodus in den iPhone-Einstellungen aktivieren.')
+        elif kind=='device_trusted':self.trustRejected=False;self.update(busy=False,usbTrustPending=False);self.refresh()
         elif kind=='app_removed':
             self.update(busy=False,scanning=False,removal={},status='App entfernt.',success=False)
             self.componentDevice=None;self.inspectDevice()
@@ -199,8 +202,12 @@ class DesktopBridge(QObject):
             pending_here=bool(self.pendingSetup and (not devices or devices[index]['id']==self.pendingSetup['device']))
             self.update(devices=devices,deviceIndex=index,busy=False,scanning=False,setupPending=pending_here)
             if devices:
-                if devices[index]['id']!=self.componentDevice or time.monotonic()-self.componentTime>(3 if self.pendingSetup else 30):self.inspectDevice()
+                if devices[index].get('trusted') is False:
+                    self.update(usbTrustPending=True)
+                    if not self.trustRejected:self.trustDevice()
+                elif devices[index]['id']!=self.componentDevice or time.monotonic()-self.componentTime>(3 if self.pendingSetup else 30):self.inspectDevice()
             else:
+                self.trustRejected=False;self.update(usbTrustPending=False)
                 self.componentDevice=None
                 self.update(vpnState='unknown',lcState='unknown',directsidePresent=False,lcPrepared=False,slotsUsed=-1,developerApps=[],installedApps=[],developerMode='unknown')
         elif kind=='device_components':
@@ -225,6 +232,8 @@ class DesktopBridge(QObject):
         elif kind=='choose_team':self.update(challenge='team',busy=True,teams=event.get('teams',[]))
         elif kind=='pairing_pin':self.update(challenge='pairing',busy=True)
         elif kind=='error':
+            if event.get('command')=='trust_device':
+                self.trustRejected=True;self.update(busy=False,scanning=False,usbTrustPending=True);return
             if event.get('command')=='app_ids':
                 self.update(appIdsLoading=False,appIdsError='App-Kennungen konnten nicht geladen werden. Bitte erneut versuchen.');return
             if event.get('command')=='app_icons':
@@ -267,6 +276,13 @@ class DesktopBridge(QObject):
 
     @Slot()
     def acknowledgeSetup(self):self.update(setupReady=False)
+
+    @Slot()
+    def trustDevice(self):
+        if self.data['busy'] or not self.data['devices']:return
+        self.trustRejected=False
+        self.update(busy=True,scanning=False,usbTrustPending=True)
+        self.send({'command':'trust_device','device_id':self.data['devices'][self.data['deviceIndex']]['id']})
 
     @Slot(result=bool)
     def loadAppIds(self):

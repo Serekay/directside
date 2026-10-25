@@ -1,5 +1,6 @@
 use std::{io::{self, Write}, path::PathBuf, time::Duration};
 use idevice::{IdeviceService, lockdown::LockdownClient, usbmuxd::{UsbmuxdAddr, UsbmuxdConnection}};
+use idevice::provider::IdeviceProvider;
 use isideload::{
     anisette::{local::LocalAnisetteProvider, AnisetteProvider, AnisetteDataResponse},
     auth::apple_account::{AppleAccount, AppToken, TwoFactorCallbackParams, TwoFactorCallbackResponse},
@@ -44,20 +45,37 @@ async fn devices() -> Result<Value, Report> {
     let mut result = Vec::new();
     for dev in list {
         let provider = dev.to_provider(UsbmuxdAddr::from_env_var()?, "DirectSide");
-        let name = match tokio::time::timeout(Duration::from_secs(8), async {
+        let (name,trusted) = match tokio::time::timeout(Duration::from_secs(8), async {
             let mut l = LockdownClient::connect(&provider).await?;
-            l.get_value(Some("DeviceName"), None).await
+            let name=l.get_value(Some("DeviceName"), None).await?;
+            let trusted=match provider.get_pairing_file().await {
+                Ok(record)=>match l.start_session(&record).await {Ok(_)=>true,Err(error)=>{let detail=error.to_string().to_lowercase();detail.contains("passwordprotected") || detail.contains("device locked")}},
+                Err(_)=>false,
+            };
+            Ok::<_,idevice::IdeviceError>((name.as_string().unwrap_or("Apple-Gerät").to_string(),trusted))
         }).await {
-            Ok(Ok(name)) => name.as_string().unwrap_or("Apple-Gerät").to_string(),
-            _ => "Apple-Gerät – entsperren / Vertrauen prüfen".to_string(),
+            Ok(Ok(result)) => result,
+            _ => ("Apple-Gerät – entsperren / Vertrauen prüfen".to_string(),provider.get_pairing_file().await.is_ok()),
         };
-        result.push(json!({"id":dev.udid,"name":name}));
+        result.push(json!({"id":dev.udid,"name":name,"trusted":trusted}));
     }
     Ok(json!({"event":"devices", "devices":result}))
 }
 
 fn app_present(apps:&std::collections::HashMap<String,plist::Value>,bundle:&str,allow_team_suffix:bool)->bool {
     apps.keys().any(|id|id==bundle || (allow_team_suffix && id.strip_prefix(bundle).is_some_and(|suffix|suffix.starts_with('.') && suffix.len()>1)))
+}
+
+async fn trust_device(request:&Value)->Result<(),Report> {
+    let id=text(request,"device_id")?;
+    let mut mux=UsbmuxdConnection::default().await?;
+    let dev=mux.get_devices().await?.into_iter().find(|d|d.udid==id).ok_or_else(||report!("iPhone nicht verbunden."))?;
+    let buid=mux.get_buid().await?;
+    let provider=dev.to_provider(UsbmuxdAddr::from_env_var()?,"DirectSide");
+    let mut lockdown=LockdownClient::connect(&provider).await?;
+    let record=lockdown.pair(buid.clone(),buid,Some("DirectSide")).await?;
+    mux.save_pair_record(&id,record.serialize()?).await?;
+    emit(json!({"event":"device_trusted","device_id":id}));Ok(())
 }
 
 async fn device_components(request:&Value)->Result<(),Report> {
@@ -624,6 +642,7 @@ pub async fn run() {
                 Ok(Err(e)) => Err(e),
                 Err(_) => Err(report!("Die Geräteerkennung antwortet nicht. Apple-USB-Verbindung prüfen.")),
             },
+            "trust_device"=>match tokio::time::timeout(Duration::from_secs(90),trust_device(&request)).await {Ok(result)=>result,Err(_)=>Err(report!("iPhone entsperren und Vertrauen bestätigen. Dann erneut versuchen."))},
             "local_auth_probe" => match tokio::time::timeout(Duration::from_secs(45),probe_local_auth()).await {Ok(r)=>r,Err(_)=>Err(report!("Lokale Apple-Einrichtung hat zu lange gedauert."))},
             "device_components" => match tokio::time::timeout(Duration::from_secs(20),device_components(&request)).await {Ok(r)=>r,Err(_)=>Err(report!("App-Prüfung nicht möglich. iPhone entsperren und Vertrauen bestätigen."))},
             "app_icons" => match tokio::time::timeout(Duration::from_secs(25),app_icons(&request)).await {Ok(r)=>r,Err(_)=>Err(report!("Icons konnten nicht geladen werden."))},
