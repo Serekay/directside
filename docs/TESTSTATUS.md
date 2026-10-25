@@ -1,5 +1,29 @@
 # Teststand vom 25. Oktober 2026
 
+## Repository- und Release-Prüfung
+
+Gitleaks 8.30.1 über die gesamte erreichbare Historie: keine Geheimnisse
+gefunden. Zusätzlich 643 historische Textblobs und aktuelle Dateien auf
+private Adressen, lokale Pfade und Gerätekennungen geprüft; Code-Testwerte,
+Lizenzautoren und Emulatorpfade von persönlichen Angaben unterschieden.
+Die persönliche Autorenadresse wurde nach ausdrücklicher Nutzerfreigabe aus
+allen Commits und Tags entfernt. Autoren und Committer verwenden jetzt den
+öffentlichen GitHub-Namen und die GitHub-Noreply-Adresse. Dateibäume und
+Quellstand des bestehenden Releases bleiben unverändert; aktuelle
+Dokumentationsverweise wurden auf die neuen Commit-IDs angepasst.
+
+Windows-Archivinhalt und IPA-Dateiliste enthalten keine lokalen Konto-,
+Pairing-, Profil- oder privaten Signierdateien. Ausschlussregeln ergänzt;
+lokaler Pre-Commit-Hook prüft Dateitypen, Autorenadresse und staged Secrets.
+85 Python/Qt-Tests bestanden, einschließlich realer Staging-Tests für
+erlaubte Dateien, verbotene .env-Dateien und synthetische Tokens. Keine
+Kontoanmeldung und keine Signieridentität für die Repository-Prüfung verändert.
+
+Die Prüfung erfasst erreichbare Git-Objekte und veröffentlichte Inhalte,
+keine Garantie für das Fehlen beliebiger Geheimnisse. Alte GitHub-Commit-Caches
+und frühere Actions-Metadaten können nach einem Force-Push weiterhin bestehen;
+das Repository wird durch diese Arbeit nicht öffentlich geschaltet.
+
 ## Windows-Aufnahme und aufklappbare README
 
 Aktuelle QML-Ansicht 0.1.1 (16) über Windows-Screenshotwerkzeug aufgenommen.
@@ -17,7 +41,7 @@ ProductVersion 0.1.1 (16)). iPhone-Einstellungen lesen beide Werte aus dem
 installierten Bundle. Versionsabgleich zwischen Windows, iPhone, Cargo und
 Lockdatei als Regressionstest ergänzt. 82 Python/Qt-Tests, 12 native Tests und
 Windows-Paketstart bestanden. Private iPhone-Prüfung 40200121156 für Quellstand
-c8c2477 erfolgreich. IPA geprüft: 0.1.1 (16), com.directside.app,
+0354a3a erfolgreich. IPA geprüft: 0.1.1 (16), com.directside.app,
 14.712.801 Bytes, SHA-256
 c06812e8b38e0dc505e71d906af4d64ae0d76efb2e80f57a77685e73cbab7cc2.
 Kein Release veröffentlicht und keine Installation auf dem iPhone ausgelöst.
@@ -41,7 +65,7 @@ wurden entfernt; die PNG-Pixeldaten bleiben unveraendert. Keine Konto- oder
 Signiereinstellungen geaendert, keine Installation ausgeloest. README zeigt
 nur diese zwei Aufnahmen; die veralteten Windows-Abbildungen sind dort entfernt.
 Lokale Bild- und Dokumentverweise geprueft. Private iPhone-Buildpruefung 15
-bestanden (Actions 40199099636, Quellstand 216f26e). IPA lokal geprueft:
+bestanden (Actions 40199099636, Quellstand cacbe35). IPA lokal geprueft:
 Version 0.1.0, Build 15, com.directside.app, 14.711.841 Bytes, SHA-256
 c4929671c46fca8d4201bb28d15f843e24524a83de0dbea21cf0008526348101.
 Kein Release erstellt und kein Update auf dem iPhone installiert; der
@@ -508,7 +532,7 @@ erst in einem neu gebauten iPhone-Kern enthalten.
 Windows lokal gebaut. Auf ausdrücklichen Buildauftrag wurde iPhone-Build 6
 erfolgreich über Action [40146215784](https://github.com/Serekay/directside/actions/runs/40146215784)
 gebaut: Swift-Modell-/Quellentests, lokale Apple-Provisionierungsprüfung,
-Rust-Kern für aarch64-apple-ios und Xcode-App bestanden. Quellstand `e6f4ab4`.
+Rust-Kern für aarch64-apple-ios und Xcode-App bestanden. Quellstand `1cabc8c`.
 `dist/DirectSide.ipa`: Version 0.1.0, Build 6, 10.470.986 Bytes,
 SHA256 `fe072e3495ccc7dcd9501dffa52212650603ec9b96fb47acb64079db1ef92772`.
 App-Kennung und Buildnummer nach Download direkt aus der IPA geprüft.
@@ -554,7 +578,7 @@ Hardware-Freigabe. Keine Zugangsdaten oder Profile im Repository.
 
 Release 0.1.0 vom Besitzer am 24. Oktober 2026 ausdrücklich freigegeben.
 Repository bleibt privat. EXE und IPA stammen unverändert aus dem geprüften
-Build 847f4bf; die Freigabe ersetzt keine noch ausstehenden Gerätetests.
+Build 44d764f; die Freigabe ersetzt keine noch ausstehenden Gerätetests.
 
 [Release v0.1.0](https://github.com/Serekay/directside/releases/tag/v0.1.0)
 mit `DirectSide.exe`, `DirectSide.ipa` und `SHA256SUMS.txt` veröffentlicht.
@@ -569,7 +593,7 @@ Die folgenden Einträge dokumentieren auch frühere Entwicklungsstände.
 
 ## Bestätigung vom Besitzer und neue Einrichtung
 
-Neubau auf ausdrückliches „bau“: Stand 847f4bf lokal als Windows-EXE gebaut;
+Neubau auf ausdrückliches „bau“: Stand 44d764f lokal als Windows-EXE gebaut;
 46 Python-/UI-Tests, fünf Rust-Tests und der echte gepackte Starttest mit lokaler
 Authentifizierung bestanden. Die EXE wurde nach Prozessprüfung und Hashvergleich
 nach `dist/DirectSide.exe` übernommen. Der Besitzer hat danach die vollständige
@@ -706,7 +730,7 @@ Der frühere QtCore-DLL-Fehler kam von einer fremden ICU-DLL im Build-PATH. Der 
 
 ## iPhone und LiveContainer
 
-Aktuelle IPA: Quellstand `53be0e7`, Version 0.1.0, Build 2. Privater manueller Build:
+Aktuelle IPA: Quellstand `3640815`, Version 0.1.0, Build 2. Privater manueller Build:
 https://github.com/Serekay/directside/actions/runs/40094299353 . Die IPA wurde nach
 `dist/DirectSide.ipa` übernommen und auf Bundle-ID, Buildnummer, eingebetteten
 Mac-Runtime-Hash, fehlende Android-Bibliotheken, IPA-Dokumenttyp, VPN-URL-Schema
@@ -768,4 +792,4 @@ Windows wird ausschließlich lokal gebaut. iPhone-Actions sind nur manuell ausl�
 
 ## Ergänzung Account-/Zertifikatsverwaltung
 
-Stand e3c5997: Windows-EXE lokal gebaut und nach bestandenem Paketstarttest nach dist/DirectSide.exe übernommen. 43 Python-Tests und vier Rust-Tests bestanden. iPhone-Action 40096167045 erfolgreich: Build 3, lokale TCI-Provisionierung, Zustandswiederherstellung und wiederholte OTP-Erzeugung bestanden; IPA samt Bundle-ID, Buildnummer und CoreADI-Hash geprüft und nach dist/DirectSide.ipa übernommen. Kein Zertifikat widerrufen. Der Besitzer hat die früher mit SideStore installierten Apps selbst gelöscht; die Oberfläche meldet 0/3 Entwickler-Apps und ein Zertifikat namens iloader. Die tatsächliche Installation und iPhone-Anmeldung bleiben zu prüfen.
+Stand 63e4674: Windows-EXE lokal gebaut und nach bestandenem Paketstarttest nach dist/DirectSide.exe übernommen. 43 Python-Tests und vier Rust-Tests bestanden. iPhone-Action 40096167045 erfolgreich: Build 3, lokale TCI-Provisionierung, Zustandswiederherstellung und wiederholte OTP-Erzeugung bestanden; IPA samt Bundle-ID, Buildnummer und CoreADI-Hash geprüft und nach dist/DirectSide.ipa übernommen. Kein Zertifikat widerrufen. Der Besitzer hat die früher mit SideStore installierten Apps selbst gelöscht; die Oberfläche meldet 0/3 Entwickler-Apps und ein Zertifikat namens iloader. Die tatsächliche Installation und iPhone-Anmeldung bleiben zu prüfen.

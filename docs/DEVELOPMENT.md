@@ -155,3 +155,14 @@ current QML with sample account/device data and isolated temporary preferences.
 The signing engine and automatic release checks are not started. Capture the
 window with the normal screenshot tool, then close it. This preview does not
 verify USB communication, authentication or installation.
+
+## Commit checks
+
+Install [Gitleaks](https://github.com/gitleaks/gitleaks) and run
+`git config --local core.hooksPath .githooks`. The hook uses the project Python
+when available, checks staged local credential/binary paths and runs Gitleaks
+with redacted output. Configure a GitHub noreply author email for commits.
+The Windows tool may live at `.tools/gitleaks/gitleaks.exe`; other systems can
+provide `gitleaks` on PATH. Run `scripts/check-git-content.py` manually to check
+the current index. For a full history check use `gitleaks git --log-opts=--all
+--redact=100 .`. Do not commit scanner reports containing detected values.
