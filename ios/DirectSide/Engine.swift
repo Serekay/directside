@@ -49,6 +49,7 @@ import CryptoKit
     @Published var pendingSource: SourceCatalog?
     @Published var pairingReady = false
     @Published var liveContainerCertificateReady = false
+    private var openLiveContainerAfterExport=false
     private var timer: Timer?
     private var coreStarted=false
     private var signingImportPending=false
@@ -90,8 +91,9 @@ import CryptoKit
         send(["command":"pair_local","peer":peer,"port":port,"pairing_path":Paths.pairing.path,"bootstrap_path":Paths.bootstrap.path])
     }
     func submitPairingCode(_ code:String) {needsPairingCode=false;send(["code":code])}
-    func configureLiveContainer() {
+    func configureLiveContainer(openWhenReady:Bool=true) {
         guard !busy,canSign else {return}
+        openLiveContainerAfterExport=openWhenReady
         busy=true;error=nil;message="Zertifikat vorbereiten …"
         send(["command":"export_livecontainer","path":Paths.support.appendingPathComponent("livecontainer-transfer.json").path,"signing_mode":signingMode])
     }
@@ -110,7 +112,7 @@ import CryptoKit
             let saved=Paths.support.appendingPathComponent("LiveContainer-3.8.0.ipa")
             try bytes.write(to:saved,options:[.atomic,.completeFileProtectionUntilFirstUserAuthentication])
             try await waitForInstall(saved,app:ManagedApp(id:"com.kdt.livecontainer",name:"LiveContainer",cachedIPA:saved.path,installedAt:Date(),version:"3.8.0"),peer:peer,port:port)
-            configureLiveContainer()
+            configureLiveContainer(openWhenReady:false)
         }catch{fail(error.localizedDescription)}
     }
 
@@ -237,12 +239,11 @@ import CryptoKit
                 try FileManager.default.removeItem(at:transfer)
             }
             try AppUpdater.recoverOriginal()
-            let transferred=try LiveContainerBridge.importTransfer()
+            try LiveContainerBridge.importTransfer()
             liveContainerCertificateReady=LiveContainerBridge.certificateReady
             bootstrap = try? JSONDecoder().decode(Bootstrap.self, from: Data(contentsOf: Paths.bootstrap))
             pairingReady = bootstrap != nil && FileManager.default.fileExists(atPath: Paths.pairing.path)
             importSigningIfNeeded()
-            if transferred && LiveContainerBridge.available {LiveContainerBridge.configure(engine:self)}
         } catch { self.error = error.localizedDescription }
     }
     private func importSigningIfNeeded() {
@@ -300,7 +301,15 @@ import CryptoKit
             case "pairing_pin":needsPairingCode=true;message="Pairing-Code eingeben"
             case "paired_local":busy=false;needsPairingCode=false;refreshBootstrap();message="Gerät gekoppelt"
             case "livecontainer_exported":
-                do {try LiveContainerBridge.importTransfer(from:Paths.support.appendingPathComponent("livecontainer-transfer.json"));liveContainerCertificateReady=LiveContainerBridge.certificateReady;busy=false;LiveContainerBridge.configure(engine:self)}catch{fail(error.localizedDescription)}
+                let shouldOpen=openLiveContainerAfterExport
+                openLiveContainerAfterExport=false
+                do {
+                    try LiveContainerBridge.importTransfer(from:Paths.support.appendingPathComponent("livecontainer-transfer.json"))
+                    liveContainerCertificateReady=LiveContainerBridge.certificateReady
+                    busy=false
+                    if shouldOpen {LiveContainerBridge.configure(engine:self)}
+                    else {message="Installation abgeschlossen"}
+                }catch{fail(error.localizedDescription)}
             case "status": message = event["message"] as? String ?? message
             case "progress": progress = (event["value"] as? Double ?? 0)/100
             case "logged_in": restoring=false;busy=false; loggedIn=true;signingCertificates=[];certificatesLoaded=false;certificateTeam=event["team_id"] as? String ?? ""; teamName=event["team"] as? String ?? "Developer-Team"; message="Angemeldet";if let email=event["email"] as? String {accountEmail=email;UserDefaults.standard.set(email,forKey:"accountEmail")}
@@ -387,6 +396,7 @@ import CryptoKit
         }
     }
     func fail(_ reason: String) {
+        openLiveContainerAfterExport=false
         cleanupIdentityImport()
         if let app=pendingApp {removeUnusedIPA(app.cachedIPA)}
         pendingApp=nil

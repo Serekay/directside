@@ -49,7 +49,7 @@ struct OnboardingView:View {
     }
     private var preparation:some View {
         VStack(spacing:18) {
-            VPNStatusView(connection:connection)
+            VPNStatusView(connection:connection,showsSetupGuide:true)
             if !engine.pairingReady {
                 NavigationLink {ConnectionSettings(connection:connection)} label:{Label(L("Dieses Gerät koppeln"),systemImage:"link").font(.headline)}
             }
@@ -74,7 +74,10 @@ struct OnboardingView:View {
                     .buttonStyle(.borderedProminent).controlSize(.large).frame(maxWidth:.infinity)
                     .disabled(step==1 && (!engine.pairingReady || !connection.vpnReachable))
             } else {
-                if liveContainerInstalled {Button(L("Fertig")){finish()}.buttonStyle(.borderedProminent).controlSize(.large).disabled(engine.busy)}
+                if liveContainerInstalled {
+                    Button(L("Fertig")){finish()}.buttonStyle(.borderedProminent).controlSize(.large).disabled(engine.busy)
+                    Button(L("LiveContainer einrichten")){engine.configureLiveContainer()}.disabled(engine.busy || !engine.canSign)
+                }
                 else {
                     Button(L(engine.preparingAccount ? "Vorbereiten …":"LiveContainer installieren")){Task{await engine.installLiveContainer(peer:connection.peer,port:connection.port);liveContainerInstalled=LiveContainerBridge.available}}
                         .buttonStyle(.borderedProminent).controlSize(.large).disabled(engine.busy || !engine.canSign || !engine.pairingReady || !connection.vpnReachable)

@@ -603,5 +603,11 @@
   "Verbunden": "Connected",
   "Weiter": "Continue",
   "Zurück": "Back",
-  "Signaturen erneuern": "Renew signatures"
+  "Signaturen erneuern": "Renew signatures",
+  "1. LocalDevVPN aus dem App Store installieren und öffnen.": "1. Install LocalDevVPN from the App Store and open it.",
+  "1. LocalDevVPN öffnen.": "1. Open LocalDevVPN.",
+  "2. Der Anleitung in LocalDevVPN folgen und die VPN-Einrichtung erlauben.": "2. Follow the instructions in LocalDevVPN and allow VPN setup.",
+  "3. Dort verbinden und anschließend zu DirectSide zurückkehren.": "3. Connect there, then return to DirectSide.",
+  "LocalDevVPN öffnen": "Open LocalDevVPN",
+  "LiveContainer einrichten": "Set up LiveContainer"
 }

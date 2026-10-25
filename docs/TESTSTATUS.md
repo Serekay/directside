@@ -8,7 +8,16 @@ Willkommensseite der Einführung; Windows zeigt erst danach „DirectSide opened
 in Grün. Keine Neuinstallation und Kontingent weiterhin 9/10. Kontoübernahme
 auch in diesem frischen Durchlauf erfolgreich: Diagnose `restored`, keine
 erneute Passworteingabe, temporäre Konto-/Signierübergabedateien entfernt.
-LocalDevVPN und LiveContainer sind in diesem Durchlauf noch nicht installiert.
+Danach den LiveContainer-Schritt erreicht; laut Betreiber lief die Installation
+durch und wechselte automatisch zu LiveContainer. Dieser Wechsel kam aus der
+Zertifikatübergabe. Für den nächsten iPhone-Build bleibt die Installation in
+DirectSide; Export und sichere Ablage des Zertifikats bleiben automatisch.
+Der ausdrückliche Schritt „LiveContainer einrichten“ übergibt es anschließend
+an LiveContainer. Die Installation allein bestätigt damit noch keine fertige
+JIT-less-Einrichtung. Swift-Syntax, Übersetzungs-JSON und Diff geprüft; noch
+kein neuer iPhone-Build und kein Hardwaretest dieser Änderung.
+Die LocalDevVPN-Einführung erhält außerdem die Anleitung für Installation,
+VPN-Freigabe, Verbindung und Rückkehr zu DirectSide (Deutsch/Englisch).
 
 Windows erkennt im aktuellen Ausfall genau ein Apple-USB-Composite-Gerät,
 während Apples USB-Dienst null Geräte meldet. Neuer Wiederherstellungspfad:
