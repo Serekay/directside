@@ -54,8 +54,17 @@ weiterhin 9/10 App-IDs. Der erste native Start erreichte Apples Dialog
 „Entwicklungsteam, dem nicht vertraut wird“. Nach Bestätigung durch den Betreiber
 startet DirectSide erfolgreich; native Accessibility bestätigt den frischen
 Entdecken-Bildschirm und die erste iOS-Abfrage für das lokale Netzwerk.
-LocalDevVPN ist noch nicht installiert; Installation über VPN und Selbsterneuerung
-sind durch diesen Teilschritt noch nicht belegt. Ein gezielter USB-Hinweis in der Warteansicht und ein
+LocalDevVPN wurde anschließend durch den Betreiber aus dem App Store installiert
+und eingerichtet. DirectSide erkennt den Zustand „installiert, nicht verbunden“
+nativ korrekt und zeigt „Verbinden“. Die Schaltfläche erreicht die iOS-Abfrage
+zum Öffnen von LocalDevVPN; der verbundene Zustand, Installation über VPN und
+Selbsterneuerung sind durch diesen Teilschritt noch nicht belegt.
+Bei der Suche nach den wiederkehrenden USB-Ausfällen blieb die Verbindung während
+manueller App-Wechsel mit ausschließlich lesender USB-Gerätelistenbeobachtung
+erhalten. Auch eine einzelne AX-Abfrage und ein Screenshot lösten im anschließenden
+Versuch keinen Abbruch aus. Ursache weiterhin ungeklärt; kein allgemeiner
+Windows-11-Fehler und kein Fehler der Steuerung nachgewiesen.
+Ein gezielter USB-Hinweis in der Warteansicht und ein
 Fehler beim erwarteten Beenden des Testfensters wurden korrigiert; 57 Windows-
 Tests einschließlich beider Regressionen bestanden.
 Der auf diesem Gerät bereits sichtbare Schalter belegt keinen
