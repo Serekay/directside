@@ -36,7 +36,7 @@ struct SectionTitle: View {
 struct EngineProgress: View {
     @EnvironmentObject var engine:Engine
     var body: some View {
-        if engine.busy {
+        if engine.showsProgress {
             VStack(alignment:.leading,spacing:7) { ProgressView(value:engine.progress); Text(L(engine.message)).font(.caption).foregroundStyle(.secondary) }
                 .padding(14).background(.regularMaterial,in:RoundedRectangle(cornerRadius:16)).padding(.horizontal).padding(.bottom,8)
         }

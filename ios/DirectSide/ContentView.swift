@@ -45,7 +45,7 @@ struct ContentView:View {
         .onChange(of:engine.importedIPA?.id){_,value in if value != nil {tab=1;sheet = .ipa}}
         .onChange(of:engine.teams.count){_,value in if value>0 {sheet = .team}}
         .onChange(of:updater.showOffer){_,_ in presentUpdateIfReady()}
-        .onChange(of:engine.busy){_,value in if !value {presentUpdateIfReady()}}
+        .onChange(of:engine.busy){_,value in if !value {engine.inspectConnection(peer:connection.peer,port:connection.port);presentUpdateIfReady()}}
         .onChange(of:connection.port){_,value in if value>0 {engine.inspectConnection(peer:connection.peer,port:value)}}
         .onChange(of:connection.vpnReachable){_,value in if value {engine.inspectConnection(peer:connection.peer,port:connection.port)}}
     }

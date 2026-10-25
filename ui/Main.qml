@@ -22,7 +22,9 @@ ApplicationWindow {
     property bool certificateLimitShown: false
     property string developerHelpDevice: ""
     onSChanged: {
-        if(s.developerMode==="disabled" && !s.busy && s.devices.length && page==="install" && developerHelpDevice!==s.devices[s.deviceIndex].id) {developerHelpDevice=s.devices[s.deviceIndex].id;page="developer"}
+        if(s.setupPending) page="developer"
+        else if(s.setupReady) page="developer"
+        else if(s.developerMode==="disabled" && s.directsidePresent && !s.busy && s.devices.length && page==="install" && developerHelpDevice!==s.devices[s.deviceIndex].id) {developerHelpDevice=s.devices[s.deviceIndex].id;page="developer"}
         if(certificatePage*3>=s.certificates.length) certificatePage=0
         if(appIdPage*3>=s.appIds.length) appIdPage=0
         if(s.certificateLimit && !certificateLimitShown) {certificateLimitShown=true;page="certificates";backend.loadCertificates()}
@@ -201,13 +203,15 @@ ApplicationWindow {
                     objectName:"developerModeGuide";visible:win.page==="developer";Layout.fillWidth:true;Layout.fillHeight:true
                     ColumnLayout {anchors.fill:parent;anchors.margins:24;spacing:18
                         RowLayout {Label {text:win.t("Entwicklermodus");font.pixelSize:20;font.weight:Font.DemiBold;Layout.fillWidth:true} Badge {text:s.developerMode==="enabled"?win.t("Aktiv"):s.developerMode==="disabled"?win.t("Aus"):win.t("Nicht geprüft");tone:s.developerMode==="enabled"?"ok":s.developerMode==="disabled"?"missing":"warning"}}
-                        Text {text:win.t("Damit DirectSide auf deinem iPhone oder iPad starten kann.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
-                        Text {text:win.t("1. Auf dem Gerät: Einstellungen → Datenschutz & Sicherheit → Entwicklermodus einschalten.");color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
-                        Text {text:win.t("2. Gerät neu starten. Danach entsperren und Aktivieren bestätigen.");color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
-                        Text {text:win.t("3. Falls iOS fragt: Einstellungen → Allgemein → VPN & Geräteverwaltung → deinem Entwicklerprofil vertrauen.");color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
-                        RowLayout {Action {text:win.t("Option auf dem Gerät anzeigen");enabled:s.devices.length>0 && !s.busy;onClicked:backend.revealDeveloperMode()} Action {text:win.t("Erneut prüfen");enabled:s.devices.length>0 && !s.busy;onClicked:backend.inspectDevice()}}
+                        Label {visible:s.setupPending;text:win.t("DirectSide installiert");color:win.accent;font.weight:Font.DemiBold}
+                        Text {visible:s.developerMode!=="enabled";text:win.t("1. Einstellungen → Datenschutz & Sicherheit → Entwicklermodus einschalten.");color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Text {visible:s.developerMode!=="enabled";text:win.t("2. Neustarten → Entsperren → Aktivieren bestätigen.");color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Text {visible:s.developerMode!=="enabled" || s.setupReady;text:win.t("Falls verlangt: Einstellungen → Allgemein → VPN & Geräteverwaltung → Vertrauen.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Label {visible:s.setupPending && s.developerMode==="enabled";text:win.t("Einrichtung abschließen …");color:win.muted}
+                        Label {visible:s.setupReady;text:win.t("DirectSide auf dem iPhone öffnen.");color:win.accent;font.weight:Font.DemiBold}
+                        RowLayout {visible:s.developerMode!=="enabled";Action {text:win.t("Schalter anzeigen");enabled:s.devices.length>0 && !s.busy;onClicked:backend.revealDeveloperMode()} Action {text:win.t("Erneut prüfen");enabled:s.devices.length>0 && !s.busy;onClicked:backend.inspectDevice()}}
                         Item {Layout.fillHeight:true}
-                        Action {text:win.t("Weiter zur Installation");primary:true;onClicked:win.page="install"}
+                        Action {text:win.t(s.setupPending ? "Warte auf das iPhone …":s.setupReady ? "Fertig":"Weiter zur Installation");primary:true;enabled:!s.setupPending;onClicked:{backend.acknowledgeSetup();win.page="install"}}
                     }
                 }
                 Card {

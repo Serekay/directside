@@ -350,7 +350,16 @@ async fn install(engine:Option<&mut Engine>,request:&Value)->Result<(),Report> {
     validate_installed_target(request,&installed_bundle_id)?;
     let expires_at=profile_expiry(&signed.join("embedded.mobileprovision"));
     isideload::sideload::install::install_app(&provider,&signed,|p|emit(json!({"event":"progress","value":55.0+(p as f64)*0.45}))).await?;
-    if directside {bootstrap(if imported {None}else{engine.as_deref_mut()},&provider,&path,&installed_bundle_id).await?;}
+    if directside {
+        let needs_mode=apple_codesign_quick::ProvisioningProfile::parse(&std::fs::read(signed.join("embedded.mobileprovision"))?)?.entitlements().get("get-task-allow").and_then(plist::Value::as_boolean)==Some(true);
+        let mode=tokio::time::timeout(Duration::from_secs(3),async {idevice::amfi::AmfiClient::connect(&provider).await?.get_developer_mode_status().await}).await.ok().and_then(Result::ok);
+        if needs_mode && mode!=Some(true) {
+            let _=tokio::time::timeout(Duration::from_secs(3),async {idevice::amfi::AmfiClient::connect(&provider).await?.reveal_developer_mode_option_in_ui().await}).await;
+            emit(json!({"event":"installed","path":request["path"],"device_id":id,"bootstrap_ready":false,"developer_mode_required":true,"installed_bundle_id":installed_bundle_id,"expires_at":expires_at}));
+            return Ok(())
+        }
+        bootstrap(if imported {None}else{engine.as_deref_mut()},&provider,&path,&installed_bundle_id).await?;
+    }
     if livecontainer {
         // DirectSide forwards the certificate to LiveContainer when next opened.
         // A missing DirectSide installation must not turn a successful LC install
@@ -397,7 +406,7 @@ async fn usb_remote_pairing(provider:&impl idevice::provider::IdeviceProvider,ud
     Ok(pairing)
 }
 
-async fn repair_directside(engine:&mut Engine,request:&Value)->Result<(),Report> {
+async fn repair_directside(engine:Option<&mut Engine>,request:&Value)->Result<(),Report> {
     let id=text(request,"device_id")?;
     let path=PathBuf::from(text(request,"path")?);
     let info=isideload::sideload::application::inspect_ipa(&path)?;
@@ -405,8 +414,10 @@ async fn repair_directside(engine:&mut Engine,request:&Value)->Result<(),Report>
     let mut mux=UsbmuxdConnection::default().await?;
     let device=mux.get_devices().await?.into_iter().find(|d|d.udid==id).ok_or_else(||report!("iPhone nicht mehr verbunden."))?;
     let provider=device.to_provider(UsbmuxdAddr::from_env_var()?,"DirectSide");
-    let team=engine.get_team().await?;
-    bootstrap(Some(engine),&provider,&path,&format!("com.directside.app.{}",team.team_id)).await?;
+    let apps=idevice::installation_proxy::InstallationProxyClient::connect(&provider).await?.get_apps(Some("User"),None).await?;
+    let targets:Vec<_>=apps.keys().filter(|id|*id=="com.directside.app" || id.starts_with("com.directside.app.")).collect();
+    if targets.len()!=1 {bail!("Eine eindeutige DirectSide-Installation ist erforderlich.");}
+    bootstrap(engine,&provider,&path,targets[0]).await?;
     emit(json!({"event":"directside_repaired","device_id":id}));Ok(())
 }
 
@@ -648,7 +659,8 @@ pub async fn run() {
             "pair_local"=>pair_local(&request).await,
             "local_app_icons"=>match tokio::time::timeout(Duration::from_secs(18),local_app_icons(&request)).await {Ok(r)=>r,Err(_)=>Err(report!("Icons konnten nicht geladen werden."))},
             "reveal_developer_mode"=>reveal_developer_mode(&request).await,
-            "repair_directside"=>match engine.as_mut() {Some(e)=>repair_directside(e,&request).await,None=>Err(report!("Zum Übertragen des Signierschlüssels bitte am PC anmelden."))},
+            "repair_directside" if request["signing_mode"].as_str()==Some("imported")=>repair_directside(None,&request).await,
+            "repair_directside"=>match engine.as_mut() {Some(e)=>repair_directside(Some(e),&request).await,None=>Err(report!("Zum Übertragen des Signierschlüssels bitte am PC anmelden."))},
             "restore" => {
                 match tokio::time::timeout(Duration::from_secs(45),restore()).await {
                     Ok(Ok(Some(e)))=>{engine=Some(e);Ok(())},
