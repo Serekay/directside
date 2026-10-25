@@ -16,8 +16,8 @@ from urllib.error import HTTPError
 from urllib.parse import urlsplit
 from urllib.request import Request, HTTPRedirectHandler, build_opener
 
-VERSION = '0.1.1'
-BUILD = 16
+VERSION = '0.1.2'
+BUILD = 17
 REPOSITORY = 'Serekay/directside'
 API = 'https://api.github.com/repos/' + REPOSITORY
 CACHE = Path(os.environ.get('LOCALAPPDATA', Path.home())) / 'DirectSide' / 'updates'
