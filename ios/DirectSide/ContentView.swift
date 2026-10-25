@@ -14,12 +14,24 @@ struct ContentView:View {
     @State private var code=""
     @Environment(\.scenePhase) private var phase
     var body:some View {
+        presentedContent
+        .alert(L("LocalDevVPN verbinden"),isPresented:$engine.vpnRequired) {
+            if connection.vpnInstalled {Button(L("LocalDevVPN öffnen")){connection.openVPN()}}
+            else {Button(L("LocalDevVPN installieren")){UIApplication.shared.open(URL(string:"https://apps.apple.com/app/id6755608044")!)}}
+            Button(L("Abbrechen"),role:.cancel){}
+        } message:{Text(L("Zum Installieren muss LocalDevVPN verbunden sein. Öffne LocalDevVPN, aktiviere die Verbindung und versuche es anschließend erneut."))}
+        .alert(L("DirectSide"),isPresented:Binding(get:{engine.error != nil},set:{if !$0 {engine.error=nil}})){Button(L("OK")){engine.error=nil}}message:{Text(L(engine.error ?? ""))}
+    }
+    private var tabContent:some View {
         TabView(selection:$tab) {
             NavigationStack{DiscoverView(connection:connection,addSource:{sheet = .add})}.tabItem{Label(L("Entdecken"),systemImage:"safari")}.tag(0)
             NavigationStack{LibraryView(connection:connection)}.tabItem{Label(L("Meine Apps"),systemImage:"square.stack")}.badge(engine.updates.count+(updater.available == nil ? 0:1)).tag(1)
             NavigationStack{SourcesView(connection:connection,addSource:{sheet = .add})}.tabItem{Label(L("Quellen"),systemImage:"square.stack.3d.up")}.tag(2)
             NavigationStack{SettingsView(connection:connection)}.tabItem{Label(L("Einstellungen"),systemImage:"gearshape")}.tag(3)
         }.tint(Style.accent)
+    }
+    private var observedTabs:some View {
+        tabContent
         .background(KeyboardDismissal().frame(width:0,height:0))
         .task {connection.startMonitoring();await engine.refreshSources()}
         .task {await updater.check()}
@@ -36,15 +48,20 @@ struct ContentView:View {
         .onChange(of:engine.busy){_,value in if !value {presentUpdateIfReady()}}
         .onChange(of:connection.port){_,value in if value>0 {engine.inspectConnection(peer:connection.peer,port:value)}}
         .onChange(of:connection.vpnReachable){_,value in if value {engine.inspectConnection(peer:connection.peer,port:connection.port)}}
-        .sheet(item:$sheet,onDismiss:{if engine.needsPairingCode {engine.submitPairingCode("")};if engine.needsCode {engine.cancelCode()};if !engine.teams.isEmpty {engine.chooseTeam("")};if engine.importedIPA != nil {engine.cancelIPAImport()};presentUpdateIfReady()}){item in
-            NavigationStack {sheetContent(item)}.presentationDetents(item == .scan ? [.large]:[.medium,.large]).interactiveDismissDisabled(item == .code || item == .team || item == .pairing)
-        }
-        .alert(L("LocalDevVPN verbinden"),isPresented:$engine.vpnRequired) {
-            if connection.vpnInstalled {Button(L("LocalDevVPN öffnen")){connection.openVPN()}}
-            else {Button(L("LocalDevVPN installieren")){UIApplication.shared.open(URL(string:"https://apps.apple.com/app/id6755608044")!)}}
-            Button(L("Abbrechen"),role:.cancel){}
-        } message:{Text(L("Zum Installieren muss LocalDevVPN verbunden sein. Öffne LocalDevVPN, aktiviere die Verbindung und versuche es anschließend erneut."))}
-        .alert(L("DirectSide"),isPresented:Binding(get:{engine.error != nil},set:{if !$0 {engine.error=nil}})){Button(L("OK")){engine.error=nil}}message:{Text(L(engine.error ?? ""))}
+    }
+    private var presentedContent:some View {
+        observedTabs.sheet(item:$sheet,onDismiss:dismissSheet){item in sheetNavigation(item)}
+    }
+    private func sheetNavigation(_ item:AppSheet)->some View {
+        let detents:Set<PresentationDetent> = item == .scan ? [.large]:[.medium,.large]
+        return NavigationStack {sheetContent(item)}.presentationDetents(detents).interactiveDismissDisabled(item == .code || item == .team || item == .pairing)
+    }
+    private func dismissSheet() {
+        if engine.needsPairingCode {engine.submitPairingCode("")}
+        if engine.needsCode {engine.cancelCode()}
+        if !engine.teams.isEmpty {engine.chooseTeam("")}
+        if engine.importedIPA != nil {engine.cancelIPAImport()}
+        presentUpdateIfReady()
     }
     private func presentUpdateIfReady() {
         guard updater.showOffer,sheet==nil,!engine.busy,!engine.needsCode,!engine.needsPairingCode,engine.teams.isEmpty else {return}
