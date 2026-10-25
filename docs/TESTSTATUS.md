@@ -1,5 +1,22 @@
 # Teststand vom 25. Oktober 2026
 
+## README-Aufnahmen vom echten iPhone
+
+Zwei PNG-Aufnahmen aus der installierten Version 0.1.0 (Build 14): Meine Apps
+mit DirectSide/LiveContainer und Quelle hinzufuegen. Beide Ansichten bleiben
+in Build 15 unveraendert. Sichtpruefung: keine persoenlichen Kontodaten,
+Geraetekennungen oder privaten Quellenadressen im Bild. EXIF- und Textmetadaten
+wurden entfernt; die PNG-Pixeldaten bleiben unveraendert. Keine Konto- oder
+Signiereinstellungen geaendert, keine Installation ausgeloest. README zeigt
+nur diese zwei Aufnahmen; die veralteten Windows-Abbildungen sind dort entfernt.
+Lokale Bild- und Dokumentverweise geprueft. Private iPhone-Buildpruefung 15
+bestanden (Actions 40199099636, Quellstand 216f26e). IPA lokal geprueft:
+Version 0.1.0, Build 15, com.directside.app, 14.711.841 Bytes, SHA-256
+c4929671c46fca8d4201bb28d15f843e24524a83de0dbea21cf0008526348101.
+Kein Release erstellt und kein Update auf dem iPhone installiert; der
+native Update-Test bleibt beim Nutzer.
+
+
 ## Entwicklerteam: Anleitung statt iPhone-Fernsteuerung
 
 Die Windows-Einrichtung sendet keine Befehle zum Start von DirectSide oder

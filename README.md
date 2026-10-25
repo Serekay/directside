@@ -11,33 +11,29 @@ Sideload with your own Apple ID. Set up your iPhone or iPad from Windows, then b
 - One-button DirectSide installation, automatic USB pairing and setup repair. Install your own IPAs too.
 - HTTP and HTTPS sources with QR import, descriptions, screenshots and updates.
 - Install from sources or import an IPA on iPhone. Renew signatures and manage apps and certificates.
-- Optional LiveContainer installation with automatic certificate transfer and JIT-less configuration.
+- Optional LiveContainer installation, with certificate preparation and a final setup handoff.
 - Free and paid Apple Developer teams, or imported P12 certificates with matching provisioning profiles.
 - English and German, with saved language preferences in both apps.
 - Windows and iPhone update checks with verified downloads from published releases.
 
-| Windows setup | Installed apps |
+| My Apps | Add a source |
 |:---:|:---:|
-| [![Windows setup in English](docs/screenshots/windows-setup.png)](docs/screenshots/windows-setup.png) | [![Installed apps in English](docs/screenshots/windows-apps.png)](docs/screenshots/windows-apps.png) |
+| <img src="docs/screenshots/iphone-my-apps.png" alt="DirectSide and LiveContainer with signature days remaining" width="260"> | <img src="docs/screenshots/iphone-add-source.png" alt="Add a source by address or QR code" width="260"> |
 
-*Windows screenshots use demonstration account and device data.*
-
-| iPhone introduction | LiveContainer setup |
-|:---:|:---:|
-| <img src="docs/screenshots/iphone-introduction.png" alt="DirectSide welcome screen on iPhone" width="260"> | <img src="docs/screenshots/iphone-livecontainer.png" alt="Optional LiveContainer setup with the custom icon" width="260"> |
+Actual iPhone captures. No personal account information, device identifiers or private source addresses are shown.
 
 ## Get started
 
 1. Download and open **DirectSide.exe**. Connect your device by USB, unlock it and accept **Trust** if requested.
 2. Sign in with your Apple ID and select your device. For an existing certificate, use **Settings > Install using > Change**, choose **Your own certificate**, then select the P12 file and matching `.mobileprovision` files.
 3. Select **Install DirectSide**. It uses a current DirectSide IPA beside the Windows app, or downloads the published release. Pairing, the original IPA and signing files are transferred automatically. Use the **+** beside your device to install another IPA.
-4. **Follow the Windows setup screen before opening DirectSide.** It detects whether Developer Mode is needed and prepares the switch automatically. On the iPhone, open **Settings > Privacy & Security > Developer Mode**, turn it on, restart, unlock and confirm **Turn On**. Windows detects the reconnect and finishes pairing automatically; do not reinstall the app. If requested, trust the developer profile under **Settings > General > VPN & Device Management**. Distribution profiles may not require Developer Mode.
+4. **Follow the Windows setup screen before opening DirectSide.** It detects whether Developer Mode is needed and prepares the switch automatically. On the iPhone, open **Settings > Privacy & Security > Developer Mode**, turn it on, restart, unlock and confirm **Turn On**. Windows checks the connection and finishes the transfer; do not reinstall the app. If USB remains disconnected after reconnecting the cable, select **Repair connection** in Windows. This restarts the Apple connection service and requires selecting **Yes** in the Windows permission prompt. Follow the on-screen instructions to trust your developer team under **Settings > General > VPN & Device Management**, then open DirectSide yourself. Windows does not navigate or launch apps on your iPhone. Distribution profiles may not require Developer Mode.
 5. Open DirectSide and follow the short introduction. It opens the App Store if **LocalDevVPN** is missing. Install it, confirm its VPN setup and select **Connect**. If it is already connected, continue. The introduction also offers optional **LiveContainer** installation and can be skipped.
 6. Add a source using **+** and choose an app. Your Windows sign-in is carried over automatically. If Apple requires another sign-in, use **Settings > Apple Account**.
 
 On iPhone, pull down to refresh sources and swipe left to remove one. **My Apps** shows signature days remaining and updates on the affected app rows. Swipe left or touch and hold an installed app to delete it and its data; this frees a free-account app slot. Regular App Store apps remain managed by iOS. Windows also lists only sideloaded apps. **Settings** holds your account, signing method, language, connection and updates, plus **View introduction**. Developer Mode is guided in Windows before the first app launch. Windows help is under **?**.
 
-For LiveContainer, install it from DirectSide. After installation, DirectSide opens LiveContainer with the matching certificate; the certificate enables JIT-less automatically. When installing from Windows, open DirectSide on the iPhone to complete that handoff. **Settings > LiveContainer > Transfer Certificate** remains available to repair an interrupted handoff. The LiveContainer diagnostic is useful if a guest app fails to start; it is not an additional mode switch. Compatibility and certificate capabilities still matter.
+For LiveContainer, install it from DirectSide. DirectSide stays open and prepares the certificate. Select **Complete setup** to open LiveContainer and hand over the certificate, then follow any confirmation shown there. **Set up later** explicitly skips this step; installation alone does not mean setup is complete. The certificate supports JIT-less operation; compatibility and certificate capabilities still matter. **Settings > LiveContainer > Transfer Certificate** is available to repeat an interrupted handoff.
 
 ## Requirements and limits
 
@@ -53,6 +49,8 @@ The iPhone updater is prepared for public DirectSide releases and needs no GitHu
 
 ## Project
 
-The published release remains **0.1.0, build 5**. The current **0.1.0, build 14** test IPA is available locally at dist/DirectSide.ipa; its private build passed, and its fresh device test is pending. Keep it beside DirectSide.exe: the Windows **Install DirectSide** button uses that package when its version is at least the known release version, and shows its build number. No release was published. Earlier hardware checks covered Windows account handoff without another password, the introduction, LiveContainer installation over VPN, certificate handoff and its custom icon. Build 14 adds the LocalDevVPN instructions and keeps DirectSide open after LiveContainer installation; **Set up LiveContainer** explicitly opens it for certificate handoff. Signature renewal on iPhone reuses its stored original IPA; it does not fetch a new app version. Installing a new IPA over the existing app with the same signing team updates it while normally preserving its data. The self-updater, imported signing and LiveContainer guest compatibility still require owner verification; see [test status](docs/TESTSTATUS.md).
+The published release remains **0.1.0, build 5**. Test build **0.1.0, build 15** passed its private Actions build; it is not an update offered by the public-release updater. No new release has been published. The verified test IPA is available locally at `dist/DirectSide.ipa`. Keep it beside DirectSide.exe and use **Install DirectSide** to install it over the existing app with the same signing team. This normally preserves app data and reuses the existing App ID. Builds use the stable `com.directside.app` identifier.
+
+Build 15 makes **Complete setup** the main LiveContainer onboarding action and replaces the misleading **Done** button with **Set up later**. The two iPhone screenshots above were captured from installed build 14; those views are unchanged in build 15. The Windows setup now guides developer-team trust without controlling the iPhone. Build success does not prove installation, self-update or guest-app compatibility; see [test status](docs/TESTSTATUS.md).
 
 [Build guide](docs/DEVELOPMENT.md) | [Architecture](docs/ARCHITECTURE.md) | [Changelog](CHANGELOG.md) | [Third-party notices](THIRD_PARTY.md) | [License](LICENSE)
