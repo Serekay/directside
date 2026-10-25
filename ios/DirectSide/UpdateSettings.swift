@@ -19,11 +19,11 @@ struct UpdateSettings:View {
                     Button(L("Update installieren")){Task{await updater.install(engine:engine,connection:connection)}}.buttonStyle(.borderedProminent).disabled(engine.busy || updater.downloading)
                 }
             }
-            Section(L("Privates Repository")) {
+            Section {
                 SecureField(L("GitHub-Zugang"),text:$token).textInputAutocapitalization(.never).autocorrectionDisabled()
                 Button(L("Zugang speichern")){updater.saveCredential(token);token=""}.disabled(token.isEmpty || updater.downloading || updater.checking)
                 if updater.hasCredential {Button(L("Zugang entfernen"),role:.destructive){updater.forgetCredential()}.disabled(updater.downloading || updater.checking)}
-            } footer:{Text(L("Für Serekay/directside einen auf dieses Repository beschränkten GitHub-Zugang mit Contents: Read verwenden. Er wird nur im Schlüsselbund dieses iPhones gespeichert."))}
+            } header:{Text(L("Privates Repository"))} footer:{Text(L("Für Serekay/directside einen auf dieses Repository beschränkten GitHub-Zugang mit Contents: Read verwenden. Er wird nur im Schlüsselbund dieses iPhones gespeichert."))}
         }.navigationTitle(L("DirectSide-Updates"))
     }
 }

@@ -36,12 +36,12 @@ struct ImportedSigningSettings:View {
                     Button(L("Importiertes Zertifikat entfernen"),role:.destructive){engine.forgetImportedIdentity()}.disabled(engine.busy)
                 }
             }
-            Section(L("Zertifikat importieren")) {
+            Section {
                 Button {importingProfiles=false;showImporter=true}label:{Label(p12?.lastPathComponent ?? L("P12-Datei auswählen"),systemImage:"doc.badge.plus")}
                 SecureField(L("Passwort der P12-Datei"),text:$password)
                 Button {importingProfiles=true;showImporter=true}label:{Label(profiles.isEmpty ? L("Profile auswählen"):L("\(profiles.count) Profile ausgewählt"),systemImage:"doc.on.doc")}
                 Button(L("Prüfen und sicher speichern")) {if let p12 {Task{await engine.importIdentity(p12:p12,profiles:profiles,password:password);password=""}}}.buttonStyle(.borderedProminent).disabled(p12==nil || profiles.isEmpty || engine.busy)
-            } footer:{Text(L("Importiere eine P12-Datei mit privatem Schlüssel und die zugehörigen .mobileprovision-Dateien. Profile müssen zu App, Erweiterungen und iPhone passen. Die Zugangsdaten zu anderen Plattformen werden nicht benötigt."))}
+            } header:{Text(L("Zertifikat importieren"))} footer:{Text(L("Importiere eine P12-Datei mit privatem Schlüssel und die zugehörigen .mobileprovision-Dateien. Profile müssen zu App, Erweiterungen und iPhone passen. Die Zugangsdaten zu anderen Plattformen werden nicht benötigt."))}
         }.navigationTitle(L("Signierung"))
         .fileImporter(isPresented:$showImporter,allowedContentTypes:[.data],allowsMultipleSelection:importingProfiles){result in
             switch result {
