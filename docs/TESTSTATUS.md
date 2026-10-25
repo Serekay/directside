@@ -2,6 +2,14 @@
 
 ## USB-Wiederherstellung und tatsächlicher erster App-Start
 
+Nach manueller Freigabe des Entwicklungsteams „Check again“ im gepackten
+Windows-Programm betätigt. Nativ bestätigt: DirectSide startet mit der
+Willkommensseite der Einführung; Windows zeigt erst danach „DirectSide opened“
+in Grün. Keine Neuinstallation und Kontingent weiterhin 9/10. Kontoübernahme
+auch in diesem frischen Durchlauf erfolgreich: Diagnose `restored`, keine
+erneute Passworteingabe, temporäre Konto-/Signierübergabedateien entfernt.
+LocalDevVPN und LiveContainer sind in diesem Durchlauf noch nicht installiert.
+
 Windows erkennt im aktuellen Ausfall genau ein Apple-USB-Composite-Gerät,
 während Apples USB-Dienst null Geräte meldet. Neuer Wiederherstellungspfad:
 Nach acht Sekunden anhaltender Diskrepanz und vorher gesehenem iPhone wird
