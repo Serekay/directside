@@ -1,16 +1,16 @@
 # Änderungen
 
-## Unveröffentlicht
+## 0.1.1 (16) - 2026-10-25
 
 - 0.1.1 (16): Version und Buildnummer in Windows und iPhone sichtbar, Windows-Dateieigenschaften versioniert, vier iPhone-Ansichten in der vereinfachten README.
 - iPhone: VPN-Status in Einstellungen, Installationshinweis bei getrennter Verbindung, Tastaturabschluss außerhalb von Textfeldern und verständliche Berechtigungen.
 - Entwicklermodus in Installation, Hilfe, iPhone-Einstellungen und README vor dem ersten App-Start erklärt.
 - Sideload-Apps mit Geräte-Icons; reguläre App-Store-Apps aus der Verwaltung entfernt. Löschen in Meine Apps per Wischen oder langem Drücken mit Bestätigung.
-- iPhone-Selbstupdater für freigegebene Releases mit Schlüsselbund-Zugang, Größen-/SHA256-/Versions-/App-ID-Prüfung und Übernahme der neuen Original-IPA. Updates nur bei betroffenen App-Zeilen.
-- LiveContainer-Zertifikatsübergabe nach Installation automatisiert; Zertifikat aktiviert den vorhandenen JIT-less-Pfad.
+- iPhone-Selbstupdater für freigegebene Releases mit Größen-/SHA256-/Versions-/App-ID-Prüfung und Übernahme der neuen Original-IPA. Updates nur bei betroffenen App-Zeilen.
+- LiveContainer installiert mit vorbereitetem Zertifikat; Einrichtung abschließen startet die Zertifikatsübergabe. Später einrichten ersetzt den irreführenden Fertig-Button.
 - Bezahlte Teams anhand tatsächlicher Profile behandelt; P12-/Profilimport ohne Apple-Anmeldung in beiden Apps einschließlich USB-Übernahme ans iPhone.
 - Quellen und Apps klar getrennt; vereinfachter Dialog zum Hinzufügen mit QR-Symbolknopf.
-- Windows lokal geprüft; neuer iPhone-Build und native Prüfung der Änderungen stehen aus. Details in [Teststand](docs/TESTSTATUS.md).
+- Windows lokal und iPhone-Build auf macOS geprüft. Native Update-Prüfung steht aus. Details in [Teststand](docs/TESTSTATUS.md).
 
 ## 0.1.0 - 2026-10-24
 
