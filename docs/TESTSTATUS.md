@@ -1,5 +1,22 @@
 # Teststand vom 25. Oktober 2026
 
+## USB-Verbindungsverlust
+
+Windows erkennt den Verlust eines bereits gesehenen iPhones sowie Fehler beim
+Abrufen der USB-Geräteliste. Es zeigt eine große Ansicht mit animiertem
+Kabelstecker, „USB-Verbindung verloren“ und „iPhone entsperren und Kabel neu
+einstecken“. Der Titelbereich markiert die Unterbrechung rot. Beim ersten Start
+ohne Gerät erscheint keine falsche Verlustmeldung. Erneutes Prüfen ist möglich;
+nach Wiedererkennung kehrt die Oberfläche automatisch zur vorherigen Ansicht
+beziehungsweise zur noch offenen Einrichtung zurück. Keine automatische zweite
+Installation bei bloßem Wiederverbinden.
+
+Zustandswechsel, Ausfall des USB-Dienstes, Seitenrückkehr und Start/Stopp der
+Animation durch Qt-Tests geprüft. Darstellung in Deutsch und Englisch bei
+960 × 680 visuell geprüft. Insgesamt 59 Windows-Tests bestanden. Die neue
+Warnansicht wurde mit eingespeisten Geräteereignissen geprüft; ein erneuter
+physischer Abbruch mit diesem Paket ist noch nicht beobachtet worden.
+
 ## Oberflächenkorrektur, App-ID-Übersicht und Erststart
 
 USB-Screenshots und echte Accessibility-Navigation auf dem iPhone eingerichtet.

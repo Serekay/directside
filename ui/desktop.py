@@ -65,6 +65,8 @@ class DesktopBridge(QObject):
         except (OSError,ValueError):self.pendingSetup=None
         self.data.update(setupPending=bool(self.pendingSetup),setupReady=False)
         self.data.update(usbTrustPending=False)
+        self.data.update(usbReconnectNeeded=bool(self.pendingSetup))
+        self.usbSeen=bool(self.pendingSetup)
         self.trustRejected=False
         self.releaseClient=ReleaseClient(HOME if getattr(sys,'frozen',False) else ROOT)
         self.release=None
@@ -197,11 +199,12 @@ class DesktopBridge(QObject):
             old=self.data['devices'];index=self.data['deviceIndex']
             selected=old[index].get('id') if old and index<len(old) else None
             devices=event.get('devices',[])
+            if devices:self.usbSeen=True
             for device in devices:device['label']=device.get('name','Apple-Gerät')+' · '+device['id'][-4:]
             index=next((i for i,d in enumerate(devices) if d.get('id')==selected),0)
             if devices and devices[index]['id']!=selected:self.update(installedApps=[],slotsUsed=-1,developerApps=[],lcPrepared=False,developerMode='unknown')
             pending_here=bool(self.pendingSetup and (not devices or devices[index]['id']==self.pendingSetup['device']))
-            self.update(devices=devices,deviceIndex=index,busy=False,scanning=False,setupPending=pending_here)
+            self.update(devices=devices,deviceIndex=index,busy=False,scanning=False,setupPending=pending_here,usbReconnectNeeded=self.usbSeen and not devices)
             if devices:
                 if devices[index].get('trusted') is False:
                     self.update(usbTrustPending=True)
@@ -233,6 +236,10 @@ class DesktopBridge(QObject):
         elif kind=='choose_team':self.update(challenge='team',busy=True,teams=event.get('teams',[]))
         elif kind=='pairing_pin':self.update(challenge='pairing',busy=True)
         elif kind=='error':
+            if event.get('command')=='devices' and self.usbSeen:
+                self.componentDevice=None
+                self.update(busy=False,scanning=False,devices=[],usbReconnectNeeded=True,usbTrustPending=False,developerMode='unknown',directsidePresent=False,slotsUsed=-1,installedApps=[],developerApps=[],vpnState='unknown',lcState='unknown')
+                return
             if event.get('command')=='trust_device':
                 self.trustRejected=True;self.update(busy=False,scanning=False,usbTrustPending=True);return
             if event.get('command')=='app_ids':
