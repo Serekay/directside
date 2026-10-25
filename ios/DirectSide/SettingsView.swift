@@ -4,6 +4,8 @@ struct SettingsView:View {
     @EnvironmentObject var engine:Engine
     @ObservedObject var connection:Connection
     @AppStorage("language") private var language="en"
+    @AppStorage("onboardingComplete") private var onboardingComplete=false
+    @AppStorage("onboardingStep") private var onboardingStep=0
     var body:some View {
         List {
             Section {
@@ -17,7 +19,6 @@ struct SettingsView:View {
                     .listRowInsets(EdgeInsets(top:0,leading:0,bottom:0,trailing:0))
             }
             Section(L("Gerät & Signierung")) {
-                NavigationLink {DeveloperModeHelp()} label:{Label(L("Entwicklermodus"),systemImage:"hammer")}
                 NavigationLink {ConnectionSettings(connection:connection)} label:{SettingsRow(title:"Verbindung",icon:"network",value:engine.pairingReady ? "Gekoppelt":"Einrichten",ok:engine.pairingReady)}
                 NavigationLink {ImportedSigningSettings()} label:{Label(L("Signierung"),systemImage:"checkmark.seal")}
                 NavigationLink {CertificateManagementView()} label:{Label(L("Zertifikate"),systemImage:"signature")}.disabled(!engine.loggedIn)
@@ -30,6 +31,7 @@ struct SettingsView:View {
                 Picker(L("Sprache"),selection:$language) {Text(L("English")).tag("en");Text(L("Deutsch")).tag("de")}
             }
             Section {NavigationLink {UpdateSettings(connection:connection)} label:{Label(L("DirectSide-Updates"),systemImage:"arrow.down.app")}}
+            Section {Button {onboardingStep=0;onboardingComplete=false} label:{Label(L("Einführung ansehen"),systemImage:"sparkles")}}
             Section {HStack{Text(L("DirectSide"));Spacer();Text(L(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")).foregroundStyle(.secondary)}}
         }.navigationTitle(L("Einstellungen")).safeAreaInset(edge:.bottom){EngineProgress()}
     }
@@ -66,9 +68,6 @@ struct ConnectionSettings:View {
     @ObservedObject var connection:Connection
     var body:some View {
         Form {
-            Section {
-                NavigationLink {DeveloperModeHelp()} label:{Label(L("Entwicklermodus einrichten"),systemImage:"hammer")}
-            }
             Section(L("Gerätekopplung")) {
                 Label(L(engine.pairingReady ? "Dieses Gerät ist gekoppelt":"Dieses Gerät koppeln"),systemImage:engine.pairingReady ? "checkmark.circle.fill":"link").foregroundStyle(engine.pairingReady ? Color.green:Color.orange)
                 if !engine.pairingReady {

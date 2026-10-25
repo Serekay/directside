@@ -1,5 +1,25 @@
 # Teststand vom 25. Oktober 2026
 
+## Einführung und Kontoübernahme (Build 10 in Vorbereitung)
+
+Überflüssige Entwicklermodus-Anleitung aus der laufenden iPhone-App entfernt;
+die Einrichtung vor dem ersten Start bleibt in Windows. Neue überspringbare
+Einführung: Willkommen, VPN-Verbindung und optional LiveContainer mit kurzer
+Erklärung des gemeinsamen App-Platzes und der Kompatibilitätsgrenze. Kein
+Kontoübernahme-Schritt in der Einführung. Wieder aufrufbar in Einstellungen.
+Die lokale Netzwerksuche beginnt erst im Verbindungsschritt oder nach dem
+Überspringen. Bereits vorhandene Kopplung/VPN/LiveContainer werden berücksichtigt.
+
+Windows bereitet eine einmalige Sitzungskopie über den vertrauenswürdigen USB-
+App-Container vor. Kein Passwort, kein Einbau in die IPA und keine Sitzung im
+freigegebenen Dokumentenordner. Die private Übergabedatei liegt außerhalb von
+Backups im Cache und wird nach Import/Verwerfung entfernt. iOS prüft Account und
+Team gegen das eingebettete Profil, speichert im Schlüsselbund und prüft die
+Sitzung mit Apple. Das zuvor ausgewählte Entwicklerteam wird wiederverwendet;
+bei abgelehnter Sitzung bleibt die Anmeldung mit vorausgefüllter Apple-ID möglich.
+Neue Kern-Tests prüfen Feldfreigabe, Größenbegrenzung und fremde Accountdaten.
+Xcode-Build und native Kontoübernahme/Einführung sind noch nicht geprüft.
+
 ## USB-Verbindungsverlust
 
 Windows erkennt den Verlust eines bereits gesehenen iPhones sowie Fehler beim

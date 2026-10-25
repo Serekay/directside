@@ -10,6 +10,8 @@ import CryptoKit
     @Published var deviceIcons:[String:Data]=[:]
     @Published var busy = true
     private var restoring=true
+    private var sessionImportPending=false
+    var preparingAccount:Bool {restoring || sessionImportPending}
     var showsProgress:Bool {busy && !restoring}
     @Published var loggedIn = false
     @Published var signingMode=UserDefaults.standard.string(forKey:"signingMode") ?? "account"
@@ -196,6 +198,7 @@ import CryptoKit
     }
 
     init() {
+        let awaitingAccountTransfer=FileManager.default.fileExists(atPath:Paths.sessionImport.path)
         // A terminated import must not leave temporary private-key copies behind.
         if let files=try? FileManager.default.contentsOfDirectory(at:Paths.support,includingPropertiesForKeys:nil) {
             for file in files where file.lastPathComponent.hasPrefix("identity-") && ["p12","mobileprovision"].contains(file.pathExtension) {try? FileManager.default.removeItem(at:file)}
@@ -211,12 +214,19 @@ import CryptoKit
         timer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.poll() }
         }
-        send(["command":"restore"])
+        if !awaitingAccountTransfer {send(["command":"restore"])}
         send(["command":"imported_identity"])
         if let path=Bundle.main.path(forResource:"embedded",ofType:"mobileprovision") {send(["command":"profile","path":path])}
     }
     func refreshBootstrap() {
         do {
+            let partialSession=Paths.sessionImport.appendingPathExtension("pending")
+            if let modified=try? partialSession.resourceValues(forKeys:[.contentModificationDateKey]).contentModificationDate,Date().timeIntervalSince(modified)>600 {
+                try? FileManager.default.removeItem(at:partialSession)
+            }
+            if FileManager.default.fileExists(atPath:Paths.sessionImport.path) {
+                try FileManager.default.setAttributes([.protectionKey:FileProtectionType.complete],ofItemAtPath:Paths.sessionImport.path)
+            }
             try Paths.importBootstrap()
             let transfer=Paths.documents.appendingPathComponent("DirectSide-imported.json")
             if FileManager.default.fileExists(atPath:transfer.path) {
@@ -235,11 +245,20 @@ import CryptoKit
         } catch { self.error = error.localizedDescription }
     }
     private func importSigningIfNeeded() {
+        defer {importSessionIfNeeded()}
         if coreStarted,!importedArchivePending,FileManager.default.fileExists(atPath:importedArchive.path) {
             importedArchivePending=true;send(["command":"import_identity","archive_path":importedArchive.path])
         }
         guard coreStarted,!signingImportPending,FileManager.default.fileExists(atPath:Paths.signing.path) else {return}
         signingImportPending=true;send(["command":"import_signing","path":Paths.signing.path])
+    }
+    private func importSessionIfNeeded() {
+        guard coreStarted,!signingImportPending,!sessionImportPending,FileManager.default.fileExists(atPath:Paths.sessionImport.path) else {return}
+        guard let profile=Bundle.main.path(forResource:"embedded",ofType:"mobileprovision"),!accountEmail.isEmpty else {
+            try? FileManager.default.removeItem(at:Paths.sessionImport);restoring=false;busy=false;return
+        }
+        sessionImportPending=true;restoring=true;busy=true
+        send(["command":"import_session","path":Paths.sessionImport.path,"email":accountEmail,"profile_path":profile])
     }
     func send(_ request: [String: Any]) {
         guard let data = try? JSONSerialization.data(withJSONObject: request), let command = String(data: data, encoding: .utf8) else { return }
@@ -277,7 +296,8 @@ import CryptoKit
             case "status": message = event["message"] as? String ?? message
             case "progress": progress = (event["value"] as? Double ?? 0)/100
             case "logged_in": restoring=false;busy=false; loggedIn=true;signingCertificates=[];certificatesLoaded=false;certificateTeam=event["team_id"] as? String ?? ""; teamName=event["team"] as? String ?? "Developer-Team"; message="Angemeldet";if let email=event["email"] as? String {accountEmail=email;UserDefaults.standard.set(email,forKey:"accountEmail")}
-            case "signing_imported": signingImportPending=false;if let email=event["email"] as? String {accountEmail=email;UserDefaults.standard.set(email,forKey:"accountEmail")}
+            case "signing_imported": signingImportPending=false;if let email=event["email"] as? String {accountEmail=email;UserDefaults.standard.set(email,forKey:"accountEmail")};importSessionIfNeeded()
+            case "session_imported":sessionImportPending=false;signingMode="account";UserDefaults.standard.set(signingMode,forKey:"signingMode");send(["command":"restore"])
             case "profile": if let raw=event["expires_at"] as? String {selfExpiration=ISO8601DateFormatter().date(from:raw)}
             case "slots": slotsUsed=event["used"] as? Int;developerApps=(event["apps"] as? [[String:String]] ?? []).compactMap{$0["name"]}
             case "account_quota":appIDsLimit=event["limit"] as? Int;appIDsAvailable=event["available"] as? Int
@@ -337,10 +357,11 @@ import CryptoKit
                 pendingApp=nil
                 let continuation=installContinuation; installContinuation=nil; continuation?.resume()
             case "error":
+                if event["command"] as? String == "import_session" {sessionImportPending=false;restoring=false;busy=false;message="Bitte anmelden";continue}
                 if event["command"] as? String == "app_ids" {loadingAppIDs=false;appIDsError="App-Kennungen konnten nicht geladen werden. Bitte erneut versuchen.";continue}
                 if event["command"] as? String == "local_app_icons" {continue}
                 if event["command"] as? String == "inspect_local" {inspecting=false;lastInspection=nil;continue}
-                if event["command"] as? String == "import_signing" {signingImportPending=false}
+                if event["command"] as? String == "import_signing" {signingImportPending=false;try? FileManager.default.removeItem(at:Paths.sessionImport);restoring=false}
                 if event["command"] as? String == "import_identity" {importedArchivePending=false}
                 fail(event["message"] as? String ?? "Unbekannter Fehler")
             default: break

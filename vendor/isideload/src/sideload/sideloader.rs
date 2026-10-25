@@ -357,6 +357,7 @@ impl<C: MaxCertsCallback, E: ExtensionsBehaviorCallback> Sideloader<C, E> {
                     self.team_selection
                 );
                 match &self.team_selection {
+                    TeamSelection::ById(id) => teams.into_iter().find(|team|&team.team_id==id).ok_or_else(||report!("Selected developer team is unavailable"))?,
                     TeamSelection::First => teams.into_iter().next().ok_or_report()?,
                     TeamSelection::PromptOnce(prompt_fn)
                     | TeamSelection::PromptAlways(prompt_fn) => {
