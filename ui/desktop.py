@@ -50,7 +50,7 @@ def after_scan(method):
             if self.pendingUserAction is None:
                 devices=self.data['devices'];index=self.data['deviceIndex']
                 device=devices[index]['id'] if devices and index<len(devices) else None
-                if method.__name__ in ('refresh','recoverUSB','loadCertificates','setSigningMode','checkComponents','setupComponents','chooseIPA'):device=None
+                if method.__name__ in ('refresh','recoverUSB','loadCertificates','setSigningMode','checkComponents','setupComponents','chooseIPA','chooseIdentityCertificate','chooseIdentityProfiles'):device=None
                 self.pendingUserAction=(method,args,device)
             return True
         return method(self,*args)
@@ -471,12 +471,14 @@ class DesktopBridge(QObject):
         self.update(signingMode=mode)
 
     @Slot()
+    @after_scan
     def chooseIdentityCertificate(self):
         if self.data['busy']:return
         path,_=QFileDialog.getOpenFileName(None,translate('P12-Datei auswählen',self.data['language']),'','PKCS#12 (*.p12 *.pfx)')
         if path:self.update(identityP12=path)
 
     @Slot()
+    @after_scan
     def chooseIdentityProfiles(self):
         if self.data['busy']:return
         paths,_=QFileDialog.getOpenFileNames(None,translate('Profile auswählen',self.data['language']),'','Apple profiles (*.mobileprovision)')
