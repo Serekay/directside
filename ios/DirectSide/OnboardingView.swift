@@ -33,7 +33,10 @@ struct OnboardingView:View {
         VStack(alignment:.leading,spacing:15) {
             if step==0 {BrandIcon(size:82)}
             else {Image(systemName:step==1 ? "checkmark.shield.fill":"square.stack.3d.up.fill").font(.system(size:54)).foregroundStyle(Style.accent).padding(.vertical,8)}
-            Text(L(step==0 ? "Willkommen bei DirectSide":step==1 ? "Verbindung einrichten":"Mehr Platz für deine Apps")).font(.largeTitle.bold())
+            if step==0 {
+                Text(L("Willkommen bei")).font(.title2.weight(.semibold)).foregroundStyle(.secondary)
+                Text("DirectSide").font(.largeTitle.bold()).lineLimit(1).minimumScaleFactor(0.75)
+            } else {Text(L(step==1 ? "Verbindung einrichten":"Mehr Platz für deine Apps")).font(.largeTitle.bold())}
         }
     }
     private var welcome:some View {

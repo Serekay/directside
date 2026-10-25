@@ -13,7 +13,7 @@ async fn main()->Result<(),Report> {
 }
 async fn run()->Result<(),Report> {
     let action=std::env::args().nth(1).unwrap_or_else(||"--inventory".into());
-    if !["--inventory","--remove-test-apps","--remove-directside","--forget-pairing"].contains(&action.as_str()){bail!("Use --inventory, --remove-test-apps, --remove-directside or --forget-pairing.");}
+    if !["--inventory","--remove-test-apps","--remove-directside","--account-transfer-status","--forget-pairing"].contains(&action.as_str()){bail!("Unknown scoped setup action.");}
     let mut mux=UsbmuxdConnection::default().await?;
     let devices=mux.get_devices().await?;
     if devices.len()!=1 {bail!("Exactly one trusted, unlocked iPhone is required.");}
@@ -24,7 +24,20 @@ async fn run()->Result<(),Report> {
     let targets:Vec<_>=apps.iter().filter(|(id,_)|test_app(id)).map(|(id,info)|(id.clone(),info.as_dictionary().and_then(|d|d.get("CFBundleDisplayName")).and_then(plist::Value::as_string).unwrap_or("Test app").to_string())).collect();
     println!("Developer Mode: {}. Test apps present: {}.",if mode {"on"}else{"off"},targets.len());
     for (_,name) in &targets {println!("Test app: {name}");}
-    if action=="--remove-directside" {
+    if action=="--account-transfer-status" {
+        let ids:Vec<_>=targets.iter().filter(|(id,_)|id=="com.directside.app" || id.starts_with("com.directside.app.")).collect();
+        if ids.len()!=1 {bail!("Exactly one DirectSide is required.");}
+        let mut container=idevice::house_arrest::HouseArrestClient::connect(&provider).await?.vend_container(&ids[0].0).await?;
+        for path in ["/Library/Caches/DirectSide-session-import.json","/Library/Application Support/DirectSide/signing-import.json","/Documents/DirectSide-signing.json"] {
+            println!("{}: {}",path,container.get_file_info(path).await.is_ok());
+        }
+        let report="/Library/Caches/DirectSide-account-status.json";
+        if container.get_file_info(report).await.is_ok() {
+            let mut file=container.open(report,idevice::afc::opcode::AfcFopenMode::RdOnly).await?;
+            let bytes=file.read_entire().await?;file.close().await?;
+            if bytes.len()<=8192 {let value:serde_json::Value=serde_json::from_slice(&bytes)?;println!("Account handoff: {}",value);}
+        }
+    } else if action=="--remove-directside" {
         for (id,name) in &targets {
             if id=="com.directside.app" || id.starts_with("com.directside.app.") {
                 proxy.uninstall(id.clone(),None).await?;println!("Removed: {name}");
