@@ -237,7 +237,7 @@ class WindowsUIStateTests(unittest.TestCase):
   self.assertFalse(self.bridge.data['setupReady'])
   self.bridge.handle({'event':'directside_launch_result','device_id':'phone','ok':False})
   self.assertFalse(self.bridge.data['success']);self.assertEqual(self.bridge.data['launchState'],'blocked')
-  self.assertEqual(self.sent[-1],{'command':'open_trust_settings','device_id':'phone'})
+  self.assertFalse(any(e['command']=='open_trust_settings' for e in self.sent))
   self.bridge.handle({'event':'trust_settings_opened','device_id':'phone','ok':True})
   self.assertFalse(self.bridge.data['setupReady'])
   self.bridge.update(developerMode='enabled');self.sent.clear();self.bridge.resumeSetup()
@@ -266,7 +266,7 @@ class WindowsUIStateTests(unittest.TestCase):
   self.bridge.pendingSetup={'device':'phone','path':'fixture','mode':'account','email':'fixture@example.com','phase':'launch'}
   self.bridge.update(busy=False,devices=[{'id':'phone'}])
   self.bridge.launchDirectSide()
-  self.assertTrue(json.loads(self.bridge.setupRecord.read_text())['launch_attempted'])
+  self.assertEqual(json.loads(self.bridge.setupRecord.read_text())['phase'],'launch')
   restored=DesktopBridge(start=False,preferences=self.bridge.preferences);sent=[];restored.send=sent.append
   try:
    self.assertEqual(restored.data['launchState'],'blocked')
@@ -277,7 +277,7 @@ class WindowsUIStateTests(unittest.TestCase):
    restored.handle({'event':'device_components','device_id':'phone','developer_mode':True,'directside':True})
    self.assertFalse(any(item['command']=='launch_directside' for item in sent))
    restored.update(busy=False);restored.launchDirectSide()
-   self.assertEqual(sent[-1],{'command':'launch_directside','device_id':'phone'})
+   self.assertFalse(any(e['command']=='launch_directside' for e in sent))
   finally:restored.timer.stop()
  def test_app_status_and_slots_belong_to_selected_device(self):
   self.bridge.update(busy=False,devices=[{'id':'phone'},{'id':'tablet'}])
@@ -702,15 +702,15 @@ class WindowsUIStateTests(unittest.TestCase):
   self.assertTrue(self.bridge.data['settingUp'])
   self.bridge.handle({'event':'directside_repaired','device_id':'phone'})
   self.assertFalse(self.bridge.data['setupReady']);self.assertTrue(self.bridge.setupRecord.exists())
-  self.assertEqual(self.sent[-1],{'command':'launch_directside','device_id':'phone'})
+  self.assertFalse(any(e['command']=='launch_directside' for e in self.sent))
   self.bridge.handle({'event':'directside_launch_result','device_id':'phone','ok':False})
   self.assertFalse(self.bridge.data['setupReady']);self.assertFalse(self.bridge.data['success'])
-  self.assertEqual(self.sent[-1],{'command':'open_trust_settings','device_id':'phone'})
+  self.assertFalse(any(e['command']=='open_trust_settings' for e in self.sent))
   self.bridge.handle({'event':'trust_settings_opened','device_id':'phone','ok':False})
   self.assertEqual(self.bridge.data['settingsNavigation'],'manual')
   self.bridge.launchDirectSide()
-  self.bridge.handle({'event':'directside_launch_result','device_id':'phone','ok':True})
-  self.assertFalse(self.bridge.data['setupPending']);self.assertTrue(self.bridge.data['setupReady'])
+  self.bridge.acknowledgeSetup()
+  self.assertFalse(self.bridge.data['setupPending']);self.assertFalse(self.bridge.data['setupReady'])
   self.assertFalse(self.bridge.setupRecord.exists())
 
  def test_failed_settings_navigation_shows_manual_fallback_at_same_step(self):
@@ -722,9 +722,9 @@ class WindowsUIStateTests(unittest.TestCase):
   fallback=root.findChild(QObject,'manualTrustFallback')
   self.assertTrue(fallback.property('visible'));self.assertEqual(root.property('page'),'launch')
   self.assertFalse(self.bridge.data['setupReady'])
-  self.assertEqual(fallback.property('text'),'Please open this on your iPhone:')
+  self.assertEqual(fallback.property('text'),'On your iPhone:')
   self.bridge.setLanguage('de');APP.processEvents()
-  self.assertEqual(fallback.property('text'),'Bitte am iPhone selbst öffnen:')
+  self.assertEqual(fallback.property('text'),'Am iPhone:')
   root.close();engine.deleteLater();APP.processEvents()
 
  def test_pending_setup_survives_restart_and_cannot_target_another_phone(self):

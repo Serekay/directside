@@ -263,16 +263,12 @@ ApplicationWindow {
                     objectName:"launchGuide";visible:win.page==="launch";Layout.fillWidth:true;Layout.fillHeight:true;border.color:s.launchState==="opened"?win.accent:"#b57a37"
                     ColumnLayout {anchors.fill:parent;anchors.margins:28;spacing:18
                         Item {Layout.fillHeight:true}
-                        Text {objectName:"launchGuideTitle";text:win.t(s.launchState==="opened"?"DirectSide gestartet.":s.launchState==="checking"?"DirectSide wird gestartet …":"Freigabe am iPhone prüfen");color:s.launchState==="opened"?win.accent:win.ink;font.pixelSize:24;font.weight:Font.DemiBold;horizontalAlignment:Text.AlignHCenter;wrapMode:Text.WordWrap;Layout.fillWidth:true}
-                        Text {visible:s.launchState==="blocked";text:win.t("Falls iOS „Nicht vertrauenswürdiger Entwickler“ meldet:");color:"#f1bd70";font.pixelSize:16;wrapMode:Text.WordWrap;Layout.fillWidth:true}
-                        Text {objectName:"manualTrustFallback";visible:s.launchState==="blocked" && s.settingsNavigation==="manual";text:win.t("Bitte am iPhone selbst öffnen:");color:"#f1bd70";font.pixelSize:17;font.weight:Font.DemiBold;wrapMode:Text.WordWrap;Layout.fillWidth:true}
-                        Text {visible:s.launchState==="blocked";text:win.t("Einstellungen → Allgemein → VPN & Geräteverwaltung → Entwicklungsteam → Vertrauen.");color:win.ink;font.pixelSize:17;wrapMode:Text.WordWrap;Layout.fillWidth:true}
-                        Text {visible:s.launchState==="blocked";text:win.t("iPhone entsperrt lassen. Danach erneut starten.");color:win.ink;font.pixelSize:16;wrapMode:Text.WordWrap;Layout.fillWidth:true}
-                        RowLayout {visible:s.launchState==="blocked";Layout.alignment:Qt.AlignHCenter
-                            Action {text:win.t("Einstellungen am iPhone öffnen");enabled:!s.foregroundBusy;onClicked:backend.openTrustSettings()}
-                            Action {text:win.t("DirectSide starten");enabled:!s.foregroundBusy;onClicked:backend.launchDirectSide()}
-                        }
-                        Action {visible:s.launchState==="opened";Layout.alignment:Qt.AlignHCenter;text:win.t("Fertig");onClicked:{backend.acknowledgeSetup();win.page="install"}}
+                        Text {objectName:"launchGuideTitle";text:win.t("DirectSide am iPhone freigeben");color:win.ink;font.pixelSize:24;font.weight:Font.DemiBold;horizontalAlignment:Text.AlignHCenter;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Text {objectName:"manualTrustFallback";text:win.t("Am iPhone:");color:"#f1bd70";font.pixelSize:17;font.weight:Font.DemiBold;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Text {text:win.t("1. Einstellungen > Allgemein > VPN & Geräteverwaltung.");color:win.ink;font.pixelSize:17;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Text {text:win.t("2. Entwicklungsteam auswählen und Vertrauen bestätigen.");color:win.ink;font.pixelSize:17;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Text {text:win.t("3. DirectSide auf dem iPhone öffnen.");color:win.ink;font.pixelSize:17;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Action {objectName:"finishManualSetup";Layout.alignment:Qt.AlignHCenter;text:win.t("Fertig");onClicked:{backend.acknowledgeSetup();win.page="install"}}
                         Item {Layout.fillHeight:true}
                     }
                 }
