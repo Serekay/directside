@@ -13,7 +13,7 @@ async fn main()->Result<(),Report> {
 }
 async fn run()->Result<(),Report> {
     let action=std::env::args().nth(1).unwrap_or_else(||"--inventory".into());
-    if !["--inventory","--remove-test-apps","--forget-pairing"].contains(&action.as_str()){bail!("Use --inventory, --remove-test-apps or --forget-pairing.");}
+    if !["--inventory","--remove-test-apps","--remove-directside","--forget-pairing"].contains(&action.as_str()){bail!("Use --inventory, --remove-test-apps, --remove-directside or --forget-pairing.");}
     let mut mux=UsbmuxdConnection::default().await?;
     let devices=mux.get_devices().await?;
     if devices.len()!=1 {bail!("Exactly one trusted, unlocked iPhone is required.");}
@@ -24,7 +24,16 @@ async fn run()->Result<(),Report> {
     let targets:Vec<_>=apps.iter().filter(|(id,_)|test_app(id)).map(|(id,info)|(id.clone(),info.as_dictionary().and_then(|d|d.get("CFBundleDisplayName")).and_then(plist::Value::as_string).unwrap_or("Test app").to_string())).collect();
     println!("Developer Mode: {}. Test apps present: {}.",if mode {"on"}else{"off"},targets.len());
     for (_,name) in &targets {println!("Test app: {name}");}
-    if action=="--remove-test-apps" {
+    if action=="--remove-directside" {
+        for (id,name) in &targets {
+            if id=="com.directside.app" || id.starts_with("com.directside.app.") {
+                proxy.uninstall(id.clone(),None).await?;println!("Removed: {name}");
+            }
+        }
+        let remaining=proxy.get_apps(Some("User"),None).await?;
+        if remaining.keys().any(|id|id=="com.directside.app" || id.starts_with("com.directside.app.")){bail!("DirectSide is still installed.");}
+        println!("DirectSide absent. Other apps, Apple App IDs and certificates were not modified.");
+    } else if action=="--remove-test-apps" {
         for (id,name) in &targets {proxy.uninstall(id.clone(),None).await?;println!("Removed: {name}");}
         let remaining=proxy.get_apps(Some("User"),None).await?;
         if remaining.keys().any(|id|test_app(id)){bail!("A test app is still installed.");}

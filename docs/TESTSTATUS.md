@@ -41,7 +41,14 @@ setzt Windows die Kopplung/Schlüsselübertragung für genau dieses Gerät und d
 ursprünglichen Account fort. Importierte Zertifikate werden dabei unterstützt.
 Tests decken Warten, Trennen/Wiederverbinden, Fortsetzen, App-Neustart und die
 Abgrenzung zu anderen Geräten ab. Der echte Frischstarttest mit ausgeschaltetem
-Entwicklermodus ist vom Betreiber gewünscht und noch durchzuführen.
+Entwicklermodus läuft: Am angeschlossenen Gerät wurde Modus „aus“ und nach
+gezielter Deinstallation keine der drei Setup-Apps festgestellt. Die lokale
+Build-9-IPA wurde über den echten Windows-Einrichtungsablauf installiert;
+das Ereignis `developer_mode_required` erreicht die vorgesehene Warteansicht.
+Die Aktivierung/Neustartbestätigung am iPhone und das automatische Fortsetzen
+sind noch offen. Der auf diesem Gerät bereits sichtbare Schalter belegt keinen
+Hardwaretest mit anfänglich unsichtbarem Schalter. Windows ohne installierte
+Apple-Komponenten ist ebenfalls noch nicht praktisch geprüft.
 
 Build 9 ist über Action
 [40151158809](https://github.com/Serekay/directside/actions/runs/40151158809)

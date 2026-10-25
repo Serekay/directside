@@ -100,6 +100,8 @@ DirectSide through Instruments; it does not install or replace it.
 
 The optional `iphone-reset-setup` helper is restricted to the owner-requested
 fresh setup test. `--inventory` reads the three setup apps and Developer Mode.
+`--remove-directside` removes only DirectSide and verifies its absence, for
+restarting an interrupted first-install test without removing other apps.
 `--remove-test-apps` removes DirectSide, LiveContainer (including local guests)
 and LocalDevVPN only. After the owner disables Developer Mode and restarts,
 `--forget-pairing` refuses to proceed unless those apps are absent and the mode
