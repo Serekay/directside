@@ -7,6 +7,7 @@
 - Do not claim that a successful build proves successful device installation or self-renewal. State which hardware checks actually ran.
 - The owner has a normal Apple ID. LocalDevVPN remains external; seven-day and other Apple limits still apply.
 - LocalDevVPN setup belongs exclusively to the iPhone introduction/settings. Do not show its install prompt, QR code or missing-status badge in Windows, or require it before the USB installation of DirectSide.
+- Keep the Windows start page focused on DirectSide. Offer other IPA installs through a visible plus button and a separate page. Show Developer Mode guidance when the installation flow actually needs it, without a persistent start-page badge or warning.
 - Use branch names beginning with codex/.
 - Build Windows locally with scripts/build-windows.ps1. GitHub Actions is only for manually requested iPhone builds; do not add Windows CI or automatic runs.
 - Preserve the compact iLoader-inspired Qt Quick desktop: custom window chrome, status badges, icon settings, inline authentication and no scrollbar in the main view.

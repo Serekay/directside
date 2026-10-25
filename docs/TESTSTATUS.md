@@ -1,5 +1,21 @@
 # Teststand vom 25. Oktober 2026
 
+## Vereinfachte Windows-Startseite
+
+Kein dauerhafter Dev-Badge und kein Entwicklermodus-Hinweis unter Installieren.
+Die erforderliche Anleitung nach einer Installation bleibt erhalten, weil
+DirectSide bei ausgeschaltetem Entwicklermodus noch nicht starten kann.
+Ein sichtbares Plus neben dem Gerät öffnet einen eigenen IPA-Bereich mit
+Dateiauswahl und Installieren; die DirectSide-Karte enthält nur DirectSide.
+Zahnrad symmetrisch korrigiert. Hilfemenü auf Einrichtung und Aktivität gekürzt;
+Updates, Zertifikate und App-Kennungen über die Einstellungen erreichbar.
+74 Python/Qt-Tests bestanden, einschließlich Plus-Navigation und getrennten
+Installationsbereichen sowie erreichbaren Einstellungen bei minimaler
+Fenstergröße in beiden Sprachen. Windows-Paket neu gebaut, Startprüfung
+bestanden. Plus-Seite, Zahnrad, zweizeiliges Hilfemenü und vollständig sichtbare
+Einstellungen im laufenden Paket geprüft; anschließend Startseite geöffnet.
+Kein iPhone-Eingriff.
+
 ## LocalDevVPN ausschließlich auf dem iPhone einrichten
 
 Windows zeigt keinen LocalDevVPN-Installationsbereich, QR-Code oder fehlenden
