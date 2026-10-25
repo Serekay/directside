@@ -21,8 +21,15 @@ ApplicationWindow {
     property int appIdPage: 0
     property bool certificateLimitShown: false
     property string developerHelpDevice: ""
+    property string pageBeforeReconnect: "install"
+    property bool reconnectShown: false
     onSChanged: {
-        if(s.usbTrustPending) page="trust"
+        if(s.usbReconnectNeeded) {
+            if(!reconnectShown) {pageBeforeReconnect=page;reconnectShown=true;page="reconnect"}
+        }
+        else if(reconnectShown) {reconnectShown=false;if(page==="reconnect")page=pageBeforeReconnect}
+        if(s.usbReconnectNeeded) {}
+        else if(s.usbTrustPending) page="trust"
         else if(page==="trust") page="install"
         else if(s.setupPending) page="developer"
         else if(s.setupReady) page="developer"
@@ -101,7 +108,7 @@ ApplicationWindow {
                 Image {source:s.icon;Layout.preferredWidth:38;Layout.preferredHeight:38;sourceSize.width:76;sourceSize.height:76}
                 Label {text:"DirectSide";font.pixelSize:22;font.weight:Font.DemiBold;font.letterSpacing:-0.6}
                 Badge {text:s.version}
-                Badge {text:s.devices.length?win.t("●  USB verbunden"):win.t("Nicht verbunden");tone:s.devices.length?"ok":"warning"}
+                Badge {text:s.devices.length?win.t("●  USB verbunden"):s.usbReconnectNeeded?win.t("USB unterbrochen"):win.t("Nicht verbunden");tone:s.devices.length?"ok":s.usbReconnectNeeded?"missing":"warning"}
                 Item {Layout.fillWidth:true}
                 Action {objectName:"windowsUpdateButton";visible:s.windowsUpdate;text:win.t("Update");primary:true;implicitHeight:32;enabled:!s.updateBusy && !s.directsideInstalling && (!s.busy || s.scanning);onClicked:backend.updateWindows();ToolTip.visible:hovered;ToolTip.text:s.releaseVersion}
                 IconButton {text:"⚙";hint:win.t("Einstellungen");onClicked:win.page=win.page==="settings" ? "install":"settings"}
@@ -178,7 +185,36 @@ ApplicationWindow {
             }
             ColumnLayout {
                 Layout.fillWidth:true;Layout.fillHeight:true;spacing:16
-                RowLayout {Layout.preferredHeight:30
+                Card {
+                    objectName:"usbReconnectCard";visible:win.page==="reconnect" && s.usbReconnectNeeded
+                    Layout.fillWidth:true;Layout.fillHeight:true;border.color:"#b57a37"
+                    ColumnLayout {
+                        anchors.centerIn:parent;width:parent.width-48;spacing:18
+                        Item {
+                            objectName:"usbReconnectAnimation";Layout.alignment:Qt.AlignHCenter;implicitWidth:160;implicitHeight:132
+                            Rectangle {x:56;y:0;width:48;height:78;radius:10;color:"#15171b";border.width:3;border.color:"#f1bd70"
+                                Rectangle {anchors.horizontalCenter:parent.horizontalCenter;y:65;width:18;height:3;radius:1;color:"#f1bd70"}
+                            }
+                            Rectangle {
+                                id:reconnectPlug;x:69;y:94;width:22;height:27;radius:5;color:"#f1bd70"
+                                Rectangle {anchors.horizontalCenter:parent.horizontalCenter;y:-9;width:13;height:12;radius:2;color:"#f1bd70"}
+                                Rectangle {anchors.horizontalCenter:parent.horizontalCenter;y:25;width:5;height:26;color:"#f1bd70"}
+                                SequentialAnimation on y {
+                                    objectName:"usbReconnectPulse"
+                                    running:win.page==="reconnect" && s.usbReconnectNeeded;loops:Animation.Infinite
+                                    NumberAnimation {from:103;to:88;duration:850;easing.type:Easing.InOutSine}
+                                    PauseAnimation {duration:250}
+                                    NumberAnimation {from:88;to:103;duration:850;easing.type:Easing.InOutSine}
+                                    PauseAnimation {duration:450}
+                                }
+                            }
+                        }
+                        Text {objectName:"usbReconnectTitle";text:win.t("USB-Verbindung verloren");color:win.ink;font.pixelSize:23;font.weight:Font.DemiBold;horizontalAlignment:Text.AlignHCenter;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Text {text:win.t("iPhone entsperren und Kabel neu einstecken.");color:"#f1bd70";font.pixelSize:16;horizontalAlignment:Text.AlignHCenter;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Action {text:win.t("Erneut prüfen");Layout.alignment:Qt.AlignHCenter;enabled:!s.busy;onClicked:backend.refresh()}
+                    }
+                }
+                RowLayout {visible:win.page!=="reconnect";Layout.preferredHeight:30
                     IconButton {visible:win.page!=="install";text:"‹";hint:win.t("Zurück");onClicked:win.page="install"}
                     Label {text:win.page==="appids"?win.t("App-Kennungen"):win.page==="identity"?win.t("Signierung"):win.page==="developer"?win.t("Entwicklermodus"):win.page==="certificates"?win.t("Zertifikate"):win.page==="confirm"?win.t("Entfernen bestätigen"):win.page==="settings"?win.t("Einstellungen"):win.page==="activity"?win.t("Aktivität"):win.page==="help"?win.t("Hilfe"):win.page==="apps"?win.t("Installierte Apps"):win.t("DEIN GERÄT");font.pixelSize:win.page==="install"?10:17;font.letterSpacing:win.page==="install"?1.6:0;color:win.page==="install"?win.muted:win.ink;font.weight:Font.DemiBold}
                     Item {Layout.fillWidth:true}

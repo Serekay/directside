@@ -443,5 +443,8 @@
   "Original-IPA auswählen.": "Select the original IPA.",
   "1. iPhone entsperren": "1. Unlock your iPhone",
   "2. Auf dem iPhone Vertrauen bestätigen": "2. Confirm Trust on your iPhone",
-  "Nach dem Neustart: USB-Kabel erneut einstecken.": "After restarting: reconnect the USB cable."
+  "Nach dem Neustart: USB-Kabel erneut einstecken.": "After restarting: reconnect the USB cable.",
+  "USB-Verbindung verloren": "USB connection lost",
+  "iPhone entsperren und Kabel neu einstecken.": "Unlock your iPhone and reconnect the cable.",
+  "USB unterbrochen": "USB disconnected"
 }

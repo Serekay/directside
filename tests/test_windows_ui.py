@@ -29,6 +29,34 @@ class WindowsUIStateTests(unittest.TestCase):
   self.bridge.update(error='')
   self.bridge.close();self.bridge.exited();self.bridge.processError()
   self.assertEqual(self.bridge.data['error'],'')
+ def test_usb_loss_is_distinct_from_first_start_and_recovers(self):
+  self.bridge.handle({'event':'devices','devices':[]})
+  self.assertFalse(self.bridge.data['usbReconnectNeeded'])
+  self.bridge.handle({'event':'devices','devices':[{'id':'phone','trusted':True}]})
+  self.bridge.handle({'event':'devices','devices':[]})
+  self.assertTrue(self.bridge.data['usbReconnectNeeded'])
+  self.bridge.handle({'event':'devices','devices':[]})
+  self.assertTrue(self.bridge.data['usbReconnectNeeded'])
+  self.bridge.handle({'event':'devices','devices':[{'id':'phone','trusted':True}]})
+  self.assertFalse(self.bridge.data['usbReconnectNeeded'])
+  self.bridge.handle({'event':'error','command':'devices','message':'USB service unavailable'})
+  self.assertTrue(self.bridge.data['usbReconnectNeeded']);self.assertEqual(self.bridge.data['devices'],[])
+  self.assertFalse(self.bridge.data['error'])
+ def test_usb_reconnect_guide_preserves_page_and_fits_small_window(self):
+  from PySide6.QtCore import QPointF
+  engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
+  engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')));root=engine.rootObjects()[0]
+  root.setWidth(960);root.setHeight(680);root.setProperty('page','appids')
+  self.bridge.update(usbReconnectNeeded=True,devices=[]);APP.processEvents()
+  card=root.findChild(QObject,'usbReconnectCard');title=root.findChild(QObject,'usbReconnectTitle')
+  self.assertTrue(card.property('visible'));self.assertEqual(root.property('page'),'reconnect')
+  pulse=root.findChild(QObject,'usbReconnectPulse');self.assertTrue(pulse.property('running'))
+  point=title.mapToScene(QPointF(0,0));self.assertGreater(point.y(),78)
+  self.assertLess(point.y()+title.height(),620)
+  self.bridge.update(usbReconnectNeeded=False);APP.processEvents()
+  self.assertFalse(card.property('visible'));self.assertEqual(root.property('page'),'appids')
+  self.assertFalse(pulse.property('running'))
+  root.close();engine.deleteLater();APP.processEvents()
  def test_pending_setup_reconnect_hint_only_when_disconnected(self):
   engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
   engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')));root=engine.rootObjects()[0]
