@@ -1,5 +1,27 @@
 # Teststand vom 25. Oktober 2026
 
+## Einrichtung ohne Zurückspringen aus Einstellungen und Hilfe
+
+Die bisherige Navigation wertete jede Statusmeldung als Anlass aus, den
+Einrichtungsschritt erneut aufzurufen. Automatische Schrittwechsel gelten jetzt
+nur innerhalb der Einrichtungsansichten; manuell geöffnete Einstellungen, Hilfe,
+Protokoll und Detailseiten bleiben geöffnet. Zurück führt direkt zum aktuellen
+Schritt statt kurz zur erneut installierbaren Hauptkarte.
+„Show switch“ entfällt: Der Aufruf blendet den iOS-Schalter ein, öffnet aber
+keine Einstellungsseite; dieser Aufruf erfolgt bereits bei der Installation.
+Entwicklermodus wird automatisch geprüft, ohne manuelles Check-again und ohne
+deaktivierten Warte-Button. Die USB-Neuprüfung liegt als Aktualisieren-Symbol
+mit Tooltip „USB-Verbindung prüfen“ auf dem Disconnect-Bildschirm. Der explizite
+Start nach Teamfreigabe heißt „DirectSide starten“, Zertifikate haben eine
+konkrete Aktualisieren-Beschriftung. 78 Python/Qt-Tests bestanden, einschließlich
+Seitenstabilität bei Prüfungen, Freigabe- und Startzustandswechseln sowie
+expliziter Rückkehr in den Ablauf. Windows neu gebaut, Paket-Startprüfung
+bestanden. Im laufenden echten Einrichtungsschritt blieben Einstellungen
+und Hilfe jeweils über mehrere automatische Prüfungen geöffnet; Zurück führte
+zum Entwicklermodus-Schritt. Anmeldefelder waren nach dem Windows-Neustart
+wieder sichtbar; der Assistent hat keine erneute Anmeldung vorgenommen.
+Keine iPhone-Einstellungen automatisiert.
+
 ## Stabile Statusanzeigen am zugehörigen Bereich
 
 Die Geräteprüfung setzte vor jeder Antwort App-Anzahl und Komponentenstatus

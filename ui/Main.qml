@@ -26,6 +26,10 @@ ApplicationWindow {
     property bool developerDisabled: s.developerMode==="disabled"
     property bool developerSuccess: s.setupReady || (developerEnabled && !s.setupPending)
     property bool helpTrouble: false
+    property bool setupPageActive: ["install","developer","trust","launch"].indexOf(page)>=0
+    function returnToSetup() {
+        page=s.usbReconnectNeeded?"reconnect":s.usbTrustPending?"trust":s.launchState!=="idle"?"launch":s.setupPending || s.setupReady || (s.directsidePresent && developerDisabled)?"developer":"install"
+    }
     property string helpStep: s.usbState==="missing" || s.usbState==="stopped" ? "apple" : !s.devices.length ? "connect" : !s.canSign ? (s.signingMode==="imported"?"certificate":"account") : !s.directsidePresent ? "install" : !developerEnabled ? "developer" : "iphone"
     onSChanged: {
         if(s.usbReconnectNeeded) {
@@ -33,11 +37,11 @@ ApplicationWindow {
         }
         else if(reconnectShown) {reconnectShown=false;if(page==="reconnect")page=pageBeforeReconnect}
         if(s.usbReconnectNeeded) {}
-        else if(s.usbTrustPending) page="trust"
-        else if(s.launchState!=="idle") page="launch"
+        else if(setupPageActive && s.usbTrustPending) page="trust"
+        else if(setupPageActive && s.launchState!=="idle") page="launch"
         else if(page==="trust") page="install"
-        else if(s.setupPending) page="developer"
-        else if(s.setupReady) page="developer"
+        else if(setupPageActive && s.setupPending) page="developer"
+        else if(setupPageActive && s.setupReady) page="developer"
         else if(s.developerMode==="disabled" && s.directsidePresent && !s.foregroundBusy && s.devices.length && page==="install" && developerHelpDevice!==s.devices[s.deviceIndex].id) {developerHelpDevice=s.devices[s.deviceIndex].id;page="developer"}
         if(certificatePage*3>=s.certificates.length) certificatePage=0
         if(appIdPage*3>=s.appIds.length) appIdPage=0
@@ -117,7 +121,7 @@ ApplicationWindow {
                 Badge {text:s.devices.length?win.t("●  USB verbunden"):s.usbReconnectNeeded?win.t("USB unterbrochen"):win.t("Nicht verbunden");tone:s.devices.length?"ok":s.usbReconnectNeeded?"missing":"warning"}
                 Item {Layout.fillWidth:true}
                 Action {objectName:"windowsUpdateButton";visible:s.windowsUpdate && win.page!=="settings";text:win.t("Update");primary:true;implicitHeight:32;enabled:!s.updateBusy && !s.directsideInstalling && (!s.foregroundBusy || s.scanning);onClicked:backend.updateWindows();ToolTip.visible:hovered;ToolTip.text:s.releaseVersion}
-                IconButton {text:"⚙";hint:win.t("Einstellungen");onClicked:win.page=win.page==="settings" ? "install":"settings"}
+                IconButton {text:"⚙";hint:win.t("Einstellungen");onClicked:if(win.page==="settings")win.returnToSetup();else win.page="settings"}
                 IconButton {text:"?";hint:win.t("Hilfe");onClicked:{win.helpTrouble=false;win.page="help"}}
                 Rectangle {width:1;height:20;color:"#34373e";Layout.leftMargin:6;Layout.rightMargin:6}
                 IconButton {text:"−";hint:win.t("Minimieren");onClicked:win.showMinimized()}
@@ -217,13 +221,13 @@ ApplicationWindow {
                         Text {visible:s.usbRepairState!=="idle";text:win.t(s.usbRepairState==="repairing"?"USB-Verbindung wird wiederhergestellt. Windows-Abfrage bestätigen.":s.usbRepairState==="failed"?"USB-Wiederherstellung nicht abgeschlossen.":"Warte auf den Apple-USB-Dienst …");color:"#f1bd70";font.pixelSize:14;horizontalAlignment:Text.AlignHCenter;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                         Label {objectName:"usbCheckStatus";text:win.t("Automatische Prüfung alle 3 Sekunden")+(s.deviceCheckedAt?" · "+s.deviceCheckedAt:"");color:win.muted;Layout.alignment:Qt.AlignHCenter;font.pixelSize:12}
                         RowLayout {Layout.alignment:Qt.AlignHCenter
-                            Action {text:win.t("Erneut prüfen");enabled:!s.foregroundBusy;onClicked:backend.refresh()}
+                            IconButton {objectName:"usbReconnectRefresh";text:"↻";implicitWidth:44;implicitHeight:44;hint:win.t("USB-Verbindung prüfen");enabled:!s.foregroundBusy;onClicked:backend.refresh()}
                             Action {visible:s.usbRepairState==="failed" || s.usbRepairState==="waiting";text:win.t("USB wiederherstellen");enabled:!s.foregroundBusy;onClicked:backend.recoverUSB()}
                         }
                     }
                 }
                 RowLayout {visible:win.page!=="reconnect";Layout.preferredHeight:30
-                    IconButton {visible:win.page!=="install";text:"‹";hint:win.t("Zurück");onClicked:win.page="install"}
+                    IconButton {objectName:"setupBackButton";visible:win.page!=="install";text:"‹";hint:win.t("Zurück");onClicked:win.returnToSetup()}
                     Label {text:win.page==="customipa"?win.t("Andere App installieren"):win.page==="appids"?win.t("App-Kennungen"):win.page==="identity"?win.t("Installieren mit"):win.page==="developer"?win.t("Entwicklermodus"):win.page==="certificates"?win.t("Zertifikate"):win.page==="confirm"?win.t("Entfernen bestätigen"):win.page==="settings"?win.t("Einstellungen"):win.page==="activity"?win.t("Protokoll"):win.page==="help"?win.t("Hilfe"):win.page==="apps"?win.t("Installierte Apps"):win.t("DEIN GERÄT");font.pixelSize:win.page==="install"?10:17;font.letterSpacing:win.page==="install"?1.6:0;color:win.page==="install"?win.muted:win.ink;font.weight:Font.DemiBold}
                     Item {Layout.fillWidth:true}
                     Action {visible:win.page==="activity";text:win.t("Kopieren");enabled:s.logs.length>0;onClicked:backend.copyActivity()}
@@ -241,7 +245,6 @@ ApplicationWindow {
                             Badge {objectName:"deviceSlotsBadge";visible:s.devices.length>0;text:s.slotsUsed>=0?s.slotsUsed+" "+win.t("Sideload-Apps"):win.t("App-Plätze nicht geprüft");tone:s.slotsUsed<0?"warning":"neutral"}
                         }
                         ComboBox {visible:s.devices.length>1;model:s.devices;textRole:"label";currentIndex:s.deviceIndex;enabled:!s.foregroundBusy;onActivated:index=>backend.selectDevice(index);Layout.maximumWidth:210}
-                        IconButton {text:"↻";implicitWidth:44;implicitHeight:44;hint:win.t("Geräte aktualisieren");enabled:!s.foregroundBusy;onClicked:backend.refresh()}
                         IconButton {text:"▦";implicitWidth:44;implicitHeight:44;hint:win.t("Installierte Apps");enabled:s.devices.length>0;onClicked:{win.appPage=0;win.page="apps"}}
                         IconButton {objectName:"addAppButton";text:"+";iconName:"plus";implicitWidth:44;implicitHeight:44;hint:win.t("Andere App installieren");enabled:!s.foregroundBusy && !s.directsideInstalling;onClicked:win.page="customipa"}
                     }
@@ -267,7 +270,7 @@ ApplicationWindow {
                         Text {visible:s.launchState==="blocked";text:win.t("iPhone entsperrt lassen. Danach erneut starten.");color:win.ink;font.pixelSize:16;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                         RowLayout {visible:s.launchState==="blocked";Layout.alignment:Qt.AlignHCenter
                             Action {text:win.t("Einstellungen am iPhone öffnen");enabled:!s.foregroundBusy;onClicked:backend.openTrustSettings()}
-                            Action {text:win.t("Erneut prüfen");enabled:!s.foregroundBusy;onClicked:backend.launchDirectSide()}
+                            Action {text:win.t("DirectSide starten");enabled:!s.foregroundBusy;onClicked:backend.launchDirectSide()}
                         }
                         Action {visible:s.launchState==="opened";Layout.alignment:Qt.AlignHCenter;text:win.t("Fertig");onClicked:{backend.acknowledgeSetup();win.page="install"}}
                         Item {Layout.fillHeight:true}
@@ -286,13 +289,13 @@ ApplicationWindow {
                         Text {objectName:"setupReconnectHint";visible:s.setupPending && s.devices.length===0;text:win.t("Nach dem Neustart: USB-Kabel erneut einstecken.");color:win.accent;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                         Text {visible:win.developerDisabled;text:win.t("1. Einstellungen → Datenschutz & Sicherheit → Entwicklermodus einschalten.");font.pixelSize:16;color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                         Text {visible:win.developerDisabled;text:win.t("2. Neustarten → Entsperren → Aktivieren bestätigen.");font.pixelSize:16;color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
-                        Text {visible:win.developerDisabled;text:win.t("Fehlt der Schalter: zuerst DirectSide installieren, dann erneut nachsehen.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
-                        Text {visible:!win.developerEnabled && !win.developerDisabled;text:win.t("iPhone entsperren und per USB verbinden. Dann erneut prüfen.");color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Text {visible:win.developerDisabled && !s.directsidePresent && !s.setupPending;text:win.t("Fehlt der Schalter: zuerst DirectSide installieren, dann erneut nachsehen.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Text {visible:!win.developerEnabled && !win.developerDisabled;text:win.t("iPhone entsperren und per USB verbinden.");color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                         Text {visible:win.developerEnabled && !s.setupPending && !s.setupReady;text:win.t("Du musst hier nichts mehr tun.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                         Label {visible:s.setupReady;text:win.t("DirectSide gestartet.");color:win.accent;font.weight:Font.DemiBold}
-                        RowLayout {visible:!win.developerEnabled;Action {visible:win.developerDisabled;text:win.t("Schalter anzeigen");enabled:s.devices.length>0 && !s.foregroundBusy;onClicked:backend.revealDeveloperMode()} Action {objectName:"developerModeRefresh";text:win.t("Erneut prüfen");enabled:!s.foregroundBusy;onClicked:backend.refresh()}}
+                        Label {objectName:"developerAutoCheck";visible:!win.developerEnabled || s.setupPending;text:win.t("Automatische Prüfung alle 3 Sekunden");color:win.muted;font.pixelSize:12}
                         Item {Layout.fillHeight:true}
-                        Action {objectName:"developerModeDone";text:win.t(s.setupPending ? "Warte auf das iPhone …":win.developerSuccess ? "Fertig":"Zurück");primary:true;enabled:!s.setupPending;onClicked:{backend.acknowledgeSetup();win.page="install"}}
+                        Action {objectName:"developerModeDone";visible:!s.setupPending;text:win.t(win.developerSuccess?"Fertig":"Zurück");primary:true;onClicked:{backend.acknowledgeSetup();win.page="install"}}
                     }
                 }
                 Card {
@@ -383,13 +386,11 @@ ApplicationWindow {
                     objectName:"helpCard";visible:win.page==="help";Layout.fillWidth:true;Layout.fillHeight:true;Layout.minimumHeight:260
                     ColumnLayout {anchors.fill:parent;anchors.margins:24;spacing:18
                         Text {objectName:"helpNextTitle";text:win.t(win.helpStep==="apple"?"iPhone-Verbindung vorbereiten":win.helpStep==="connect"?"iPhone anschließen":win.helpStep==="certificate"?"Zertifikat einrichten":win.helpStep==="account"?"Bei Apple anmelden":win.helpStep==="install"?"DirectSide installieren":win.helpStep==="developer"?(win.developerDisabled?"DirectSide zum Starten freigeben":"iPhone-Status prüfen"):"Auf dem iPhone fortfahren");font.pixelSize:23;font.weight:Font.DemiBold;color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
-                        Text {objectName:"helpNextInstruction";text:win.t(win.helpStep==="apple"?"Windows benötigt die Apple-Unterstützung, um dein iPhone zu erkennen.":win.helpStep==="connect"?"Verbinde dein iPhone per USB und entsperre es. Bestätige „Vertrauen“, falls das iPhone danach fragt.":win.helpStep==="certificate"?"Wähle dein Zertifikat und die zugehörigen Profile aus.":win.helpStep==="account"?"Melde dich links mit deinem Apple Account an.":win.helpStep==="install"?"Installiere DirectSide. Danach führt Windows dich durch die nötigen Freigaben am iPhone.":win.helpStep==="developer"?(win.developerDisabled?"Aktiviere den Entwicklermodus am iPhone. Die Anleitung zeigt dir die Schritte.":"Lass dein iPhone entsperrt und per USB angeschlossen. Prüfe dann erneut."):"Öffne DirectSide auf deinem iPhone und folge dort der Einführung.");font.pixelSize:16;color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Text {objectName:"helpNextInstruction";text:win.t(win.helpStep==="apple"?"Windows benötigt die Apple-Unterstützung, um dein iPhone zu erkennen.":win.helpStep==="connect"?"Verbinde dein iPhone per USB und entsperre es. Bestätige „Vertrauen“, falls das iPhone danach fragt.":win.helpStep==="certificate"?"Wähle dein Zertifikat und die zugehörigen Profile aus.":win.helpStep==="account"?"Melde dich links mit deinem Apple Account an.":win.helpStep==="install"?"Installiere DirectSide. Danach führt Windows dich durch die nötigen Freigaben am iPhone.":win.helpStep==="developer"?(win.developerDisabled?"Aktiviere den Entwicklermodus am iPhone. Die Anleitung zeigt dir die Schritte.":"Lass dein iPhone entsperrt und per USB angeschlossen. Der Status wird automatisch geprüft."):"Öffne DirectSide auf deinem iPhone und folge dort der Einführung.");font.pixelSize:16;color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                         Action {objectName:"helpAppleSetup";visible:win.helpStep==="apple" && !s.foregroundBusy && !s.setupBusy;text:win.t("Apple-Unterstützung einrichten");primary:true;onClicked:backend.setupComponents()}
-                        Action {objectName:"helpConnectCheck";visible:win.helpStep==="connect" && !s.foregroundBusy;text:win.t("Verbindung prüfen");onClicked:backend.refresh()}
                         Action {visible:win.helpStep==="certificate" && !s.foregroundBusy;text:win.t("Zertifikat einrichten");onClicked:win.page="identity"}
                         Action {objectName:"helpInstall";visible:win.helpStep==="install" && !s.foregroundBusy && !s.updateBusy && !s.directsideInstalling && (s.bundledIPAReady || s.releaseIPA);text:win.t("DirectSide installieren");primary:true;onClicked:backend.installDirectSide()}
                         Action {objectName:"helpDeveloper";visible:win.helpStep==="developer" && win.developerDisabled;text:win.t("Anleitung öffnen");primary:true;onClicked:win.page="developer"}
-                        Action {visible:win.helpStep==="developer" && !win.developerDisabled && !s.foregroundBusy;text:win.t("Erneut prüfen");onClicked:backend.refresh()}
                         Action {visible:win.helpStep==="iphone" && s.canSign && s.bundledIPAReady && !s.foregroundBusy && !s.updateBusy && !s.setupPending;text:win.t("App startet nicht?");quiet:true;onClicked:win.helpTrouble=!win.helpTrouble}
                         Text {visible:win.helpTrouble && win.helpStep==="iphone";text:win.t("Falls iOS danach fragt: Einstellungen → Allgemein → VPN & Geräteverwaltung → Entwicklungsteam → Vertrauen.");color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                         Action {objectName:"repairDirectSideButton";visible:win.helpTrouble && win.helpStep==="iphone" && s.canSign && s.bundledIPAReady && !s.foregroundBusy && !s.updateBusy && !s.setupPending;text:win.t("Einrichtung reparieren");onClicked:if(backend.repairDirectSide())win.page="install"}
@@ -469,7 +470,7 @@ ApplicationWindow {
                 Card {
                     visible:win.page==="certificates";Layout.fillWidth:true;Layout.fillHeight:true
                     ColumnLayout {anchors.fill:parent;anchors.margins:24;spacing:12
-                        RowLayout {Label {text:s.team;Layout.fillWidth:true} Badge {objectName:"certificateCountBadge";text:win.t("Zertifikate")+" · "+(s.certificatesLoaded?String(s.certificates.length):"?");tone:s.certificateLimit?"missing":"neutral"} IconButton {text:"↻";hint:win.t("Erneut prüfen");enabled:s.loggedIn && !s.foregroundBusy;onClicked:backend.loadCertificates()}}
+                        RowLayout {Label {text:s.team;Layout.fillWidth:true} Badge {objectName:"certificateCountBadge";text:win.t("Zertifikate")+" · "+(s.certificatesLoaded?String(s.certificates.length):"?");tone:s.certificateLimit?"missing":"neutral"} IconButton {text:"↻";hint:win.t("Zertifikate aktualisieren");enabled:s.loggedIn && !s.foregroundBusy;onClicked:backend.loadCertificates()}}
                         Text {text:win.t("Ein Zertifikat kann mehrere Apps signieren.");color:win.muted;font.pixelSize:12;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                         Action {objectName:"manageDeviceAppsButton";text:win.t("Apps auf diesem Gerät")+" · "+(s.slotsUsed>=0?s.slotsUsed+win.t(" Entwickler-Apps"):"?");enabled:s.devices.length>0 && !s.foregroundBusy;onClicked:{win.page="apps";win.developerOnly=true;backend.inspectDevice()}}
                         Repeater {model:s.certificates.slice(win.certificatePage*3,win.certificatePage*3+3)
