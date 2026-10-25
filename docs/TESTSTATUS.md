@@ -2,18 +2,18 @@
 
 ## USB-Ausfall nach iPhone-Neustart: Reparatur und Windows-Zustimmung
 
-Am angeschlossenen Ger?t erkennt Windows genau ein Apple-USB-Ger?t; Apples
-laufender Verbindungsdienst liefert gleichzeitig null Ger?te. Erneutes
+Am angeschlossenen Gerät erkennt Windows genau ein Apple-USB-Gerät; Apples
+laufender Verbindungsdienst liefert gleichzeitig null Geräte. Erneutes
 Einstecken und die bisherige reine PnP-Reparatur haben diesen Fall nicht behoben.
-Die neue Reparatur startet zus?tzlich den Apple Mobile Device Service neu und
-setzt ausschlie?lich das einzeln gepr?fte Apple-USB-Verbundger?t zur?ck.
-Sie beginnt erst nach einem bewussten Klick mit vorheriger Erkl?rung der
-Windows-Abfrage. Nein/Schlie?en wird als Abbruch behandelt, ohne automatische
-Wiederholung. Nach dem Helfer wird bis zu 25 Sekunden die tats?chliche
-USB-Ger?teliste gepr?ft; ein erfolgreicher Prozess alleine z?hlt nicht als
-wiederhergestellte Verbindung. 81 Python/Qt-Tests bestanden, einschlie?lich
-Abbruch, fehlgeschlagener Diensterneuerung und leerer Ger?teliste trotz
-Helfer-Erfolg. Hardware-Reparatur mit anschlie?ender Windows-Zustimmung des
+Die neue Reparatur startet zusätzlich den Apple Mobile Device Service neu und
+setzt ausschließlich das einzeln geprüfte Apple-USB-Verbundgerät zurück.
+Sie beginnt erst nach einem bewussten Klick mit vorheriger Erklärung der
+Windows-Abfrage. Nein/Schließen wird als Abbruch behandelt, ohne automatische
+Wiederholung. Nach dem Helfer wird bis zu 25 Sekunden die tatsächliche
+USB-Geräteliste geprüft; ein erfolgreicher Prozess alleine zählt nicht als
+wiederhergestellte Verbindung. 81 Python/Qt-Tests bestanden, einschließlich
+Abbruch, fehlgeschlagener Diensterneuerung und leerer Geräteliste trotz
+Helfer-Erfolg. Hardware-Reparatur mit anschließender Windows-Zustimmung des
 Nutzers noch ausstehend; keine erfolgreiche Wiederverbindung behauptet.
 
 
