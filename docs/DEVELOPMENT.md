@@ -147,3 +147,11 @@ actual installed bundle values. Do not change com.directside.app when updating.
 For a published update, increase the semantic version: the updater compares
 release versions, while the build number identifies individual test packages.
 Never replace an already published release binary with a different build.
+
+## Windows documentation preview
+
+Run `.tools/python/Scripts/python.exe scripts/preview-windows.py` to open the
+current QML with sample account/device data and isolated temporary preferences.
+The signing engine and automatic release checks are not started. Capture the
+window with the normal screenshot tool, then close it. This preview does not
+verify USB communication, authentication or installation.

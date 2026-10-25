@@ -1,5 +1,14 @@
 # Teststand vom 25. Oktober 2026
 
+## Windows-Aufnahme und aufklappbare README
+
+Aktuelle QML-Ansicht 0.1.1 (16) über Windows-Screenshotwerkzeug aufgenommen.
+Dokumentationsvorschau mit Beispieldaten und isolierten temporären Einstellungen;
+kein Signierkern gestartet und keine Geräte- oder Kontoaktion ausgeführt.
+Vorschau anschließend geschlossen. README enthält fünf Bilder und 14 geprüfte
+Details-/Summary-Bereiche für Einrichtung, Bilder und konkrete Problemfälle.
+Bilddateien und lokale Dokumentverweise geprüft. Keine Paketänderung nötig.
+
 ## Version 0.1.1 (16) und vier README-Ansichten
 
 Windows-Titelleiste und Einstellungen zeigen Version und Build; auch die
