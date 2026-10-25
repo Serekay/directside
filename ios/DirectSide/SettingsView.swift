@@ -32,7 +32,7 @@ struct SettingsView:View {
             }
             Section {NavigationLink {UpdateSettings(connection:connection)} label:{Label(L("DirectSide-Updates"),systemImage:"arrow.down.app")}}
             Section {Button {onboardingStep=0;onboardingComplete=false} label:{Label(L("Einführung ansehen"),systemImage:"sparkles")}}
-            Section {HStack{Text(L("DirectSide"));Spacer();Text(L(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")).foregroundStyle(.secondary)}}
+            Section {HStack{Text(L("DirectSide"));Spacer();Text("\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""))").foregroundStyle(.secondary)}}
         }.navigationTitle(L("Einstellungen")).safeAreaInset(edge:.bottom){EngineProgress()}
     }
 }
