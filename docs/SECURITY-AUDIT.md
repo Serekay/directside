@@ -37,7 +37,7 @@ The source and lockfile now use patched Rustls, WebPKI/root stores, Tokio, crypt
 
 **RUSTSEC-2023-0071 (`rsa` 0.9.10) remains reported.** Upstream reports no patched version. It concerns private-key timing leakage where an attacker can observe repeated RSA operations, especially over a network. DirectSide's usage is local key generation/import and certificate/code signing; it does not implement an RSA-decryption service. Upstream explicitly distinguishes ordinary local use on an uncompromised machine. The build audit has a visible warning for this exact package/version/advisory; other findings block the build. This contextual assessment is not a constant-time implementation fix. See the [RustSec advisory](https://rustsec.org/advisories/RUSTSEC-2023-0071.html).
 
-These dependency fixes are **not present in the already published 0.1.0/0.1.1 binaries**. This review does not replace release assets or publish a new version. A new IPA build and release require the owner's release instruction.
+These dependency fixes were **not present in the earlier 0.1.0/0.1.1 binaries**. Those downloads were subsequently withdrawn. Version 0.1.2 (17) rebuilds both applications with the corrected dependencies; see the release validation below.
 
 ### Withdrawal of earlier binaries
 
@@ -57,3 +57,15 @@ A fresh Windows EXE was built locally under the ignored `build/security-hardened
 GitHub-hosted runner images, SDKs, Homebrew tools and upstream package infrastructure remain external trust dependencies. HTTP app sources remain intentionally supported and do not authenticate or encrypt traffic; use HTTPS outside trusted local development networks. A compromised owner account or computer remains a material risk.
 
 No secret values or raw diagnostic dumps are included in this report. Detailed scan files and downloaded verification copies remain under the ignored local `build/security-audit-2026-10-25/` directory.
+
+## Follow-up: release 0.1.2 (17)
+
+The owner requested a current public release after withdrawal of the earlier downloads. Both applications were rebuilt from source commit `617a4f7`; subsequent changes in the release tag are documentation only.
+
+- Windows: 90 Python/UI and 12 core Rust tests passed again; the 9 vendor Rust tests had passed on the unchanged signing/security code. The fresh EXE passed packaged Qt/QML, icon, signing-engine and local authentication-runtime startup checks. Embedded version and file properties are 0.1.2 (17).
+- iPhone: [manual build 40240704291](https://github.com/Serekay/directside/actions/runs/40240704291) succeeded with the hardened workflow, including the real full-history secret scan and dependency check on macOS, source/refresh tests, local authentication-runtime probe, native signing-core build and IPA publication check.
+- Downloaded IPA: bundle identifier `com.directside.app`, version 0.1.2, build 17. CoreADI hash and HTTP-source configuration verified. Personal-material rejection and secret scanning passed.
+- All three draft release assets were checked against local sizes and SHA-256 values before publication. The release contains only `DirectSide.exe`, `DirectSide.ipa` and `SHA256SUMS.txt`.
+- The documented RSA advisory remains explicitly reported. No new hardware installation, account sign-in or self-renewal test was performed for this release.
+
+[Release 0.1.2](https://github.com/Serekay/directside/releases/tag/v0.1.2) replaces the withdrawn downloads. Windows is built locally; only the iPhone build uses Actions.

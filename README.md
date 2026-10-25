@@ -2,9 +2,9 @@
 
 Install iPhone apps with your own Apple account. Set up once from Windows, then install apps and renew signatures directly on your iPhone.
 
-**Downloads temporarily unavailable.** Previous binaries have been withdrawn pending a release containing the dependency security fixes. See the [security review](docs/SECURITY-AUDIT.md).
+**Version 0.1.2 (17)** - includes the dependency security fixes. Earlier releases remain withdrawn. See the [security review](docs/SECURITY-AUDIT.md).
 
-[Release status](https://github.com/Serekay/directside/releases)
+[Download for Windows](https://github.com/Serekay/directside/releases/latest/download/DirectSide.exe) | [Download IPA](https://github.com/Serekay/directside/releases/latest/download/DirectSide.ipa) | [Releases](https://github.com/Serekay/directside/releases)
 
 [Quick start](#quick-start) | [Setup](#setup) | [Screenshots](#screenshots) | [Troubleshooting](#troubleshooting)
 

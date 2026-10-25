@@ -1,5 +1,21 @@
 # Teststand vom 25. Oktober 2026
 
+## Sicherheitsrelease 0.1.2 (17)
+
+Auf Wunsch des Besitzers wurden EXE und IPA nach dem Zurückziehen der alten
+Downloads neu gebaut. Quellstand `617a4f7`, macOS-Action 40240704291 erfolgreich:
+Secret-Scan, Abhängigkeitsprüfung, Swift-Quellen-/Refresh-Tests, echte lokale
+Authentifizierungsprobe, Rust-Signierkern und IPA-Veröffentlichungsprüfung.
+Windows lokal gebaut; 90 Python-/UI-Tests und 12 Rust-Kerntests erneut bestanden,
+9 Vendor-Tests auf unverändertem Signiercode zuvor bestanden. Gepackter Starttest
+für Qt, QML, Icon, Signierkern und lokalen Authentifizierungskern erfolgreich.
+IPA-Kennung, Version/Build, CoreADI-Hash und beide Release-Prüfsummen geprüft.
+Die RSA-Upstream-Warnung bleibt dokumentiert. Kein neuer Hardwaretest behauptet.
+Details: [Sicherheitsprüfung](SECURITY-AUDIT.md).
+
+Repository ist inzwischen öffentlich. 0.1.0 und 0.1.1 sind zurückgezogen;
+die folgenden Einträge dokumentieren auch frühere Entwicklungsstände.
+
 ## Release v0.1.1 (16) veröffentlicht
 
 Nach ausdrücklicher Betreiberfreigabe als stabiler aktueller GitHub-Release
