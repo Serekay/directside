@@ -1,5 +1,19 @@
 # Teststand vom 25. Oktober 2026
 
+## Windows-Hilfe und Entwicklermodus-Status
+
+Nach Abschluss der iPhone-Einführung zeigte die manuell geöffnete
+Entwicklermodus-Hilfe fälschlich „Completing setup…“, obwohl kein Auftrag mehr
+lief. Die Ansicht unterscheidet jetzt aktiviert (grün, fertig), deaktiviert
+(Aktivierungsschritte), unbekannt (Verbindung und Prüfung) und tatsächlich
+laufende Einrichtung (warten). „Quick setup“ folgt dem aktuellen Ablauf:
+USB-Vertrauen, Installation und Entwicklermodus, Team-Freigabe, iPhone-Einführung
+mit LocalDevVPN und optionalem LiveContainer. Englische Beschriftungen ergänzt.
+72 Python/Qt-Tests einschließlich der vier Entwicklermodus-Zustände bestanden.
+Windows-Paket mit unveränderter Engine neu gebaut; Paket-Startprüfung bestanden.
+Im laufenden Paket mit angeschlossenem iPhone geprüft: Entwicklermodus zeigt
+grüne Bestätigung und „Done“, die überarbeitete Hilfe wird vollständig angezeigt.
+
 ## USB-Wiederherstellung und tatsächlicher erster App-Start
 
 Nach manueller Freigabe des Entwicklungsteams „Check again“ im gepackten

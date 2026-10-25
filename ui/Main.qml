@@ -23,6 +23,9 @@ ApplicationWindow {
     property string developerHelpDevice: ""
     property string pageBeforeReconnect: "install"
     property bool reconnectShown: false
+    property bool developerEnabled: s.developerMode==="enabled"
+    property bool developerDisabled: s.developerMode==="disabled"
+    property bool developerSuccess: s.setupReady || (developerEnabled && !s.setupPending)
     onSChanged: {
         if(s.usbReconnectNeeded) {
             if(!reconnectShown) {pageBeforeReconnect=page;reconnectShown=true;page="reconnect"}
@@ -272,24 +275,25 @@ ApplicationWindow {
                     }
                 }
                 Card {
-                    objectName:"developerModeGuide";visible:win.page==="developer";Layout.fillWidth:true;Layout.fillHeight:true;border.color:s.setupReady?win.accent:"#b57a37"
+                    objectName:"developerModeGuide";visible:win.page==="developer";Layout.fillWidth:true;Layout.fillHeight:true;border.color:win.developerSuccess?win.accent:"#b57a37"
                     ColumnLayout {anchors.fill:parent;anchors.margins:24;spacing:14
                         Item {Layout.fillHeight:true}
-                        Rectangle {objectName:"developerModeIllustration";Layout.alignment:Qt.AlignHCenter;implicitWidth:54;implicitHeight:82;radius:12;color:"#15171b";border.width:3;border.color:s.setupReady?win.accent:"#f1bd70"
-                            Label {anchors.centerIn:parent;text:s.setupReady?"✓":"!";font.pixelSize:34;font.weight:Font.Bold;color:s.setupReady?win.accent:"#f1bd70"}
-                            SequentialAnimation on opacity {running:win.page==="developer" && s.developerMode!=="enabled";loops:Animation.Infinite;NumberAnimation {from:1;to:0.5;duration:1000} NumberAnimation {from:0.5;to:1;duration:1000}}
+                        Rectangle {objectName:"developerModeIllustration";Layout.alignment:Qt.AlignHCenter;implicitWidth:54;implicitHeight:82;radius:12;color:"#15171b";border.width:3;border.color:win.developerSuccess?win.accent:"#f1bd70"
+                            Label {anchors.centerIn:parent;text:win.developerSuccess?"✓":"!";font.pixelSize:34;font.weight:Font.Bold;color:win.developerSuccess?win.accent:"#f1bd70"}
+                            SequentialAnimation on opacity {running:win.page==="developer" && win.developerDisabled;loops:Animation.Infinite;NumberAnimation {from:1;to:0.5;duration:1000} NumberAnimation {from:0.5;to:1;duration:1000}}
                         }
-                        Text {objectName:"developerModeTitle";text:win.t(s.setupReady?"Einrichtung abgeschlossen":s.developerMode==="enabled"?"Einrichtung abschließen …":"Entwicklermodus aktivieren");font.pixelSize:23;font.weight:Font.DemiBold;color:win.ink;horizontalAlignment:Text.AlignHCenter;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Text {objectName:"developerModeTitle";text:win.t(s.setupReady?"Einrichtung abgeschlossen":win.developerEnabled?(s.setupPending?"Einrichtung abschließen …":"Entwicklermodus ist aktiviert"):win.developerDisabled?"Entwicklermodus aktivieren":"Entwicklermodus prüfen");font.pixelSize:23;font.weight:Font.DemiBold;color:win.ink;horizontalAlignment:Text.AlignHCenter;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                         Label {visible:s.setupPending;text:win.t("DirectSide installiert");color:win.accent;font.weight:Font.DemiBold}
                         Text {objectName:"setupReconnectHint";visible:s.setupPending && s.devices.length===0;text:win.t("Nach dem Neustart: USB-Kabel erneut einstecken.");color:win.accent;wrapMode:Text.WordWrap;Layout.fillWidth:true}
-                        Text {visible:s.developerMode!=="enabled";text:win.t("1. Einstellungen → Datenschutz & Sicherheit → Entwicklermodus einschalten.");font.pixelSize:16;color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
-                        Text {visible:s.developerMode!=="enabled";text:win.t("2. Neustarten → Entsperren → Aktivieren bestätigen.");font.pixelSize:16;color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
-                        Text {visible:s.developerMode!=="enabled" || s.setupReady;text:win.t("Falls verlangt: Einstellungen → Allgemein → VPN & Geräteverwaltung → Vertrauen.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
-                        Label {visible:s.setupPending && s.developerMode==="enabled";text:win.t("Einrichtung abschließen …");color:win.muted}
+                        Text {visible:win.developerDisabled;text:win.t("1. Einstellungen → Datenschutz & Sicherheit → Entwicklermodus einschalten.");font.pixelSize:16;color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Text {visible:win.developerDisabled;text:win.t("2. Neustarten → Entsperren → Aktivieren bestätigen.");font.pixelSize:16;color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Text {visible:win.developerDisabled;text:win.t("Fehlt der Schalter: zuerst DirectSide installieren, dann erneut nachsehen.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Text {visible:!win.developerEnabled && !win.developerDisabled;text:win.t("iPhone entsperren und per USB verbinden. Dann erneut prüfen.");color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Text {visible:win.developerEnabled && !s.setupPending && !s.setupReady;text:win.t("Du musst hier nichts mehr tun.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                         Label {visible:s.setupReady;text:win.t("DirectSide gestartet.");color:win.accent;font.weight:Font.DemiBold}
-                        RowLayout {visible:s.developerMode!=="enabled";Action {text:win.t("Schalter anzeigen");enabled:s.devices.length>0 && !s.foregroundBusy;onClicked:backend.revealDeveloperMode()} Action {objectName:"developerModeRefresh";text:win.t("Erneut prüfen");enabled:!s.foregroundBusy;onClicked:backend.refresh()}}
+                        RowLayout {visible:!win.developerEnabled;Action {visible:win.developerDisabled;text:win.t("Schalter anzeigen");enabled:s.devices.length>0 && !s.foregroundBusy;onClicked:backend.revealDeveloperMode()} Action {objectName:"developerModeRefresh";text:win.t("Erneut prüfen");enabled:!s.foregroundBusy;onClicked:backend.refresh()}}
                         Item {Layout.fillHeight:true}
-                        Action {text:win.t(s.setupPending ? "Warte auf das iPhone …":s.setupReady ? "Fertig":"Weiter zur Installation");primary:true;enabled:!s.setupPending;onClicked:{backend.acknowledgeSetup();win.page="install"}}
+                        Action {objectName:"developerModeDone";text:win.t(s.setupPending ? "Warte auf das iPhone …":win.developerSuccess ? "Fertig":"Zurück");primary:true;enabled:!s.setupPending;onClicked:{backend.acknowledgeSetup();win.page="install"}}
                     }
                 }
                 Card {
@@ -404,11 +408,11 @@ ApplicationWindow {
                         Label {text:win.t("1   Gerät verbinden");font.weight:Font.DemiBold}
                         Text {text:win.t("iPhone oder iPad entsperren, USB anschließen und Vertrauen bestätigen. Bei mehreren Geräten oben das Ziel wählen.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                         Label {text:win.t("2   Installieren und Entwicklermodus aktivieren");font.weight:Font.DemiBold}
-                        Text {text:win.t("Apple-ID eingeben, IPA installieren. Vor dem ersten Start: Einstellungen → Datenschutz & Sicherheit → Entwicklermodus einschalten. iPhone neu starten und Aktivierung bestätigen. Fehlt der Schalter, nach der ersten Installation erneut nachsehen.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
-                        Label {text:win.t("3   Auf dem iPhone vorbereiten");font.weight:Font.DemiBold}
-                        Text {text:win.t("LocalDevVPN über den QR-Code installieren und verbinden. Falls verlangt: Einstellungen → Allgemein → VPN & Geräteverwaltung öffnen und deinem Entwicklerprofil vertrauen.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
-                        Label {text:win.t("LiveContainer · optional");font.weight:Font.DemiBold}
-                        Text {text:win.t("Unter Einstellungen installieren. DirectSide auf dem iPhone öffnen: Das Zertifikat wird automatisch übertragen und JIT-less eingerichtet. Die Diagnose in LiveContainer ist nur bei Problemen nötig.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Text {text:win.t("Anmelden und DirectSide installieren. Falls verlangt: Entwicklermodus unter Einstellungen → Datenschutz & Sicherheit einschalten, neu starten und Aktivieren bestätigen. Fehlt der Schalter, nach der Installation erneut nachsehen.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Label {text:win.t("3   Entwicklungsteam vertrauen");font.weight:Font.DemiBold}
+                        Text {text:win.t("Falls iOS danach fragt: Einstellungen → Allgemein → VPN & Geräteverwaltung → Entwicklungsteam → Vertrauen. Anschließend in Windows erneut prüfen.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Label {text:win.t("4   Einrichtung auf dem iPhone");font.weight:Font.DemiBold}
+                        Text {text:win.t("In DirectSide der Einführung folgen: LocalDevVPN installieren, dort einrichten und verbinden. Danach zu DirectSide zurückkehren. LiveContainer kannst du im nächsten Schritt optional installieren und einrichten.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                         Item {Layout.fillHeight:true}
                         RowLayout {Label {text:win.t("Kostenlos");color:win.muted;font.pixelSize:12} Badge {text:win.t("3 Apps / Gerät")} Badge {text:win.t("10 App-IDs / Account")} Badge {text:win.t("Max. 3 Geräte / Account")}}
                     }

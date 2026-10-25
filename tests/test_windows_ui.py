@@ -65,6 +65,24 @@ class WindowsUIStateTests(unittest.TestCase):
   hint=root.findChild(QObject,'setupReconnectHint');self.assertTrue(hint.property('visible'))
   self.bridge.update(devices=[{'id':'phone'}]);APP.processEvents();self.assertFalse(hint.property('visible'))
   root.close();engine.deleteLater();APP.processEvents()
+ def test_developer_help_distinguishes_enabled_pending_disabled_and_unknown(self):
+  engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
+  engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')));root=engine.rootObjects()[0]
+  self.bridge.update(language='en',busy=False,developerMode='enabled',setupPending=False,setupReady=False,launchState='idle')
+  root.setProperty('page','developer');APP.processEvents()
+  title=root.findChild(QObject,'developerModeTitle');done=root.findChild(QObject,'developerModeDone')
+  self.assertEqual(title.property('text'),'Developer Mode is enabled')
+  self.assertTrue(root.property('developerSuccess'));self.assertEqual(done.property('text'),'Done')
+  self.bridge.update(setupPending=True);APP.processEvents()
+  self.assertEqual(title.property('text'),'Completing setup…')
+  self.assertFalse(root.property('developerSuccess'));self.assertFalse(done.property('enabled'))
+  self.bridge.update(setupPending=False,developerMode='disabled');APP.processEvents()
+  self.assertEqual(title.property('text'),'Enable Developer Mode')
+  self.assertFalse(root.property('developerSuccess'))
+  self.bridge.update(developerMode='unknown');APP.processEvents()
+  self.assertEqual(title.property('text'),'Check Developer Mode')
+  self.assertFalse(root.property('developerSuccess'))
+  root.close();engine.deleteLater();APP.processEvents()
  def test_setup_check_again_rediscovers_usb_and_poll_recovers_without_reinstall(self):
   self.bridge.initializing=False
   self.bridge.update(busy=False,setupPending=True,developerMode='disabled',devices=[])
