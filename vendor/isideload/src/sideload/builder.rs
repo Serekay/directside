@@ -16,6 +16,8 @@ use rootcause::prelude::*;
 /// If there are multiple teams, the behavior will depend on this setting.
 #[derive(Clone)]
 pub enum TeamSelection {
+    /// Reuse the team selected by the user on the installing computer.
+    ById(String),
     /// Select the first team automatically
     First,
     /// Prompt the user to select a team the first time this sideloader is used, and remember the selection for future runs
@@ -27,6 +29,7 @@ pub enum TeamSelection {
 impl Display for TeamSelection {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            TeamSelection::ById(_) => write!(f, "saved team"),
             TeamSelection::First => write!(f, "first team"),
             TeamSelection::PromptOnce(_) => write!(f, "prompting for team (once)"),
             TeamSelection::PromptAlways(_) => write!(f, "prompting for team (always)"),

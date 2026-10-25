@@ -234,6 +234,13 @@ async fn login(request: &Value) -> Result<Engine, Report> {
 fn save_session(session:&DeveloperSession,email:&str,spd:Option<&plist::Dictionary>)->Result<(),Report> {
     let (token,adsid)=session.session_credentials();
     let mut secret=json!({"email":email,"auth":"local","token":token.token,"adsid":adsid,"duration":token.duration,"expiry":token.expiry});
+    if let Some(bytes)=KeyringStorage::new("DirectSide.session".into()).retrieve_data("active")? {
+        if let Ok(previous)=serde_json::from_slice::<Value>(&bytes) {
+            if previous["email"].as_str().is_some_and(|value|value.eq_ignore_ascii_case(email)) {
+                if let Some(team)=previous["team_id"].as_str(){secret["team_id"]=json!(team);}
+            }
+        }
+    }
     if let Some(spd)=spd {
         let refresh:plist::Dictionary=["adsid","GsIdmsToken","sk","c"].iter().filter_map(|key|spd.get(*key).map(|value|((*key).to_string(),value.clone()))).collect();
         if refresh.len()==4 {
@@ -246,15 +253,27 @@ fn save_session(session:&DeveloperSession,email:&str,spd:Option<&plist::Dictiona
 }
 
 async fn make_engine(session:DeveloperSession,email:&str)->Result<Engine,Report> {
+    let saved_team=KeyringStorage::new("DirectSide.session".into()).retrieve_data("active")?
+        .and_then(|bytes|serde_json::from_slice::<Value>(&bytes).ok())
+        .filter(|saved|saved["email"].as_str().is_some_and(|value|value.eq_ignore_ascii_case(email)))
+        .and_then(|saved|saved["team_id"].as_str().map(str::to_owned));
     let storage=KeyringStorage::new("DirectSide.signing".to_string());
     let machine=isideload::sideload::cert_identity::CertificateIdentity::stored_machine_name(email,&storage)?.unwrap_or_else(||if cfg!(target_os="ios") {"DirectSide iPhone"}else{"DirectSide Windows"}.to_string());
     let mut engine = SideloaderBuilder::<MaxCertsCallbackBox, ExtensionsBehaviorCallbackBox>::new(session,email.to_string())
-        .team_selection(TeamSelection::PromptOnce(choose_team))
+        .team_selection(saved_team.clone().map(TeamSelection::ById).unwrap_or(TeamSelection::PromptOnce(choose_team)))
         .max_certs_behavior(MaxCertsBehavior::Error)
         .machine_name(machine)
         .storage(Box::new(storage))
         .build();
     let team = engine.get_team().await?;
+    if saved_team.as_ref().is_some_and(|id|id!=&team.team_id) {bail!("Gespeichertes Entwicklerteam ist nicht verfügbar.");}
+    let session_store=KeyringStorage::new("DirectSide.session".into());
+    if let Some(bytes)=session_store.retrieve_data("active")? {
+        let mut saved:Value=serde_json::from_slice(&bytes)?;
+        if saved["email"].as_str().is_some_and(|value|value.eq_ignore_ascii_case(email)) {
+            saved["team_id"]=json!(team.team_id);session_store.store_data("active",&serde_json::to_vec(&saved)?)?;
+        }
+    }
     let quota=tokio::time::timeout(Duration::from_secs(12),engine.get_dev_session().list_app_ids(&team,None)).await;
     emit(json!({"event":"logged_in","team":team.name,"team_id":team.team_id,"type":team.r#type,"email":email}));
     match quota {Ok(Ok(q))=>emit(quota_event(&q)),_=>emit(json!({"event":"account_quota","limit":null,"available":null,"registered":-1}))};
@@ -264,6 +283,45 @@ async fn make_engine(session:DeveloperSession,email:&str)->Result<Engine,Report>
 fn quota_event(q:&ListAppIdsResponse)->Value {
     // Apple's rolling registration allowance is not the number of existing IDs.
     json!({"event":"account_quota","limit":q.max_quantity,"available":q.available_quantity.map(|n|n.max(0)),"registered":q.app_ids.len()})
+}
+
+// Explicit allowlist: never transfer passwords or arbitrary credential-store fields.
+fn session_transfer(bytes:&[u8],email:&str,team:&str)->Result<Vec<u8>,Report> {
+    if bytes.len()>131072 || email.is_empty() || team.is_empty() {bail!("Kontoübernahme ungültig.");}
+    let saved:Value=serde_json::from_slice(bytes)?;
+    if !saved["email"].as_str().is_some_and(|value|value.eq_ignore_ascii_case(email)) {bail!("Kontoübernahme gehört zu einem anderen Account.");}
+    for key in ["email","token","adsid"] {
+        if !saved[key].as_str().is_some_and(|value|!value.is_empty() && value.len()<=32768) {bail!("Kontoübernahme unvollständig.");}
+    }
+    for key in ["duration","expiry"] {if saved[key].as_u64().is_none(){bail!("Kontoübernahme ungültig.");}}
+    let mut clean=json!({"auth":"local","team_id":team});
+    for key in ["email","token","adsid","duration","expiry","refresh"] {if let Some(value)=saved.get(key){clean[key]=value.clone();}}
+    if let Some(refresh)=clean.get("refresh") {
+        let data=base64::prelude::BASE64_STANDARD.decode(refresh.as_str().ok_or_else(||report!("Kontoübernahme ungültig."))?)?;
+        if data.len()>65536 {bail!("Kontoübernahme zu groß.");}
+        let fields:plist::Dictionary=plist::from_bytes(&data)?;
+        if fields.get("adsid").and_then(plist::Value::as_string)!=clean["adsid"].as_str(){bail!("Kontoübernahme gehört zu einem anderen Account.");}
+    }
+    Ok(serde_json::to_vec(&clean)?)
+}
+
+fn import_session(request:&Value)->Result<(),Report> {
+    let path=PathBuf::from(text(request,"path")?);
+    let result=(||->Result<(),Report>{
+        if std::fs::metadata(&path)?.len()>131072 {bail!("Kontoübernahme zu groß.");}
+        let bytes=std::fs::read(&path)?;
+        let transfer:Value=serde_json::from_slice(&bytes)?;
+        let profile=apple_codesign_quick::ProvisioningProfile::parse(&std::fs::read(text(request,"profile_path")?)?)?;
+        let team=profile.plist().get("TeamIdentifier").and_then(plist::Value::as_array).and_then(|items|items.first()).and_then(plist::Value::as_string).ok_or_else(||report!("Entwicklerteam fehlt."))?;
+        if transfer["team_id"].as_str()!=Some(team) {bail!("Kontoübernahme gehört zu einem anderen Entwicklerteam.");}
+        let clean=session_transfer(&bytes,text(request,"email")?,team)?;
+        let store=KeyringStorage::new("DirectSide.session".into());store.store_data("active",&clean)?;
+        if store.retrieve_data("active")?.as_deref()!=Some(clean.as_slice()){bail!("Konto konnte nicht sicher gespeichert werden.");}
+        emit(json!({"event":"session_imported"}));Ok(())
+    })();
+    // One-shot private-container handoff; invalid transfers must not recur on launch.
+    if path.exists(){std::fs::remove_file(path)?;}
+    result
 }
 
 async fn refresh_account_quota(engine:&mut Engine) {
@@ -443,9 +501,14 @@ async fn bootstrap(engine:Option<&mut Engine>, provider:&impl idevice::provider:
     use idevice::house_arrest::HouseArrestClient;
     let info=pairing_step("Geräteinformationen für die Kopplung lesen …",10,async {isideload::util::device::IdeviceInfo::from_device(provider).await}).await?;
     let pairing=usb_remote_pairing(provider,&info.udid).await?;
-    let (signing_name,signing)=if let Some(engine)=engine {
-        ("DirectSide-signing.json",pairing_step("Signierschlüssel für DirectSide vorbereiten …",35,async {engine.bootstrap_signing_identity().await}).await?)
-    }else{("DirectSide-imported.json",serde_json::to_vec(&crate::imported_identity::load()?.ok_or_else(||report!("Importiertes Zertifikat fehlt."))?)?)};
+    let (signing_name,signing,account)=if let Some(engine)=engine {
+        let signing=pairing_step("Signierschlüssel für DirectSide vorbereiten …",35,async {engine.bootstrap_signing_identity().await}).await?;
+        let identity:Value=serde_json::from_slice(&signing)?;
+        let team=engine.get_team().await?;
+        let saved=KeyringStorage::new("DirectSide.session".into()).retrieve_data("active")?;
+        let account=saved.map(|bytes|session_transfer(&bytes,text(&identity,"email")?,&team.team_id)).transpose()?;
+        ("DirectSide-signing.json",signing,account)
+    }else{("DirectSide-imported.json",serde_json::to_vec(&crate::imported_identity::load()?.ok_or_else(||report!("Importiertes Zertifikat fehlt."))?)?,None)};
     let mut afc=pairing_step("DirectSide für die Übertragung öffnen …",10,async {Ok(HouseArrestClient::connect(provider).await?.vend_documents(bundle.to_string()).await?)}).await?;
     let mut files=vec![
         ("DirectSide-pairing.plist",pairing.to_bytes()),
@@ -467,6 +530,24 @@ async fn bootstrap(engine:Option<&mut Engine>, provider:&impl idevice::provider:
     }
     Ok(())
     }).await?;
+    if let Some(account)=account {
+        // Never put account sessions in file-sharing Documents or in an IPA.
+        // Caches are outside file sharing and excluded from device backups.
+        let transferred=pairing_step("Konto auf dem iPhone vorbereiten …",15,async {
+            let mut container=HouseArrestClient::connect(provider).await?.vend_container(bundle).await?;
+            if container.get_file_info("/Library/Caches").await.is_err(){container.mk_dir("/Library/Caches").await?;}
+            let temporary="/Library/Caches/DirectSide-session-import.json.pending";
+            let destination="/Library/Caches/DirectSide-session-import.json";
+            let mut file=container.open(temporary,idevice::afc::opcode::AfcFopenMode::WrOnly).await?;
+            file.write_entire(&account).await?;file.close().await?;
+            let mut check=container.open(temporary,idevice::afc::opcode::AfcFopenMode::RdOnly).await?;
+            let actual=check.read_entire().await?;check.close().await?;
+            if actual!=account {let _=container.remove(temporary).await;bail!("Kontoübertragung unvollständig.");}
+            container.rename(temporary,destination).await?;Ok(())
+        }).await;
+        // Optional convenience must not invalidate an otherwise usable installation.
+        emit(json!({"event":"account_transfer","ready":transferred.is_ok()}));
+    }
     emit(json!({"event":"status","message":"DirectSide ist installiert. Pairing und Original-IPA wurden übertragen."}));
     Ok(())
 }
@@ -704,6 +785,7 @@ pub async fn run() {
                     emit(json!({"event":"signing_imported","email":email}));Ok(())
                 })();result
             },
+            "import_session"=>{let result=import_session(&request);if result.is_ok(){engine=None;}result},
             "inspect_local"=>match tokio::time::timeout(Duration::from_secs(25),inspect_local(&request)).await {Ok(r)=>r,Err(_)=>Err(report!("Verbindung zum lokalen Gerät hat zu lange gedauert. LocalDevVPN prüfen."))},
             "login" => {
                 engine = None;
@@ -737,6 +819,27 @@ pub async fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn account_handoff_is_bounded_and_excludes_passwords_and_unknown_fields() {
+        let original=json!({"email":"person@example.test","token":"test-session","adsid":"test-account","duration":60,"expiry":100,"password":"must-not-transfer","other":"must-not-transfer"});
+        let bytes=serde_json::to_vec(&original).unwrap();
+        let result:Value=serde_json::from_slice(&session_transfer(&bytes,"person@example.test","TEAM").unwrap()).unwrap();
+        assert!(result.get("password").is_none());assert!(result.get("other").is_none());
+        assert_eq!(result["team_id"],"TEAM");
+        assert!(session_transfer(&bytes,"different@example.test","TEAM").is_err());
+        assert!(session_transfer(&vec![b' ';131073],"person@example.test","TEAM").is_err());
+        for key in ["token","adsid","duration","expiry"] {
+            let mut invalid=original.clone();invalid.as_object_mut().unwrap().remove(key);
+            assert!(session_transfer(&serde_json::to_vec(&invalid).unwrap(),"person@example.test","TEAM").is_err());
+        }
+    }
+    #[test]
+    fn account_handoff_rejects_refresh_credentials_for_a_different_account() {
+        let refresh:plist::Dictionary=[("adsid".to_owned(),plist::Value::String("other-account".into()))].into_iter().collect();
+        let mut encoded=Vec::new();plist::to_writer_binary(&mut encoded,&refresh).unwrap();
+        let bytes=serde_json::to_vec(&json!({"email":"person@example.test","token":"test-session","adsid":"test-account","duration":60,"expiry":100,"refresh":base64::prelude::BASE64_STANDARD.encode(encoded)})).unwrap();
+        assert!(session_transfer(&bytes,"person@example.test","TEAM").is_err());
+    }
     #[tokio::test]
     async fn pairing_steps_complete_or_fail_with_their_phase_instead_of_hanging() {
         assert_eq!(pairing_step("Test phase",1,async {Ok(42)}).await.unwrap(),42);

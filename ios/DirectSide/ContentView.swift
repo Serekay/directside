@@ -13,6 +13,8 @@ struct ContentView:View {
     @State private var sourceURL=""
     @State private var code=""
     @Environment(\.scenePhase) private var phase
+    @AppStorage("onboardingComplete") private var onboardingComplete=false
+    @AppStorage("onboardingStep") private var onboardingStep=0
     var body:some View {
         presentedContent
         .alert(L("LocalDevVPN verbinden"),isPresented:$engine.vpnRequired) {
@@ -23,22 +25,29 @@ struct ContentView:View {
         .alert(L("DirectSide"),isPresented:Binding(get:{engine.error != nil},set:{if !$0 {engine.error=nil}})){Button(L("OK")){engine.error=nil}}message:{Text(L(engine.error ?? ""))}
     }
     private var tabContent:some View {
+        Group {
+        if !onboardingComplete {OnboardingView(connection:connection){onboardingComplete=true}}
+        else {
         TabView(selection:$tab) {
             NavigationStack{DiscoverView(connection:connection,addSource:{sheet = .add})}.tabItem{Label(L("Entdecken"),systemImage:"safari")}.tag(0)
             NavigationStack{LibraryView(connection:connection)}.tabItem{Label(L("Meine Apps"),systemImage:"square.stack")}.badge(engine.updates.count+(updater.available == nil ? 0:1)).tag(1)
             NavigationStack{SourcesView(connection:connection,addSource:{sheet = .add})}.tabItem{Label(L("Quellen"),systemImage:"square.stack.3d.up")}.tag(2)
             NavigationStack{SettingsView(connection:connection)}.tabItem{Label(L("Einstellungen"),systemImage:"gearshape")}.tag(3)
         }.tint(Style.accent)
+        }
+        }
     }
     private var observedTabs:some View {
         tabContent
         .background(KeyboardDismissal().frame(width:0,height:0))
-        .task {connection.startMonitoring();await engine.refreshSources()}
+        .task {startConnectionIfNeeded();await engine.refreshSources()}
         .task {await updater.check()}
         .onChange(of:phase){_,value in
-            if value == .active {engine.refreshBootstrap();connection.startMonitoring();Task{await updater.check()}}
+            if value == .active {engine.refreshBootstrap();startConnectionIfNeeded();Task{await updater.check()}}
             else if value == .background {connection.stopMonitoring()}
         }
+        .onChange(of:onboardingStep){_,_ in startConnectionIfNeeded()}
+        .onChange(of:onboardingComplete){_,complete in if complete {startConnectionIfNeeded();presentUpdateIfReady()} else {connection.stopMonitoring()}}
         .onChange(of:engine.needsPairingCode){_,value in if value {sheet = .pairing}}
         .onChange(of:engine.needsCode){_,value in if value {sheet = .code}}
         .onChange(of:engine.pendingSource?.id){_,value in if value != nil {sheet = .preview}}
@@ -64,9 +73,10 @@ struct ContentView:View {
         presentUpdateIfReady()
     }
     private func presentUpdateIfReady() {
-        guard updater.showOffer,sheet==nil,!engine.busy,!engine.needsCode,!engine.needsPairingCode,engine.teams.isEmpty else {return}
+        guard onboardingComplete,updater.showOffer,sheet==nil,!engine.busy,!engine.needsCode,!engine.needsPairingCode,engine.teams.isEmpty else {return}
         updater.showOffer=false;sheet = .update
     }
+    private func startConnectionIfNeeded() {if onboardingComplete || onboardingStep>0 {connection.startMonitoring()}}
     @ViewBuilder private func sheetContent(_ item:AppSheet)->some View {
         switch item {
         case .update:UpdateOffer(connection:connection)
