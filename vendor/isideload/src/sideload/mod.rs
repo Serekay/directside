@@ -7,4 +7,5 @@ pub mod install;
 pub mod sideloader;
 pub mod sign;
 pub mod imported;
+pub mod identifier;
 pub use builder::{SideloaderBuilder, TeamSelection};
