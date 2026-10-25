@@ -47,6 +47,19 @@ pub struct Application {
     //pub temp_path: PathBuf,
 }
 
+/// Owned by the install operation, including its error paths. Only the exact
+/// extraction directory of this IPA is removed; the original IPA is retained.
+pub struct ExtractionCleanup {path:PathBuf}
+impl ExtractionCleanup {
+    pub fn new(ipa:&std::path::Path)->Result<Self,Report> {
+        let name=ipa.file_name().ok_or_else(||report!("IPA-Dateiname fehlt."))?.to_string_lossy();
+        Ok(Self{path:isideload_vfs::fs::temp_dir().join(format!("{name}_extracted"))})
+    }
+}
+impl Drop for ExtractionCleanup {
+    fn drop(&mut self) {let _=isideload_vfs::fs::remove_dir_all(&self.path);}
+}
+
 impl Application {
     pub fn new(path: PathBuf) -> Result<Self, Report> {
         if !isideload_vfs::fs::metadata(&path).is_ok() {

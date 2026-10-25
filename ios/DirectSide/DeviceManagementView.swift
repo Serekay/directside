@@ -27,7 +27,7 @@ struct DeviceManagementView:View {
     @ObservedObject var connection:Connection
     @State private var search=""
     @State private var selected:DeviceApp?
-    private var apps:[DeviceApp] {engine.deviceApps.filter{search.isEmpty || $0.name.localizedCaseInsensitiveContains(search)}}
+    private var apps:[DeviceApp] {engine.deviceApps.filter{$0.developer}.filter{search.isEmpty || $0.name.localizedCaseInsensitiveContains(search)}}
     var body:some View {
         List {
             Section {
@@ -63,7 +63,7 @@ struct CertificateManagementView:View {
             Section {
                 HStack {Text(L(engine.teamName));Spacer();Text(L("\(engine.signingCertificates.count) Zertifikate")).foregroundStyle(.secondary)}
                 Button(L("Zertifikate aktualisieren")){engine.loadCertificates()}.disabled(engine.busy || !engine.loggedIn)
-            } footer:{Text(L("Ein Zertifikat kann mehrere Apps signieren. Apps entfernen: Mediathek → Apps auf diesem Gerät verwalten."))}
+            } footer:{Text(L("Ein Zertifikat kann mehrere Apps signieren. Zum Löschen einer App unter Meine Apps nach links wischen oder die App gedrückt halten."))}
             Section(L("Signierzertifikate")) {
                 ForEach(engine.signingCertificates) {certificate in
                     HStack {

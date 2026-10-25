@@ -12,8 +12,8 @@ enum LiveContainerBridge {
         var request=query;request[kSecReturnData as String]=true
         return SecItemCopyMatching(request as CFDictionary,nil)==errSecSuccess
     }
-    static func importTransfer(from path:URL=Paths.documents.appendingPathComponent("DirectSide-livecontainer.json")) throws {
-        guard FileManager.default.fileExists(atPath:path.path) else {return}
+    @discardableResult static func importTransfer(from path:URL=Paths.documents.appendingPathComponent("DirectSide-livecontainer.json")) throws -> Bool {
+        guard FileManager.default.fileExists(atPath:path.path) else {return false}
         let bytes=try Data(contentsOf:path)
         guard bytes.count<131072 else {throw DirectSideError.message("LiveContainer-Zertifikat ist ungültig.")}
         let archive=try JSONDecoder().decode(CertificateArchive.self,from:bytes)
@@ -28,6 +28,7 @@ enum LiveContainerBridge {
             guard SecItemAdd(item as CFDictionary,nil)==errSecSuccess else {throw DirectSideError.message("Zertifikat konnte nicht sicher gespeichert werden.")}
         } else if status != errSecSuccess {throw DirectSideError.message("Zertifikat konnte nicht sicher gespeichert werden.")}
         try FileManager.default.removeItem(at:path)
+        return true
     }
     static func configure(engine:Engine) {
         guard available else {engine.error="LiveContainer zuerst in den Einstellungen installieren.";return}
@@ -38,7 +39,7 @@ enum LiveContainerBridge {
         url.queryItems=[URLQueryItem(name:"cert",value:Data(archive.certificate).base64EncodedString()),URLQueryItem(name:"password",value:archive.password)]
         guard let destination=url.url else {return}
         UIApplication.shared.open(destination,options:[:]) {opened in Task{@MainActor in
-            if opened {engine.message="Zertifikat an LiveContainer übergeben. Dort den JIT-less-Test starten."}
+            if opened {engine.message="Zertifikat übertragen. LiveContainer verwendet jetzt JIT-less."}
             else {engine.error="LiveContainer konnte nicht geöffnet werden."}
         }}
     }

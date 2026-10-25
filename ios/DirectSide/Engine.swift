@@ -6,8 +6,33 @@ import CryptoKit
 @MainActor final class Engine: ObservableObject {
     @Published var message = "Bereit"
     @Published var error: String?
-    @Published var busy = false
+    @Published var vpnRequired=false
+    @Published var deviceIcons:[String:Data]=[:]
+    @Published var busy = true
+    private var restoring=true
     @Published var loggedIn = false
+    @Published var signingMode=UserDefaults.standard.string(forKey:"signingMode") ?? "account"
+    @Published var importedIdentity:ImportedSigningIdentity?
+    private var identityImportFiles:[URL]=[]
+    var canSign:Bool {signingMode=="imported" ? importedIdentity != nil && importedIdentity?.valid != false:loggedIn}
+    func setSigningMode(_ mode:String) {guard !busy,["account","imported"].contains(mode) else {return};signingMode=mode;UserDefaults.standard.set(mode,forKey:"signingMode")}
+    func forgetImportedIdentity(){guard !busy else {return};busy=true;send(["command":"forget_identity"])}
+    func importIdentity(p12:URL,profiles:[URL],password:String) async {
+        guard !busy,!profiles.isEmpty,profiles.count<=32 else {return}
+        busy=true;error=nil;message="Zertifikat prüfen …"
+        do {
+            for (index,url) in ([p12]+profiles).enumerated() {
+                let access=url.startAccessingSecurityScopedResource();defer{if access {url.stopAccessingSecurityScopedResource()}}
+                guard ((try url.resourceValues(forKeys:[.fileSizeKey])).fileSize ?? Int.max)<=262144 else {throw DirectSideError.message("Zertifikat oder Profil ist zu groß.")}
+                let file=Paths.support.appendingPathComponent("identity-"+UUID().uuidString+(index==0 ? ".p12":".mobileprovision"))
+                identityImportFiles.append(file)
+                try FileManager.default.copyItem(at:url,to:file)
+                try FileManager.default.setAttributes([.protectionKey:FileProtectionType.complete],ofItemAtPath:file.path)
+            }
+            send(["command":"import_identity","p12_path":identityImportFiles[0].path,"profile_paths":identityImportFiles.dropFirst().map(\.path),"password":password])
+        }catch {cleanupIdentityImport();fail(error.localizedDescription)}
+    }
+    private func cleanupIdentityImport(){for file in identityImportFiles {try? FileManager.default.removeItem(at:file)};identityImportFiles=[]}
     @Published var teamName = "Nicht angemeldet"
     @Published var progress = 0.0
     @Published var needsCode = false
@@ -23,6 +48,8 @@ import CryptoKit
     private var timer: Timer?
     private var coreStarted=false
     private var signingImportPending=false
+    private var importedArchivePending=false
+    private var importedArchive:URL {Paths.support.appendingPathComponent("DirectSide-imported.json")}
     private var pendingApp: ManagedApp?
     private var bootstrap: Bootstrap?
     private var installContinuation: CheckedContinuation<Void,Error>?
@@ -37,6 +64,7 @@ import CryptoKit
     @Published var certificatesLoaded=false
     @Published var certificateTeam=""
     private var removalConnection:(String,Int)?
+    private var inspectionConnection:(String,Int)?
     @Published var importedIPA:ImportedIPA?
     @Published var needsPairingCode=false
     private var importingPath:URL?
@@ -48,22 +76,26 @@ import CryptoKit
     }
     func submitPairingCode(_ code:String) {needsPairingCode=false;send(["code":code])}
     func configureLiveContainer() {
-        guard !busy,loggedIn else {return}
+        guard !busy,canSign else {return}
         busy=true;error=nil;message="Zertifikat vorbereiten …"
-        send(["command":"export_livecontainer","path":Paths.support.appendingPathComponent("livecontainer-transfer.json").path])
+        send(["command":"export_livecontainer","path":Paths.support.appendingPathComponent("livecontainer-transfer.json").path,"signing_mode":signingMode])
     }
     func installLiveContainer(peer:String,port:Int) async {
         guard !busy else {return}
-        guard loggedIn,pairingReady else {fail("In den Einstellungen anmelden und dieses Gerät koppeln.");return}
-        busy=true;error=nil;message="LiveContainer herunterladen …"
+        guard canSign,pairingReady else {fail("In den Einstellungen anmelden oder ein Zertifikat importieren und dieses Gerät koppeln.");return}
+        busy=true;error=nil
+        guard await requireInstallConnection(peer:peer,port:port) else {return}
+        message="LiveContainer herunterladen …"
         do {
             let (temp,response)=try await URLSession.shared.download(from:URL(string:"https://github.com/LiveContainer/LiveContainer/releases/download/3.8.0/LiveContainer.ipa")!)
+            defer{try? FileManager.default.removeItem(at:temp)}
             guard (response as? HTTPURLResponse)?.statusCode==200,response.url?.scheme=="https" else {throw DirectSideError.message("LiveContainer-Download fehlgeschlagen.")}
             let bytes=try Data(contentsOf:temp,options:.mappedIfSafe)
             guard bytes.count==4_707_271,SHA256.hash(data:bytes).map({String(format:"%02x",$0)}).joined()=="b6fea95e30083382e29ffef88fa1aaa40b5069e1112e5307d490dab04648bba6" else {throw DirectSideError.message("LiveContainer-Prüfsumme stimmt nicht.")}
             let saved=Paths.support.appendingPathComponent("LiveContainer-3.8.0.ipa")
             try bytes.write(to:saved,options:[.atomic,.completeFileProtectionUntilFirstUserAuthentication])
             try await waitForInstall(saved,app:ManagedApp(id:"com.kdt.livecontainer",name:"LiveContainer",cachedIPA:saved.path,installedAt:Date(),version:"3.8.0"),peer:peer,port:port)
+            configureLiveContainer()
         }catch{fail(error.localizedDescription)}
     }
 
@@ -88,7 +120,7 @@ import CryptoKit
     }
     func installImportedIPA(peer:String,port:Int) {
         guard !busy,let item=importedIPA else {return}
-        importedIPA=nil
+        importedIPA=nil;busy=true
         let app=ManagedApp(id:item.bundleID,name:item.name,cachedIPA:item.file.path,installedAt:Date(),version:item.version)
         Task {do {try await waitForInstall(item.file,app:app,peer:peer,port:port)}catch{fail(error.localizedDescription)}}
     }
@@ -102,16 +134,31 @@ import CryptoKit
         busy=true;error=nil
         send(["command":"revoke_certificate","serial":certificate.serial,"team_id":certificateTeam,"confirmed":true])
     }
+    func deviceApp(for app:ManagedApp)->DeviceApp? {
+        if let id=app.installedBundleID {return deviceApps.first{$0.id==id} ?? DeviceApp(id:id,name:app.name,developer:true)}
+        let team=signingMode=="imported" ? importedIdentity?.team_id ?? "":certificateTeam
+        let candidates=deviceApps.filter {device in
+            guard device.developer else {return false}
+            if device.id==app.id || (!team.isEmpty && device.id==app.id+"."+team) {return true}
+            guard device.name==app.name,device.id.hasPrefix(app.id+".") else {return false}
+            let suffix=device.id.dropFirst(app.id.count+1)
+            return suffix.utf8.count==10 && suffix.utf8.allSatisfy{(48...57).contains($0) || (65...90).contains($0)}
+        }
+        return candidates.count==1 ? candidates.first:nil
+    }
     func removeDeviceApp(_ app:DeviceApp,peer:String,port:Int) {
-        guard !busy,pairingReady,port>0,deviceApps.contains(where:{$0.id==app.id}) else {return}
+        guard !busy,pairingReady,port>0,app.developer,deviceApps.contains(where:{$0.id==app.id && $0.developer}) || managed.contains(where:{$0.installedBundleID==app.id}) else {return}
         busy=true;error=nil;removalConnection=(peer,port)
         send(["command":"remove_local_app","bundle_id":app.id,"peer":peer,"port":port,"pairing_path":Paths.pairing.path,"confirmed":true])
     }
-    var slotsText:String {slotsUsed.map{"\($0) von 3 Plätzen belegt"} ?? "App-Plätze noch nicht geprüft"}
+    var slotsText:String {slotsUsed.map{"\($0) Entwickler-Apps"} ?? "App-Plätze noch nicht geprüft"}
     func inspectConnection(peer:String,port:Int) {
         guard !busy,port>0,pairingReady else {return}
-        busy=true;message="Apps werden gelesen …"
-        send(["command":"inspect_local","peer":peer,"port":port,"pairing_path":Paths.pairing.path])
+        busy=true;message="Apps werden gelesen …";inspectionConnection=(peer,port)
+        Task {
+            guard await InstallConnection().reachable(peer:peer,port:port) else {busy=false;return}
+            send(["command":"inspect_local","peer":peer,"port":port,"pairing_path":Paths.pairing.path])
+        }
     }
     var remainingDays:Int? {
         let dates=managed.compactMap{$0.expiresAt} + (selfExpiration.map{[$0]} ?? [])
@@ -136,6 +183,10 @@ import CryptoKit
     }
 
     init() {
+        // A terminated import must not leave temporary private-key copies behind.
+        if let files=try? FileManager.default.contentsOfDirectory(at:Paths.support,includingPropertiesForKeys:nil) {
+            for file in files where file.lastPathComponent.hasPrefix("identity-") && ["p12","mobileprovision"].contains(file.pathExtension) {try? FileManager.default.removeItem(at:file)}
+        }
         sources = load("sources.json") ?? []
         managed = load("apps.json") ?? []
         refreshBootstrap()
@@ -148,19 +199,32 @@ import CryptoKit
             Task { @MainActor in self?.poll() }
         }
         send(["command":"restore"])
+        send(["command":"imported_identity"])
         if let path=Bundle.main.path(forResource:"embedded",ofType:"mobileprovision") {send(["command":"profile","path":path])}
     }
     func refreshBootstrap() {
         do {
             try Paths.importBootstrap()
-            try LiveContainerBridge.importTransfer()
+            let transfer=Paths.documents.appendingPathComponent("DirectSide-imported.json")
+            if FileManager.default.fileExists(atPath:transfer.path) {
+                let data=try Data(contentsOf:transfer)
+                guard data.count<=12_000_000 else {throw DirectSideError.message("Zertifikatsdatei ist zu groß.")}
+                try data.write(to:importedArchive,options:[.atomic,.completeFileProtection])
+                try FileManager.default.removeItem(at:transfer)
+            }
+            try AppUpdater.recoverOriginal()
+            let transferred=try LiveContainerBridge.importTransfer()
             liveContainerCertificateReady=LiveContainerBridge.certificateReady
             bootstrap = try? JSONDecoder().decode(Bootstrap.self, from: Data(contentsOf: Paths.bootstrap))
             pairingReady = bootstrap != nil && FileManager.default.fileExists(atPath: Paths.pairing.path)
             importSigningIfNeeded()
+            if transferred && LiveContainerBridge.available {LiveContainerBridge.configure(engine:self)}
         } catch { self.error = error.localizedDescription }
     }
     private func importSigningIfNeeded() {
+        if coreStarted,!importedArchivePending,FileManager.default.fileExists(atPath:importedArchive.path) {
+            importedArchivePending=true;send(["command":"import_identity","archive_path":importedArchive.path])
+        }
         guard coreStarted,!signingImportPending,FileManager.default.fileExists(atPath:Paths.signing.path) else {return}
         signingImportPending=true;send(["command":"import_signing","path":Paths.signing.path])
     }
@@ -189,19 +253,33 @@ import CryptoKit
             ds_free(pointer)
             guard let data = string.data(using: .utf8), let event = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any], let type = event["event"] as? String else { continue }
             switch type {
+            case "imported_identity":
+                if let value=event["identity"],!(value is NSNull),let bytes=try? JSONSerialization.data(withJSONObject:value) {importedIdentity=try? JSONDecoder().decode(ImportedSigningIdentity.self,from:bytes)} else {importedIdentity=nil}
+                if !identityImportFiles.isEmpty || importedArchivePending {signingMode="imported";UserDefaults.standard.set(signingMode,forKey:"signingMode");cleanupIdentityImport();importedArchivePending=false}
+                busy=restoring;message="Zertifikat geprüft."
             case "pairing_pin":needsPairingCode=true;message="Pairing-Code eingeben"
             case "paired_local":busy=false;needsPairingCode=false;refreshBootstrap();message="Gerät gekoppelt"
             case "livecontainer_exported":
                 do {try LiveContainerBridge.importTransfer(from:Paths.support.appendingPathComponent("livecontainer-transfer.json"));liveContainerCertificateReady=LiveContainerBridge.certificateReady;busy=false;LiveContainerBridge.configure(engine:self)}catch{fail(error.localizedDescription)}
             case "status": message = event["message"] as? String ?? message
             case "progress": progress = (event["value"] as? Double ?? 0)/100
-            case "logged_in": busy=false; loggedIn=true;signingCertificates=[];certificatesLoaded=false;certificateTeam=""; teamName=event["team"] as? String ?? "Developer-Team"; message="Angemeldet";if let email=event["email"] as? String {accountEmail=email;UserDefaults.standard.set(email,forKey:"accountEmail")}
+            case "logged_in": restoring=false;busy=false; loggedIn=true;signingCertificates=[];certificatesLoaded=false;certificateTeam=event["team_id"] as? String ?? ""; teamName=event["team"] as? String ?? "Developer-Team"; message="Angemeldet";if let email=event["email"] as? String {accountEmail=email;UserDefaults.standard.set(email,forKey:"accountEmail")}
             case "signing_imported": signingImportPending=false;if let email=event["email"] as? String {accountEmail=email;UserDefaults.standard.set(email,forKey:"accountEmail")}
             case "profile": if let raw=event["expires_at"] as? String {selfExpiration=ISO8601DateFormatter().date(from:raw)}
             case "slots": slotsUsed=event["used"] as? Int;developerApps=(event["apps"] as? [[String:String]] ?? []).compactMap{$0["name"]}
+            case "local_app_icons":
+                for icon in event["icons"] as? [[String:String]] ?? [] {if let id=icon["id"],let raw=icon["png"],let data=Data(base64Encoded:raw),data.count<=1_048_576 {deviceIcons[id]=data}}
             case "local_apps":
-                if let bytes=try? JSONSerialization.data(withJSONObject:event["apps"] ?? []),let apps=try? JSONDecoder().decode([DeviceApp].self,from:bytes) {deviceApps=apps.sorted{($0.developer ? "0":"1")+$0.name.lowercased()<($1.developer ? "0":"1")+$1.name.lowercased()}}
+                if let bytes=try? JSONSerialization.data(withJSONObject:event["apps"] ?? []),let apps=try? JSONDecoder().decode([DeviceApp].self,from:bytes) {deviceApps=apps.filter{$0.developer}.sorted{($0.developer ? "0":"1")+$0.name.lowercased()<($1.developer ? "0":"1")+$1.name.lowercased()}}
+                for index in managed.indices where managed[index].installedBundleID==nil {
+                    if let device=deviceApp(for:managed[index]) {managed[index].installedBundleID=device.id}
+                }
+                save(managed,"apps.json")
                 busy=false
+                if let (peer,port)=inspectionConnection {
+                    let ids=deviceApps.map(\.id).filter{deviceIcons[$0]==nil}
+                    for index in stride(from:0,to:ids.count,by:12) {send(["command":"local_app_icons","peer":peer,"port":port,"pairing_path":Paths.pairing.path,"bundles":Array(ids[index..<min(index+12,ids.count)])])}
+                }
             case "ipa_inspected":
                 if let path=event["path"] as? String,let file=importingPath,path==file.path,let bundle=event["bundle_id"] as? String {
                     importedIPA=ImportedIPA(file:file,bundleID:bundle,name:event["name"] as? String ?? "Imported app",version:event["version"] as? String)
@@ -209,31 +287,53 @@ import CryptoKit
                 importingPath=nil;busy=false
             case "app_removed":
                 busy=false;message="App entfernt."
-                if let id=event["bundle_id"] as? String {deviceApps.removeAll{$0.id==id};managed.removeAll{id==$0.id || id.hasPrefix($0.id+".")};save(managed,"apps.json")}
+                if let id=event["bundle_id"] as? String {
+                    let removed=managed.filter{$0.installedBundleID==id || $0.id==id || (!$0.id.isEmpty && id==$0.id+"."+certificateTeam)}
+                    managed.removeAll{item in removed.contains{$0.id==item.id}}
+                    save(managed,"apps.json")
+                    for app in removed {
+                        let file=URL(fileURLWithPath:app.cachedIPA).standardizedFileURL
+                        if file.deletingLastPathComponent()==Paths.support.standardizedFileURL && !managed.contains(where:{$0.cachedIPA==file.path}) && file != Paths.original {try? FileManager.default.removeItem(at:file)}
+                    }
+                    deviceApps.removeAll{$0.id==id};deviceIcons.removeValue(forKey:id)
+                }
                 if let (peer,port)=removalConnection {removalConnection=nil;inspectConnection(peer:peer,port:port)}
             case "certificates":
                 if let bytes=try? JSONSerialization.data(withJSONObject:event["certificates"] ?? []),let items=try? JSONDecoder().decode([SigningCertificate].self,from:bytes) {signingCertificates=items}
                 certificateTeam=event["team_id"] as? String ?? "";certificatesLoaded=true;busy=false
             case "certificate_revoked":message="Zertifikat widerrufen. Zugehörige Apps neu signieren."
-            case "logged_out": loggedIn=false; busy=false;signingCertificates=[];certificatesLoaded=false;certificateTeam=""
+            case "logged_out": restoring=false;loggedIn=false; busy=false;signingCertificates=[];certificatesLoaded=false;certificateTeam=""
             case "two_factor": codeNumbers=event["numbers"] as? [[String:Any]] ?? [];codeError=event["last_error"] == nil || event["last_error"] is NSNull ? "":"Code nicht akzeptiert. Bitte erneut versuchen.";needsCode=true;message="Apple-Bestätigung erforderlich"
             case "choose_team": teams=(event["teams"] as? [[String:Any]] ?? []).map { ["id":$0["id"] as? String ?? "", "name":$0["name"] as? String ?? "Developer-Team"] }
             case "installed":
                 busy=false; progress=1; message="Installation abgeschlossen"
                 if var app=pendingApp {
                     app.installedAt=Date()
+                    app.installedBundleID=event["installed_bundle_id"] as? String ?? app.installedBundleID
                     if let seconds=event["expires_at"] as? Double { app.expiresAt=Date(timeIntervalSince1970:seconds) }
                     if let raw=event["expires_at"] as? String {app.expiresAt=ISO8601DateFormatter().date(from:raw)}
+                    if app.id=="com.directside.app" {selfExpiration=app.expiresAt}
+                    let old=managed.filter{$0.id==app.id}.map(\.cachedIPA)
                     managed.removeAll { $0.id==app.id }; managed.append(app); save(managed,"apps.json")
+                    for path in old where path != app.cachedIPA {removeUnusedIPA(path)}
                 }
                 pendingApp=nil
                 let continuation=installContinuation; installContinuation=nil; continuation?.resume()
-            case "error": if event["command"] as? String == "import_signing" {signingImportPending=false};fail(event["message"] as? String ?? "Unbekannter Fehler")
+            case "error":
+                if event["command"] as? String == "local_app_icons" {continue}
+                if event["command"] as? String == "import_signing" {signingImportPending=false}
+                if event["command"] as? String == "import_identity" {importedArchivePending=false}
+                fail(event["message"] as? String ?? "Unbekannter Fehler")
             default: break
             }
         }
     }
     func fail(_ reason: String) {
+        cleanupIdentityImport()
+        if let app=pendingApp {removeUnusedIPA(app.cachedIPA)}
+        pendingApp=nil
+        try? FileManager.default.removeItem(at:Paths.support.appendingPathComponent("livecontainer-transfer.json"))
+        if vpnRequired {busy=false;return}
         if let path=importingPath {try? FileManager.default.removeItem(at:path);importingPath=nil}
         busy=false;needsPairingCode=false; pendingApp=nil; message="Vorgang fehlgeschlagen"; error=reason
         let continuation=installContinuation; installContinuation=nil; continuation?.resume(throwing:DirectSideError.message(reason))
@@ -278,10 +378,11 @@ import CryptoKit
     }
     func renewAll(peer:String,port:Int) async {
         guard !busy else { return }
-        for app in managed where app.id != "com.directside.app" {
-            do {try await waitForInstall(URL(fileURLWithPath:app.cachedIPA),app:app,peer:peer,port:port)} catch {return}
-        }
-        if pairingReady {refreshSelf(peer:peer,port:port)}
+        busy=true
+        do {
+            for app in managed where app.id != "com.directside.app" {try await waitForInstall(URL(fileURLWithPath:app.cachedIPA),app:app,peer:peer,port:port)}
+            try await waitForInstall(Paths.original,app:ManagedApp(id:"com.directside.app",name:"DirectSide",cachedIPA:Paths.original.path,installedAt:Date(),version:Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String),peer:peer,port:port)
+        }catch{fail(error.localizedDescription)}
     }
     func previewSource(_ raw: String) async {
         guard !busy else { return }
@@ -309,14 +410,17 @@ import CryptoKit
     func install(_ app: CatalogApp, source: SourceCatalog? = nil, peer: String, port: Int) async {
         guard !busy else { return }
         refreshBootstrap()
-        guard loggedIn else { fail("Bitte zuerst in den Einstellungen anmelden."); return }
+        guard canSign else { fail("In den Einstellungen anmelden oder ein Zertifikat importieren."); return }
         guard pairingReady else { fail("Dieses Gerät unter Einstellungen → Verbindung koppeln."); return }
         guard let latest=app.latest else { fail("Diese App hat keine Download-Adresse."); return }
-        busy=true; message="IPA herunterladen …"; progress=0
+        busy=true
+        guard await requireInstallConnection(peer:peer,port:port) else {return}
+        message="IPA herunterladen …"; progress=0
         do {
             let url=try SourceURL.parse(latest.downloadURL.absoluteString)
             var request=URLRequest(url:url); request.timeoutInterval=180
             let (temp,response)=try await URLSession.shared.download(for:request)
+            defer{try? FileManager.default.removeItem(at:temp)}
             guard let http=response as? HTTPURLResponse, http.statusCode==200,let final=http.url,(try? SourceURL.parse(final.absoluteString)) != nil else { throw DirectSideError.message("IPA-Download fehlgeschlagen.") }
             let saved=Paths.support.appendingPathComponent(UUID().uuidString+".ipa")
             try FileManager.default.moveItem(at:temp,to:saved)
@@ -326,26 +430,47 @@ import CryptoKit
     }
     func refresh(_ app: ManagedApp, peer: String, port: Int) {
         guard !busy else { return }
+        busy=true
         Task {do { try await waitForInstall(URL(fileURLWithPath:app.cachedIPA),app:app,peer:peer,port:port) } catch { fail(error.localizedDescription) }}
     }
     func refreshSelf(peer: String, port: Int) {
         guard !busy else { return }
+        busy=true
         Task {do { try await waitForInstall(Paths.original,app:ManagedApp(id:"com.directside.app",name:"DirectSide",cachedIPA:Paths.original.path,installedAt:Date(),version:Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String),peer:peer,port:port) } catch { fail(error.localizedDescription) }}
     }
-    private func waitForInstall(_ url:URL,app:ManagedApp,peer:String,port:Int) async throws {
+    func requireInstallConnection(peer:String,port:Int) async -> Bool {
+        guard canSign,pairingReady else {fail("In den Einstellungen anmelden oder ein Zertifikat importieren und dieses Gerät koppeln.");return false}
+        guard await InstallConnection().reachable(peer:peer,port:port) else {busy=false;vpnRequired=true;return false}
+        vpnRequired=false;return true
+    }
+    func installSelfUpdate(_ url:URL,version:String,peer:String,port:Int) async throws {
+        try await waitForInstall(url,app:ManagedApp(id:"com.directside.app",name:"DirectSide",cachedIPA:Paths.original.path,installedAt:Date(),version:version),peer:peer,port:port,selfUpdate:version)
+    }
+    private func waitForInstall(_ url:URL,app:ManagedApp,peer:String,port:Int,selfUpdate:String?=nil) async throws {
+        busy=true;pendingApp=app
+        guard await requireInstallConnection(peer:peer,port:port) else {throw CancellationError()}
         try await withCheckedThrowingContinuation { continuation in
             installContinuation=continuation
-            do { try startInstall(url,app:app,peer:peer,port:port) }
+            do { try startInstall(url,app:app,peer:peer,port:port,selfUpdate:selfUpdate) }
             catch { installContinuation=nil; continuation.resume(throwing:error); fail(error.localizedDescription) }
         }
     }
-    private func startInstall(_ url: URL, app: ManagedApp, peer: String, port: Int) throws {
-        guard loggedIn else { throw DirectSideError.message("Bitte zuerst anmelden.") }
+    private func startInstall(_ url: URL, app: ManagedApp, peer: String, port: Int,selfUpdate:String?=nil) throws {
+        guard canSign else { throw DirectSideError.message("In den Einstellungen anmelden oder ein Zertifikat importieren.") }
         guard let bootstrap, pairingReady else { throw DirectSideError.message("Dieses Gerät unter Einstellungen → Verbindung koppeln.") }
         guard port>0 && port<=65535 else { throw DirectSideError.message("Remote-Pairing-Port fehlt. Unter Verbindung suchen.") }
         guard FileManager.default.fileExists(atPath:url.path) else { throw DirectSideError.message("Die Original-IPA fehlt. Bitte erneut vom PC übertragen.") }
         busy=true; progress=0; pendingApp=app
-        send(["command":"install_local","path":url.path,"peer":peer,"port":port,"udid":bootstrap.udid,"device_name":bootstrap.name,"pairing_path":Paths.pairing.path,"bundle_id":app.id])
+        var request:[String:Any] = ["command":"install_local","path":url.path,"peer":peer,"port":port,"udid":bootstrap.udid,"device_name":bootstrap.name,"pairing_path":Paths.pairing.path,"bundle_id":app.id]
+        request["signing_mode"]=signingMode
+        if app.id=="com.directside.app",let id=Bundle.main.bundleIdentifier {request["expected_installed_bundle_id"]=id}
+        if let selfUpdate {request["self_update_version"]=selfUpdate}
+        send(request)
+    }
+    private func removeUnusedIPA(_ path:String) {
+        let file=URL(fileURLWithPath:path).standardizedFileURL
+        guard file.deletingLastPathComponent()==Paths.support.standardizedFileURL,file.pathExtension=="ipa",file != Paths.original,!managed.contains(where:{$0.cachedIPA==path}) else {return}
+        try? FileManager.default.removeItem(at:file)
     }
     private func load<T: Decodable>(_ name: String) -> T? { guard let data=try? Data(contentsOf:Paths.support.appendingPathComponent(name)) else { return nil }; return try? JSONDecoder().decode(T.self,from:data) }
     private func save<T: Encodable>(_ value: T,_ name: String) { do { try JSONEncoder().encode(value).write(to:Paths.support.appendingPathComponent(name),options:.atomic) } catch { self.error=error.localizedDescription } }

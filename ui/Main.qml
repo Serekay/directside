@@ -26,8 +26,8 @@ ApplicationWindow {
         if(s.certificateLimit && !certificateLimitShown) {certificateLimitShown=true;page="certificates";backend.loadCertificates()}
         if(!s.certificateLimit) certificateLimitShown=false
     }
-    property bool developerOnly: false
-    property var filteredApps: developerOnly ? s.installedApps.filter(a=>a.developer) : s.installedApps
+    property bool developerOnly: true
+    property var filteredApps: s.installedApps.filter(a=>a.developer)
     onFilteredAppsChanged: if(appPage*9>=filteredApps.length) appPage=0
     property var visibleApps: filteredApps.slice(appPage*9,(appPage+1)*9)
     onVisibleAppsChanged: if(page==="apps") backend.loadAppIcons(visibleApps.map(a=>a.id))
@@ -173,7 +173,7 @@ ApplicationWindow {
                 Layout.fillWidth:true;Layout.fillHeight:true;spacing:16
                 RowLayout {Layout.preferredHeight:30
                     IconButton {visible:win.page!=="install";text:"‹";hint:win.t("Zurück");onClicked:win.page="install"}
-                    Label {text:win.page==="developer"?win.t("Entwicklermodus"):win.page==="certificates"?win.t("Zertifikate"):win.page==="confirm"?win.t("Entfernen bestätigen"):win.page==="settings"?win.t("Einstellungen"):win.page==="activity"?win.t("Aktivität"):win.page==="help"?win.t("Hilfe"):win.page==="apps"?win.t("Installierte Apps"):win.t("DEIN GERÄT");font.pixelSize:win.page==="install"?10:17;font.letterSpacing:win.page==="install"?1.6:0;color:win.page==="install"?win.muted:win.ink;font.weight:Font.DemiBold}
+                    Label {text:win.page==="identity"?win.t("Signierung"):win.page==="developer"?win.t("Entwicklermodus"):win.page==="certificates"?win.t("Zertifikate"):win.page==="confirm"?win.t("Entfernen bestätigen"):win.page==="settings"?win.t("Einstellungen"):win.page==="activity"?win.t("Aktivität"):win.page==="help"?win.t("Hilfe"):win.page==="apps"?win.t("Installierte Apps"):win.t("DEIN GERÄT");font.pixelSize:win.page==="install"?10:17;font.letterSpacing:win.page==="install"?1.6:0;color:win.page==="install"?win.muted:win.ink;font.weight:Font.DemiBold}
                     Item {Layout.fillWidth:true}
                     Action {visible:win.page==="activity";text:win.t("Kopieren");enabled:s.logs.length>0;onClicked:backend.copyActivity()}
                 }
@@ -209,7 +209,7 @@ ApplicationWindow {
                 }
                 Card {
                     id:installCard;objectName:"installCard";visible:win.page==="install";Layout.fillWidth:true;Layout.fillHeight:true;Layout.minimumHeight:272;border.color:s.vpnState==="missing"?"#805440":"#30333a"
-                    ColumnLayout {anchors.fill:parent;anchors.margins:24;spacing:12
+                    ColumnLayout {anchors.fill:parent;anchors.margins:24;spacing:8
                         RowLayout {visible:s.vpnState!=="missing" || s.settingUp;spacing:8
                             Image {source:s.icon;Layout.preferredWidth:56;Layout.preferredHeight:56;sourceSize.width:112;sourceSize.height:112}
                             ColumnLayout {spacing:6
@@ -234,7 +234,8 @@ ApplicationWindow {
                             BusyIndicator {running:parent.visible;implicitWidth:30;implicitHeight:30}
                             Text {objectName:"deviceSetupProgressText";text:win.t(s.setupPhase);color:win.accent;wrapMode:Text.WordWrap;Layout.fillWidth:true;font.pixelSize:13}
                         }
-                        Action {objectName:"installDirectSideButton";text:s.directsideInstalling?win.t("Bitte warten …"):win.t("DirectSide installieren");primary:true;Layout.fillWidth:true;implicitHeight:48;enabled:s.loggedIn && s.devices.length>0 && (!s.busy || s.scanning) && !s.updateBusy && !s.directsideInstalling && s.releaseIPA;onClicked:backend.downloadDirectSide()}
+                        Action {objectName:"installDirectSideButton";text:s.directsideInstalling?win.t("Bitte warten …"):win.t("DirectSide installieren");primary:true;Layout.fillWidth:true;implicitHeight:48;enabled:s.canSign && s.devices.length>0 && (!s.busy || s.scanning) && !s.updateBusy && !s.directsideInstalling && s.releaseIPA;onClicked:backend.downloadDirectSide()}
+                        Label {visible:s.developerMode!=="enabled";text:win.t("Vor dem ersten Start:")+" <a href='developer'>"+win.t("Entwicklermodus einrichten")+"</a>";textFormat:Text.RichText;linkColor:win.accent;font.pixelSize:12;color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true;onLinkActivated:win.page="developer"}
                         RowLayout {objectName:"customIPARow";Layout.fillWidth:true;spacing:8
                         Rectangle {Layout.fillWidth:true;implicitHeight:44;radius:12;color:"#15171b";border.color:"#30343b"
                             RowLayout {anchors.fill:parent;anchors.leftMargin:15;anchors.rightMargin:8;spacing:12
@@ -243,7 +244,7 @@ ApplicationWindow {
                                 IconButton {text:"…";hint:win.t("IPA auswählen");enabled:!s.busy && !s.updateBusy && !s.directsideInstalling;onClicked:backend.chooseIPA()}
                             }
                         }
-                        Action {objectName:"installCustomIPAButton";text:win.t("IPA installieren");enabled:s.loggedIn && s.devices.length>0 && s.customIPA.length>0 && !s.busy && !s.updateBusy && !s.directsideInstalling;onClicked:backend.installCustomIPA()}
+                        Action {objectName:"installCustomIPAButton";text:win.t("IPA installieren");enabled:s.canSign && s.devices.length>0 && s.customIPA.length>0 && !s.busy && !s.updateBusy && !s.directsideInstalling;onClicked:backend.installCustomIPA()}
                         }
                         Item {Layout.fillHeight:true}
                     }
@@ -264,16 +265,17 @@ ApplicationWindow {
                         Action {visible:s.usbState!=="ready";text:s.usbState==="stopped"?win.t("Apple USB starten"):win.t("Apple USB / iTunes installieren");primary:true;enabled:!s.busy;onClicked:backend.setupComponents()}
                         Action {text:win.t("Erneut prüfen");enabled:!s.busy;onClicked:backend.checkComponents()}
                         Action {objectName:"repairDirectSideButton";text:win.t("DirectSide-Einrichtung reparieren");enabled:s.devices.length>0 && !s.busy && !s.updateBusy;onClicked:if(backend.repairDirectSide())win.page="install"}
-                        Action {text:s.slotsUsed>=0?win.t("Apps ansehen · ")+s.slotsUsed+win.t(" / 3 Plätze"):win.t("Apps ansehen");enabled:s.devices.length>0;onClicked:{win.appPage=0;win.page="apps"}}
+                        Action {text:s.slotsUsed>=0?win.t("Apps ansehen · ")+s.slotsUsed+win.t(" Entwickler-Apps"):win.t("Apps ansehen");enabled:s.devices.length>0;onClicked:{win.appPage=0;win.page="apps"}}
+                        Action {text:win.t("Signierung · Account oder Zertifikat");enabled:!s.busy;onClicked:win.page="identity"}
                         Action {text:win.t("Zertifikate verwalten");enabled:s.loggedIn && !s.busy;onClicked:{win.page="certificates";backend.loadCertificates()}}
                         }
                         ColumnLayout {visible:win.settingsSection==="livecontainer";Layout.fillWidth:true;spacing:16
                         RowLayout {Label {text:"LiveContainer";Layout.fillWidth:true} Badge {text:"Optional"} Badge {text:s.lcState==="installed"?win.t("Installiert"):s.lcState==="missing"?win.t("Fehlt"):win.t("Nicht geprüft");tone:s.lcState==="installed"?"ok":s.lcState==="missing"?"missing":"warning"}}
                         RowLayout {
-                            Action {text:s.lcState==="installed"?win.t("Neu installieren"):win.t("Installieren");enabled:!s.busy && s.loggedIn && s.devices.length>0;onClicked:backend.installLiveContainer()}
-                            Action {text:win.t("Zertifikat übertragen");enabled:!s.busy && s.loggedIn && s.lcState==="installed" && s.directsidePresent;onClicked:backend.prepareLiveContainer()}
+                            Action {text:s.lcState==="installed"?win.t("Neu installieren"):win.t("Installieren");enabled:!s.busy && s.canSign && s.devices.length>0;onClicked:backend.installLiveContainer()}
+                            Action {text:win.t("Zertifikat übertragen");enabled:!s.busy && s.canSign && s.lcState==="installed" && s.directsidePresent;onClicked:backend.prepareLiveContainer()}
                         }
-                        Label {visible:s.lcPrepared;text:win.t("Auf dem iPhone: DirectSide → Konto → LiveContainer einrichten");color:win.accent;font.pixelSize:12;Layout.fillWidth:true}
+                        Label {visible:s.lcPrepared;text:win.t("DirectSide auf dem iPhone öffnen. Das Zertifikat wird automatisch an LiveContainer übergeben.");color:win.accent;font.pixelSize:12;Layout.fillWidth:true}
                         }
                         RowLayout {visible:win.settingsSection==="language";Layout.fillWidth:true
                             Label {text:win.t("Sprache");Layout.fillWidth:true}
@@ -297,19 +299,33 @@ ApplicationWindow {
                     }
                 }
                 Card {
+                    objectName:"importedSigningCard";visible:win.page==="identity";Layout.fillWidth:true;Layout.fillHeight:true
+                    ColumnLayout {anchors.fill:parent;anchors.margins:20;spacing:8
+                        RowLayout {Layout.fillWidth:true;Label {text:win.t("Signieren mit");font.pixelSize:18;font.weight:Font.DemiBold} ComboBox {objectName:"signingModePicker";Layout.fillWidth:true;palette.button:"#17191d";palette.buttonText:win.ink;palette.base:"#1d1f24";palette.text:win.ink;model:[win.t("Apple Account"),win.t("Importiertes Zertifikat")];currentIndex:s.signingMode==="imported"?1:0;enabled:!s.busy;onActivated:index=>backend.setSigningMode(index===1?"imported":"account")}}
+                        Text {text:win.t("Kostenlose und bezahlte Teams. Gültigkeit und App-Plätze richten sich nach dem Profil.");font.pixelSize:12;color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Label {visible:!!s.importedIdentity.name;text:s.importedIdentity.name || "";color:win.accent;Layout.fillWidth:true}
+                        RowLayout {Action {text:win.t("P12-Datei auswählen");enabled:!s.busy;onClicked:backend.chooseIdentityCertificate()} Action {text:win.t("Profile auswählen");enabled:!s.busy;onClicked:backend.chooseIdentityProfiles()}}
+                        Label {text:(s.identityP12.split(/[\\/]/).pop() || "–")+" · "+s.identityProfiles.length+win.t(" Profile ausgewählt");elide:Text.ElideMiddle;Layout.fillWidth:true;font.pixelSize:12;color:win.muted}
+                        Field {id:identityPassword;objectName:"identityPasswordField";placeholderText:win.t("Passwort der P12-Datei");echoMode:TextInput.Password;Layout.fillWidth:true;enabled:!s.busy}
+                        Text {text:win.t("P12 mit privatem Schlüssel. Die Profile müssen App, Erweiterungen und iPhone erlauben.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true;font.pixelSize:12}
+                        RowLayout {Action {objectName:"importIdentityButton";text:win.t("Prüfen und sicher speichern");primary:true;enabled:!s.busy && !!s.identityP12 && s.identityProfiles.length>0;onClicked:{backend.importIdentity(identityPassword.text);identityPassword.text=""}} Action {text:win.t("Entfernen");visible:!!s.importedIdentity.name;enabled:!s.busy;onClicked:backend.forgetIdentity()}}
+                        Item {Layout.fillHeight:true}
+                    }
+                }
+                Card {
                     visible:win.page==="help";Layout.fillWidth:true;Layout.fillHeight:true
-                    ColumnLayout {anchors.fill:parent;anchors.margins:24;spacing:12
+                    ColumnLayout {anchors.fill:parent;anchors.margins:20;spacing:8
                         Label {text:win.t("So richtest du es ein");font.pixelSize:20;font.weight:Font.DemiBold}
                         Label {text:win.t("1   Gerät verbinden");font.weight:Font.DemiBold}
                         Text {text:win.t("iPhone oder iPad entsperren, USB anschließen und Vertrauen bestätigen. Bei mehreren Geräten oben das Ziel wählen.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
-                        Label {text:win.t("2   Anmelden und installieren");font.weight:Font.DemiBold}
-                        Text {text:win.t("Apple-ID eingeben. Bestätigungscode hier eintragen, IPA wählen und installieren. Fehlende PC-Komponenten unter Einstellungen einrichten.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Label {text:win.t("2   Installieren und Entwicklermodus aktivieren");font.weight:Font.DemiBold}
+                        Text {text:win.t("Apple-ID eingeben, IPA installieren. Vor dem ersten Start: Einstellungen → Datenschutz & Sicherheit → Entwicklermodus einschalten. iPhone neu starten und Aktivierung bestätigen. Fehlt der Schalter, nach der ersten Installation erneut nachsehen.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                         Label {text:win.t("3   Auf dem iPhone vorbereiten");font.weight:Font.DemiBold}
-                        Text {text:win.t("LocalDevVPN über den angezeigten QR-Code installieren und verbinden. Entwicklerprofil vertrauen; falls verlangt Entwicklermodus aktivieren.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Text {text:win.t("LocalDevVPN über den QR-Code installieren und verbinden. Falls verlangt: Einstellungen → Allgemein → VPN & Geräteverwaltung öffnen und deinem Entwicklerprofil vertrauen.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                         Label {text:win.t("LiveContainer · optional");font.weight:Font.DemiBold}
-                        Text {text:win.t("Unter Einstellungen installieren und Zertifikat übertragen. Dann auf dem iPhone: DirectSide → Konto → LiveContainer einrichten. In LiveContainer den JIT-less-Test ausführen.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+                        Text {text:win.t("Unter Einstellungen installieren. DirectSide auf dem iPhone öffnen: Das Zertifikat wird automatisch übertragen und JIT-less eingerichtet. Die Diagnose in LiveContainer ist nur bei Problemen nötig.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                         Item {Layout.fillHeight:true}
-                        RowLayout {Badge {text:win.t("3 Apps / Gerät")} Badge {text:win.t("10 App-IDs / Account")} Badge {text:win.t("Max. 3 Geräte / Account")}}
+                        RowLayout {Label {text:win.t("Kostenlos");color:win.muted;font.pixelSize:12} Badge {text:win.t("3 Apps / Gerät")} Badge {text:win.t("10 App-IDs / Account")} Badge {text:win.t("Max. 3 Geräte / Account")}}
                     }
                 }
                 Card {
@@ -319,8 +335,7 @@ ApplicationWindow {
                             ComboBox {model:s.devices;textRole:"label";currentIndex:s.deviceIndex;enabled:!s.busy;Layout.fillWidth:true;onActivated:index=>{win.appPage=0;backend.selectDevice(index)}}
                         }
                         RowLayout {spacing:8
-                            Action {text:win.t("Alle Apps · ")+s.installedApps.length;quiet:win.developerOnly;onClicked:{win.appPage=0;win.developerOnly=false}}
-                            Action {text:win.t("Entwickler · ")+s.developerApps.length;quiet:!win.developerOnly;onClicked:{win.appPage=0;win.developerOnly=true}}
+                            Label {text:win.t("Sideload-Apps · ")+win.filteredApps.length;font.weight:Font.DemiBold}
                         }
                         GridView {Layout.fillWidth:true;Layout.fillHeight:true;clip:true;interactive:false;model:win.visibleApps;cellWidth:width/3;cellHeight:height/3
                             delegate:Item {required property var modelData;width:GridView.view.cellWidth;height:GridView.view.cellHeight
@@ -354,7 +369,7 @@ ApplicationWindow {
                     ColumnLayout {anchors.fill:parent;anchors.margins:24;spacing:12
                         RowLayout {Label {text:s.team;Layout.fillWidth:true} Badge {objectName:"certificateCountBadge";text:win.t("Zertifikate")+" · "+(s.certificatesLoaded?String(s.certificates.length):"?");tone:s.certificateLimit?"missing":"neutral"} IconButton {text:"↻";hint:win.t("Erneut prüfen");enabled:s.loggedIn && !s.busy;onClicked:backend.loadCertificates()}}
                         Text {text:win.t("Ein Zertifikat kann mehrere Apps signieren.");color:win.muted;font.pixelSize:12;wrapMode:Text.WordWrap;Layout.fillWidth:true}
-                        Action {objectName:"manageDeviceAppsButton";text:win.t("Apps auf diesem Gerät")+" · "+(s.slotsUsed>=0?s.slotsUsed+" / 3":"?");enabled:s.devices.length>0 && !s.busy;onClicked:{win.page="apps";win.developerOnly=true;backend.inspectDevice()}}
+                        Action {objectName:"manageDeviceAppsButton";text:win.t("Apps auf diesem Gerät")+" · "+(s.slotsUsed>=0?s.slotsUsed+win.t(" Entwickler-Apps"):"?");enabled:s.devices.length>0 && !s.busy;onClicked:{win.page="apps";win.developerOnly=true;backend.inspectDevice()}}
                         Repeater {model:s.certificates.slice(win.certificatePage*3,win.certificatePage*3+3)
                             delegate:Rectangle {required property var modelData;Layout.fillWidth:true;implicitHeight:66;radius:12;color:"#25282e"
                                 RowLayout {anchors.fill:parent;anchors.margins:12;spacing:8
@@ -422,9 +437,8 @@ ApplicationWindow {
                 Badge {id:quotaBadge;objectName:"quotaBadge";text:win.quotaText;tone:!win.quotaKnown?"warning":s.appIdsAvailable===0?"missing":s.appIdsAvailable<=3?"warning":"ok"
                     ToolTip.visible:quotaHover.hovered;ToolTip.text:win.t("Neue App-Kennungen pro Account innerhalb von 7 Tagen. Keine installierten Apps.")+(s.appIdsRegistered>=0?"\n"+s.appIdsRegistered+" "+win.t("registrierte Kennungen"):"");HoverHandler {id:quotaHover}
                 }
-                Badge {visible:win.page==="install" || win.page==="apps";text:s.slotsUsed>=0?"Apps · "+s.slotsUsed+" / 3 · "+win.t("Gerät"):win.t("App-Plätze nicht geprüft");tone:s.slotsUsed<0?"warning":s.slotsUsed>=3?"missing":s.slotsUsed===2?"warning":"ok"}
-                Badge {objectName:"sessionBadge";text:win.accountStatus;tone:s.loggedIn?"ok":s.authState==="expired" || s.authState==="rejected"?"missing":"warning"}
-                Badge {text:win.t("7 Tage")}
+                Badge {visible:win.page==="install" || win.page==="apps";text:s.slotsUsed>=0?s.slotsUsed+win.t(" Entwickler-Apps"):win.t("App-Plätze nicht geprüft");tone:s.slotsUsed<0?"warning":"ok"}
+                Badge {objectName:"sessionBadge";text:s.signingMode==="imported"?win.t(s.canSign?"Zertifikat bereit":"Zertifikat fehlt"):win.accountStatus;tone:s.canSign?"ok":s.authState==="expired" || s.authState==="rejected"?"missing":"warning"}
             }
             }
         }

@@ -84,3 +84,4 @@ mod tests {
         assert_eq!(CALLS.load(Ordering::SeqCst),3);
     }
 }
+mod imported_identity;

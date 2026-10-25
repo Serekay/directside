@@ -68,6 +68,7 @@ struct ManagedApp: Codable, Identifiable {
     var sourceID: String?
     var iconURL: URL?
     var expiresAt: Date?
+    var installedBundleID: String?
 }
 
 struct SourceNews: Codable,Identifiable {

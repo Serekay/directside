@@ -56,6 +56,7 @@ class DesktopBridge(QObject):
         self.data.update(language=language,savedEmail=saved.get('email',''),translations=ENGLISH,status=translate(self.data['status'],language))
         self.data.update(version=VERSION,updateBusy=False,updateProgress=0,updateState='unchecked',updateMessage='',releaseVersion='',windowsUpdate=False,releaseIPA=False,directsideInstalling=False,customIPA='',customIPAName='',ipaSource='file',githubSaved=(CACHE/'github.dpapi').is_file())
         self.data.update(certificates=[],certificatesLoaded=False,certificateTeam='',certificateLimit=False,removal={},developerMode='unknown',settingUp=False,setupPhase='')
+        self.data.update(signingMode=saved.get('signing_mode','account'),importedIdentity={},identityP12='',identityProfiles=[],canSign=False)
         self.releaseClient=ReleaseClient(HOME if getattr(sys,'frozen',False) else ROOT)
         self.release=None
         self.buffer=bytearray()
@@ -93,7 +94,9 @@ class DesktopBridge(QObject):
         language=values.get('language',self.data['language'])
         for key in ('status','error','challengeError'):
             if key in values:values[key]=translate(values[key],language)
-        self.data.update(values);self.changed.emit()
+        self.data.update(values)
+        self.data['canSign']=bool(self.data['importedIdentity']) and self.data['importedIdentity'].get('valid',True) if self.data['signingMode']=='imported' else self.data['loggedIn']
+        self.changed.emit()
         if not self.data['busy'] and self.pendingLogin is not None:QTimer.singleShot(0,self.startPendingLogin)
         elif not self.data['busy'] and self.pendingReleaseInstall is not None:QTimer.singleShot(0,self.startPendingReleaseInstall)
 
@@ -150,7 +153,7 @@ class DesktopBridge(QObject):
 
     def handle(self,event):
         kind=event.get('event')
-        if kind=='ready':self.send({'command':'local_auth_probe'})
+        if kind=='ready':self.send({'command':'imported_identity'});self.send({'command':'local_auth_probe'})
         elif kind=='local_auth_ready':self.update(authLocal=True);self.send({'command':'restore'})
         elif kind in ('logged_in','logged_out'):
             self.data.update(certificates=[],certificatesLoaded=False,certificateTeam='',certificateLimit=False,removal={})
@@ -160,6 +163,9 @@ class DesktopBridge(QObject):
             self.update(loggedIn=logged,authState=state,email=email,team=event.get('team',''),busy=False,challenge='',status='Bereit' if logged else 'Sitzung abgelaufen · bitte anmelden' if state=='expired' else 'Anmeldung erforderlich',**({} if logged else dict(appIdsLimit=-1,appIdsAvailable=-1,appIdsRegistered=-1)))
             if email:self.persist(email)
             if self.initializing:self.initializing=False;self.refresh()
+        elif kind=='imported_identity':
+            identity=event.get('identity') or {}
+            self.update(importedIdentity=identity,busy=False,status='Zertifikat geprüft.' if identity else 'Kein Zertifikat importiert.')
         elif kind=='account_quota':
             self.update(appIdsLimit=event.get('limit') if event.get('limit') is not None else -1,appIdsAvailable=event.get('available') if event.get('available') is not None else -1,appIdsRegistered=event.get('registered',-1))
         elif kind=='certificates':self.update(certificates=event.get('certificates',[]),certificatesLoaded=True,certificateTeam=event.get('team_id',''),busy=False,scanning=False)
@@ -193,7 +199,7 @@ class DesktopBridge(QObject):
                 icons={icon['id']:icon.get('png','') for icon in event.get('icons',[])}
                 apps=[dict(app,icon=('data:image/png;base64,'+icons[app['id']]) if icons[app['id']] else '',iconChecked=True) if app['id'] in icons else app for app in self.data['installedApps']]
                 self.update(installedApps=apps,busy=False,scanning=False)
-        elif kind=='livecontainer_prepared':self.update(busy=False,lcPrepared=True,status='Auf dem iPhone: DirectSide → Konto → LiveContainer einrichten')
+        elif kind=='livecontainer_prepared':self.update(busy=self.installing,lcPrepared=True,status='DirectSide auf dem iPhone öffnen. Das Zertifikat wird automatisch an LiveContainer übergeben.')
         elif kind=='status':
             message=event.get('message','')
             self.update(status=message,**({'settingUp':True,'setupPhase':message} if event.get('phase')=='device_setup' else {}));self.append_log(message)
@@ -260,10 +266,41 @@ class DesktopBridge(QObject):
         self.update(busy=True,removal={});self.send({'command':'certificates'})
 
     @Slot(str)
+    def setSigningMode(self,mode):
+        if self.data['busy'] or mode not in ('account','imported'):return
+        try:self.preferences.save(self.data['email'],self.data['language'],mode)
+        except OSError:self.fail('Account-Einstellungen konnten nicht gespeichert werden.');return
+        self.update(signingMode=mode)
+
+    @Slot()
+    def chooseIdentityCertificate(self):
+        if self.data['busy']:return
+        path,_=QFileDialog.getOpenFileName(None,translate('P12-Datei auswählen',self.data['language']),'','PKCS#12 (*.p12 *.pfx)')
+        if path:self.update(identityP12=path)
+
+    @Slot()
+    def chooseIdentityProfiles(self):
+        if self.data['busy']:return
+        paths,_=QFileDialog.getOpenFileNames(None,translate('Profile auswählen',self.data['language']),'','Apple profiles (*.mobileprovision)')
+        if paths:self.update(identityProfiles=paths)
+
+    @Slot(str)
+    def importIdentity(self,password):
+        if self.data['busy'] or not self.data['identityP12'] or not self.data['identityProfiles']:return
+        self.setSigningMode('imported')
+        self.update(busy=True,error='',status='Zertifikat prüfen …')
+        self.send({'command':'import_identity','p12_path':self.data['identityP12'],'profile_paths':self.data['identityProfiles'],'password':password})
+
+    @Slot()
+    def forgetIdentity(self):
+        if self.data['busy']:return
+        self.update(busy=True);self.send({'command':'forget_identity'})
+
+    @Slot(str)
     def requestAppRemoval(self,bundle):
         if self.data['busy'] or self.data['updateBusy'] or self.data['directsideInstalling'] or not self.data['devices']:return
         app=next((app for app in self.data['installedApps'] if app['id']==bundle),None)
-        if app:self.update(removal={'kind':'app','id':bundle,'name':app['name'],'device':self.data['devices'][self.data['deviceIndex']]['id']})
+        if app and app.get('developer'):self.update(removal={'kind':'app','id':bundle,'name':app['name'],'device':self.data['devices'][self.data['deviceIndex']]['id']})
 
     @Slot(str)
     def requestCertificateRemoval(self,serial):
@@ -311,7 +348,7 @@ class DesktopBridge(QObject):
 
     @Slot()
     def installLiveContainer(self):
-        if self.data['busy'] or not self.data['loggedIn'] or not self.data['devices']:return
+        if self.data['busy'] or not self.data['canSign'] or not self.data['devices']:return
         self.update(busy=True,setupBusy=True,error='',progress=0,status='LiveContainer vorbereiten …')
         self.lcDevice=self.data['devices'][self.data['deviceIndex']]['id']
         def worker():
@@ -321,9 +358,9 @@ class DesktopBridge(QObject):
 
     @Slot()
     def prepareLiveContainer(self):
-        if self.data['busy'] or not self.data['loggedIn'] or self.data['lcState']!='installed' or not self.data['directsidePresent']:return
+        if self.data['busy'] or not self.data['canSign'] or self.data['lcState']!='installed' or not self.data['directsidePresent']:return
         self.update(busy=True,error='',lcPrepared=False,status='Zertifikat lokal übertragen …')
-        self.send({'command':'prepare_livecontainer','device_id':self.data['devices'][self.data['deviceIndex']]['id']})
+        self.send({'command':'prepare_livecontainer','signing_mode':self.data['signingMode'],'device_id':self.data['devices'][self.data['deviceIndex']]['id']})
 
     @Slot(str)
     def submitCode(self,code):
@@ -394,7 +431,7 @@ class DesktopBridge(QObject):
 
     @Slot()
     def downloadDirectSide(self):
-        if self.data['updateBusy'] or (self.data['busy'] and not self.data['scanning']) or self.data['directsideInstalling'] or not self.data['loggedIn'] or not self.data['devices'] or not self.release or not self.data['releaseIPA']:return
+        if self.data['updateBusy'] or (self.data['busy'] and not self.data['scanning']) or self.data['directsideInstalling'] or not self.data['canSign'] or not self.data['devices'] or not self.release or not self.data['releaseIPA']:return
         device=self.data['devices'][self.data['deviceIndex']]['id']
         self.update(directsideInstalling=True)
         def work():
@@ -409,7 +446,7 @@ class DesktopBridge(QObject):
     def startPendingReleaseInstall(self):
         if self.pendingReleaseInstall is None or self.data['busy'] or self.pendingLogin:return
         path,device=self.pendingReleaseInstall;self.pendingReleaseInstall=None
-        if not self.data['loggedIn'] or not self.data['devices'] or self.data['devices'][self.data['deviceIndex']]['id']!=device:
+        if not self.data['canSign'] or not self.data['devices'] or self.data['devices'][self.data['deviceIndex']]['id']!=device:
             self.fail('Zielgerät oder Anmeldung hat sich geändert. Installation erneut starten.');return
         self.data.update(ipa=path,ipaSource='github')
         self.install()
@@ -455,13 +492,13 @@ class DesktopBridge(QObject):
 
     @Slot()
     def install(self):
-        if self.data['busy'] or self.data['updateBusy'] or not self.data['loggedIn'] or not self.data['devices']:return
+        if self.data['busy'] or self.data['updateBusy'] or not self.data['canSign'] or not self.data['devices']:return
         path=Path(self.data['ipa'])
         try:bundle=ipa_identity(path)
         except Exception:self.fail('Keine gültige IPA ausgewählt.');return
         self.installing=True
         self.update(busy=True,progress=0,error='',success=False,status='Installation vorbereiten …')
-        self.send({'command':'install','device_id':self.data['devices'][self.data['deviceIndex']]['id'],'path':str(path),'bundle_id':bundle,'bootstrap':bundle=='com.directside.app'})
+        self.send({'command':'install','signing_mode':self.data['signingMode'],'device_id':self.data['devices'][self.data['deviceIndex']]['id'],'path':str(path),'bundle_id':bundle,'bootstrap':bundle=='com.directside.app'})
 
     @Slot()
     def dismissError(self):self.update(error='')
@@ -508,7 +545,7 @@ class DesktopBridge(QObject):
             except Exception as error:self.update(setupBusy=False);self.fail(str(error));return
             self.installing=True
             self.update(setupBusy=False,status='LiveContainer signieren und installieren …',progress=0)
-            self.send({'command':'install','device_id':self.lcDevice,'path':str(path),'bundle_id':bundle,'bootstrap':False})
+            self.send({'command':'install','signing_mode':self.data['signingMode'],'device_id':self.lcDevice,'path':str(path),'bundle_id':bundle,'bootstrap':False})
         elif kind=='done':
             self.update(busy=False,setupBusy=False,usbState=usb_status(),status=event.get('message',''),progress=0)
             self.checkComponents()

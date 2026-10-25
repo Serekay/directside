@@ -27,7 +27,7 @@ class WindowsUIStateTests(unittest.TestCase):
   self.assertEqual(self.bridge.data['challenge'],'')
  def test_restore_serializes_commands_and_saves_identity(self):
   self.bridge.handle({'event':'ready'})
-  self.assertEqual(self.sent,[{'command':'local_auth_probe'}])
+  self.assertEqual(self.sent,[{'command':'imported_identity'},{'command':'local_auth_probe'}])
   self.bridge.handle({'event':'local_auth_ready'})
   self.assertEqual(self.sent[-1],{'command':'restore'})
   self.bridge.handle({'event':'logged_in','email':'person@example.com','team':'Test'})
@@ -63,7 +63,7 @@ class WindowsUIStateTests(unittest.TestCase):
   self.assertEqual(root.property('certificatePage'),0)
   self.assertEqual(root.findChild(QObject,'certificateCountBadge').property('text'),'Certificates · 1')
   button=root.findChild(QObject,'manageDeviceAppsButton')
-  self.assertEqual(button.property('text'),'Apps on this device · 3 / 3')
+  self.assertEqual(button.property('text'),'Apps on this device · 3 development apps')
   QMetaObject.invokeMethod(button,'clicked');APP.processEvents()
   self.assertEqual(root.property('page'),'apps');self.assertTrue(root.property('developerOnly'))
   self.assertTrue(any(request.get('command')=='device_components' for request in self.sent))
@@ -244,7 +244,7 @@ class WindowsUIStateTests(unittest.TestCase):
   root.close();engine.deleteLater();APP.processEvents()
 
  def test_app_removal_needs_confirmation_and_remains_device_scoped(self):
-  self.bridge.update(busy=False,devices=[{'id':'phone'},{'id':'tablet'}],installedApps=[{'id':'third.party.app','name':'Other installer app'}])
+  self.bridge.update(busy=False,devices=[{'id':'phone'},{'id':'tablet'}],installedApps=[{'id':'third.party.app','name':'Other installer app','developer':True}])
   self.bridge.requestAppRemoval('third.party.app');self.assertEqual(self.sent,[])
   self.bridge.update(deviceIndex=1)
   self.bridge.confirmRemoval();self.assertEqual(self.sent,[])
@@ -309,4 +309,48 @@ class WindowsUIStateTests(unittest.TestCase):
   self.bridge.handle({'event':'device_components','device_id':'other-phone','developer_mode':False})
   self.assertEqual(self.bridge.data['developerMode'],'enabled')
   root.close();engine.deleteLater();APP.processEvents()
+ def test_regular_app_store_apps_cannot_be_removed(self):
+  self.bridge.update(busy=False,devices=[{'id':'phone'}],installedApps=[{'id':'store.app','name':'Store app','developer':False}])
+  self.bridge.requestAppRemoval('store.app');self.bridge.confirmRemoval()
+  self.assertEqual(self.sent,[])
+  engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
+  engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')));root=engine.rootObjects()[0]
+  self.assertEqual(root.property('filteredApps').toVariant(),[])
+  root.close();engine.deleteLater();APP.processEvents()
+
+ def test_imported_identity_signs_without_apple_login_and_mode_survives_restart(self):
+  import plistlib
+  from zipfile import ZipFile
+  ipa=Path(self.folder.name)/'app.ipa'
+  with ZipFile(ipa,'w') as archive:archive.writestr('Payload/App.app/Info.plist',plistlib.dumps({'CFBundleIdentifier':'example.app'}))
+  self.bridge.update(busy=False,devices=[{'id':'phone'}],loggedIn=False,ipa=str(ipa),importedIdentity={'name':'Fixture profile'})
+  self.bridge.setSigningMode('imported');self.bridge.install()
+  self.assertEqual(self.sent[-1]['command'],'install')
+  self.assertEqual(self.sent[-1]['signing_mode'],'imported')
+  self.assertEqual(self.bridge.preferences.load()['signing_mode'],'imported')
+  self.assertNotIn('password',self.bridge.preferences.path.read_text())
+  self.bridge.update(busy=False);self.bridge.handle({'event':'imported_identity','identity':None})
+  self.assertFalse(self.bridge.data['canSign'])
+
+ def test_import_certificate_request_has_password_only_in_protocol_not_state(self):
+  self.bridge.update(busy=False,identityP12='fixture.p12',identityProfiles=['main.mobileprovision','extension.mobileprovision'])
+  self.bridge.importIdentity('fixture-only-password')
+  self.assertEqual(self.sent[-1],{'command':'import_identity','p12_path':'fixture.p12','profile_paths':['main.mobileprovision','extension.mobileprovision'],'password':'fixture-only-password'})
+  self.assertNotIn('fixture-only-password',str(self.bridge.data))
+  self.assertNotIn('fixture-only-password',self.bridge.preferences.path.read_text())
+
+ def test_imported_signing_form_stays_inside_compact_window(self):
+  from PySide6.QtCore import QPointF
+  self.bridge.update(busy=False,loggedIn=False)
+  engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
+  engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')));root=engine.rootObjects()[0]
+  root.setProperty('page','identity');root.setWidth(960);root.setHeight(680);APP.processEvents()
+  card=root.findChild(QObject,'importedSigningCard');button=root.findChild(QObject,'importIdentityButton')
+  self.assertTrue(card.property('visible'))
+  point=button.mapToScene(QPointF(0,0));top=card.mapToScene(QPointF(0,0))
+  self.assertGreaterEqual(point.y(),top.y())
+  self.assertLessEqual(point.y()+button.height(),top.y()+card.height())
+  self.assertFalse(button.property('enabled'))
+  root.close();engine.deleteLater();APP.processEvents()
+
 if __name__=='__main__':unittest.main()
