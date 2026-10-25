@@ -1,5 +1,25 @@
 # Teststand vom 25. Oktober 2026
 
+## Vorbereiteter frischer Ablauf mit iPhone-Build 14
+
+Private iPhone-Aktion 40163435691 erfolgreich, Artefakt lokal als
+`dist/DirectSide.ipa`: Version 0.1.0, Build 14, Kennung `com.directside.app`,
+SHA-256 `c6f1927539385feb71368bc6353f963bdf6ab26d8170e379a7197e36705f5901`.
+Kein Release veröffentlicht. Der primäre Windows-Installationsbutton verwendet
+eine gültige nebenliegende DirectSide-IPA, sofern deren Version mindestens
+der bekannten Release-Version entspricht. Andere Apps, beschädigte Dateien
+und ältere Pakete werden nicht dafür verwendet. Version samt Build sichtbar.
+74 Python/Qt-Tests und Paket-Startprüfung bestanden; Windows neu gebaut.
+
+Für den ausdrücklich gewünschten Reset: In DirectSide am iPhone abgemeldet,
+danach DirectSide, LiveContainer und LocalDevVPN entfernt; Abwesenheit aller
+drei Apps vom Gerät bestätigt. Windows-Sitzung abgemeldet, anschließend
+`missing_session` bestätigt; lokale Benutzereinstellungen entfernt.
+Signieridentität, Apple-Kennungen, vorhandene Windows-Treiber und persönliche
+Apps bleiben erhalten. Entwicklermodus ausschalten und Neustart am iPhone
+beim Betreiber angefragt; Kopplungsreset folgt erst nach bestätigtem Aus-Zustand.
+Der eigentliche neue Einrichtungsdurchlauf wurde noch nicht gestartet.
+
 ## Update-Ansicht und nächster vollständiger Durchlauf
 
 Windows-Updateansicht ohne Repository-/Token-Eingabe und ohne technische
