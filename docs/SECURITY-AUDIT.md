@@ -39,6 +39,15 @@ The source and lockfile now use patched Rustls, WebPKI/root stores, Tokio, crypt
 
 These dependency fixes are **not present in the already published 0.1.0/0.1.1 binaries**. This review does not replace release assets or publish a new version. A new IPA build and release require the owner's release instruction.
 
+### Withdrawal of earlier binaries
+
+After the review, the owner requested removal of the earlier public builds.
+Releases 0.1.0 and 0.1.1 were withdrawn to private drafts, retaining the owner's
+administrative record while removing public access to their EXE/IPA downloads.
+All 27 historical Windows/iPhone Actions build artifacts were deleted. Source
+tags and Git history remain available. The README no longer offers the withdrawn
+downloads. Files already downloaded by others cannot be recalled.
+
 ## Validation and boundaries
 
 The hardened workflow passes Actionlint. Local tests pass: **90 Python/UI tests, 12 core Rust tests and 9 vendor Rust tests**, including the new archive/publication checks and fail-closed dependency/scanner gates. Public-log redaction on secret-scan failure is also covered. The shared Rust code compiles on Windows. No new macOS/iPhone Actions build was dispatched during this review, and Apple login or installation was not repeated with personal credentials.
