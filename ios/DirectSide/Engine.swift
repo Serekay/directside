@@ -11,6 +11,7 @@ import CryptoKit
     @Published var busy = true
     private var restoring=true
     private var sessionImportPending=false
+    private var pendingLocalIdentity:Data?
     var preparingAccount:Bool {restoring || sessionImportPending}
     var showsProgress:Bool {busy && !restoring}
     @Published var loggedIn = false
@@ -258,6 +259,10 @@ import CryptoKit
             try? FileManager.default.removeItem(at:Paths.sessionImport);restoring=false;busy=false;return
         }
         sessionImportPending=true;restoring=true;busy=true
+        if let data=try? Data(contentsOf:Paths.sessionImport),data.count<=131072,
+           let transfer=try? JSONSerialization.jsonObject(with:data) as? [String:Any],let identity=transfer["local_identity"] as? [String:Any] {
+            pendingLocalIdentity=try? JSONSerialization.data(withJSONObject:identity)
+        }
         send(["command":"import_session","path":Paths.sessionImport.path,"email":accountEmail,"profile_path":profile])
     }
     func send(_ request: [String: Any]) {
@@ -300,7 +305,17 @@ import CryptoKit
             case "progress": progress = (event["value"] as? Double ?? 0)/100
             case "logged_in": restoring=false;busy=false; loggedIn=true;signingCertificates=[];certificatesLoaded=false;certificateTeam=event["team_id"] as? String ?? ""; teamName=event["team"] as? String ?? "Developer-Team"; message="Angemeldet";if let email=event["email"] as? String {accountEmail=email;UserDefaults.standard.set(email,forKey:"accountEmail")}
             case "signing_imported": signingImportPending=false;if let email=event["email"] as? String {accountEmail=email;UserDefaults.standard.set(email,forKey:"accountEmail")};importSessionIfNeeded()
-            case "session_imported":sessionImportPending=false;signingMode="account";UserDefaults.standard.set(signingMode,forKey:"signingMode");send(["command":"restore"])
+            case "session_imported":
+                Task {
+                    do {
+                        if let identity=pendingLocalIdentity {try await LocalAnisetteService.shared.importIdentity(identity)}
+                        pendingLocalIdentity=nil;sessionImportPending=false;signingMode="account";UserDefaults.standard.set(signingMode,forKey:"signingMode");send(["command":"restore"])
+                    } catch {
+                        pendingLocalIdentity=nil;sessionImportPending=false;restoring=false;busy=false;message="Bitte anmelden"
+                        let report=["stage":"identity_import_failed","detail":error.localizedDescription]
+                        if let data=try? JSONSerialization.data(withJSONObject:report) {try? data.write(to:Paths.sessionImport.deletingLastPathComponent().appendingPathComponent("DirectSide-account-status.json"),options:[.atomic,.completeFileProtection])}
+                    }
+                }
             case "profile": if let raw=event["expires_at"] as? String {selfExpiration=ISO8601DateFormatter().date(from:raw)}
             case "slots": slotsUsed=event["used"] as? Int;developerApps=(event["apps"] as? [[String:String]] ?? []).compactMap{$0["name"]}
             case "account_quota":appIDsLimit=event["limit"] as? Int;appIDsAvailable=event["available"] as? Int
@@ -360,7 +375,7 @@ import CryptoKit
                 pendingApp=nil
                 let continuation=installContinuation; installContinuation=nil; continuation?.resume()
             case "error":
-                if event["command"] as? String == "import_session" {sessionImportPending=false;restoring=false;busy=false;message="Bitte anmelden";continue}
+                if event["command"] as? String == "import_session" {pendingLocalIdentity=nil;sessionImportPending=false;restoring=false;busy=false;message="Bitte anmelden";continue}
                 if event["command"] as? String == "app_ids" {loadingAppIDs=false;appIDsError="App-Kennungen konnten nicht geladen werden. Bitte erneut versuchen.";continue}
                 if event["command"] as? String == "local_app_icons" {continue}
                 if event["command"] as? String == "inspect_local" {inspecting=false;lastInspection=nil;continue}

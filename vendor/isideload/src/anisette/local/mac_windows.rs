@@ -30,7 +30,7 @@ impl LocalAnisetteProvider {
         if command.is_empty() || command.len()>3 || !std::path::Path::new(&command[0]).is_file(){bail!("Local authentication executable is missing.");}
         Ok(Self{command,pending:Mutex::new(None)})
     }
-    async fn fetch(&self,operation:&str,sim:Option<&str>)->Result<Payload,Report> {
+    async fn exchange(&self,operation:&str,sim:Option<&str>)->Result<Vec<u8>,Report> {
         let mut command=tokio::process::Command::new(&self.command[0]);
         let pipe_name=format!(r"\\.\pipe\DirectSide-auth-{}",uuid::Uuid::new_v4());
         let mut pipe=private_pipe(&pipe_name)?;
@@ -39,13 +39,15 @@ impl LocalAnisetteProvider {
         let exchange=async {
             pipe.connect().await?;
             pipe.write_all(format!("{}\n",serde_json::json!({"operation":operation,"sim":sim})).as_bytes()).await?;
-            let mut output=Vec::new();pipe.take(65537).read_to_end(&mut output).await?;
+            let mut output=Vec::new();pipe.take(131073).read_to_end(&mut output).await?;
             let status=child.wait().await?;
             if !status.success(){bail!("Bundled local Apple authentication failed; no remote service was used.");}
-            Payload::decode(&output)
+            if output.len()>131072 {bail!("Local authentication response exceeds its limit.");}Ok(output)
         };
         tokio::time::timeout(Duration::from_secs(85),exchange).await.context("Local Apple authentication timed out.")?
     }
+    async fn fetch(&self,operation:&str,sim:Option<&str>)->Result<Payload,Report> {Payload::decode(&self.exchange(operation,sim).await?)}
+    pub async fn export_identity(&self)->Result<Vec<u8>,Report> {self.exchange("export_identity",None).await}
 }
 #[async_trait::async_trait]
 impl AnisetteProvider for LocalAnisetteProvider {

@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import ssl
+import struct
 import sys
 import threading
 import urllib.parse
@@ -43,6 +44,21 @@ def apple_url(url):
     if p.scheme!='https' or not p.hostname or not(p.hostname=='apple.com' or p.hostname.endswith('.apple.com')) or p.username or p.password:raise ValueError('Invalid Apple provisioning endpoint')
     return url
 
+def export_identity(saved):
+    """Normalize the protected local machine context for one trusted USB handoff."""
+    identity=saved.get('identity',{})
+    host=bytes.fromhex(identity['host_uuid'])
+    if len(host)!=16:raise ValueError('Invalid local identity')
+    store=bytearray()
+    for name,value in sorted(saved.get('store',{}).items()):
+        if name=='adi.pb':continue
+        if not name or '/' in name or '\\' in name or len(name)>128:raise ValueError('Invalid local store')
+        filename=name.encode('utf-8');blob=base64.b64decode(value,validate=True)
+        store+=struct.pack('>H',len(filename))+filename+struct.pack('>I',len(blob))+blob
+        if len(store)>65536:raise ValueError('Local store exceeds its limit')
+    if not store:raise ValueError('Local identity is not provisioned')
+    return {'host':base64.b64encode(host).decode(),'device':identity['device_id'],'user':identity['local_user_uuid'],'serial':identity['serial'],'store':base64.b64encode(store).decode()}
+
 def run(request):
     trace('runtime verification')
     if hashlib.sha256(RUNTIME.read_bytes()).hexdigest()!=HASH:raise ValueError('Local Apple runtime checksum mismatch')
@@ -60,6 +76,7 @@ def run(request):
         lock.seek(0);lock.write(b'\0');lock.flush();lock.seek(0);msvcrt.locking(lock.fileno(),msvcrt.LK_LOCK,1)
         protected=state/'identity.dpapi'
         saved=json.loads(protect(protected.read_bytes(),True)) if protected.exists() else {}
+        if request.get('operation')=='export_identity':return export_identity(saved)
         trace('protected identity loaded')
         class SecureMachine(MacAnisette):
             def _load_identity(self):return saved.get('identity') or super()._load_identity()

@@ -1,6 +1,6 @@
 # Teststand vom 25. Oktober 2026
 
-## Einführung und Kontoübernahme (Build 10 in Vorbereitung)
+## Einführung, Kontoübernahme und LiveContainer-Icon (Build 12 in Vorbereitung)
 
 Überflüssige Entwicklermodus-Anleitung aus der laufenden iPhone-App entfernt;
 die Einrichtung vor dem ersten Start bleibt in Windows. Neue überspringbare
@@ -18,7 +18,22 @@ Team gegen das eingebettete Profil, speichert im Schlüsselbund und prüft die
 Sitzung mit Apple. Das zuvor ausgewählte Entwicklerteam wird wiederverwendet;
 bei abgelehnter Sitzung bleibt die Anmeldung mit vorausgefüllter Apple-ID möglich.
 Neue Kern-Tests prüfen Feldfreigabe, Größenbegrenzung und fremde Accountdaten.
-Xcode-Build und native Kontoübernahme/Einführung sind noch nicht geprüft.
+Build 10 und 11 wurden erfolgreich gebaut und über dieselbe Kennung installiert.
+Einführung, Weiter/Zurück, Überspringen, vorhandene VPN-Verbindung und Entfernung
+der Entwicklermodus-Anleitung nativ geprüft. Die Übergabedatei wird verarbeitet,
+Apple lehnt die Sitzung jedoch mit Fehler 1100 ab. Kontoübernahme ist daher noch
+nicht erfolgreich belegt. Build 12 übernimmt zusätzlich den zugehörigen lokalen
+Authentifizierungskontext aus dem geschützten Windows-Speicher in den iOS-
+Schlüsselbund; er wird vor dem Sitzungsaufruf im echten Interpreter validiert.
+Native Wiederprüfung steht aus.
+
+Neues LiveContainer-Icon mit dem Bildwerkzeug erstellt und in
+`assets/livecontainer-directside.png` gespeichert. Die Signierung ersetzt nur
+das Icon der eigenständigen App mit exakt passender Bundle-ID. Passende deckende
+iPhone-/iPad-PNGs und die Icon-Metadaten werden vor dem Signieren erzeugt. Name,
+Kennung und Erweiterungen bleiben erhalten. Ein Integrationstest prüft die
+Abgrenzung zu ähnlich benannten Apps sowie Größe, Deckkraft und Identität.
+Die Anzeige auf dem iPhone ist noch offen.
 
 ## USB-Verbindungsverlust
 

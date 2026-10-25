@@ -28,6 +28,13 @@ Git. Its download and hashes are in `scripts/prepare-mac-runtime.py`.
 
 The Rust signing and transport core uses isideload and idevice. See [vendor/README-DirectSide.md](vendor/README-DirectSide.md) and [vendor/LICENSE-isideload](vendor/LICENSE-isideload) for the vendored source and changes.
 
+Icon preparation uses the PNG-only configuration of [image](https://github.com/image-rs/image)
+0.25.10 (MIT or Apache-2.0), with its PNG/color processing dependencies recorded
+in Cargo.lock. LiveContainer remains the upstream application; DirectSide applies
+a custom icon before signing the owner's installation. The generated artwork and
+its prompt are in `assets/livecontainer-directside.png` and
+`assets/livecontainer-icon-prompt.md`.
+
 ## Windows interface
 
 The Windows local authentication helper uses a subset of [os-findmy-e](https://github.com/sacca97/os-findmy-e), revision `374d83854f657a7fdca45f813387d99d491db0e2`, under MIT. Its unchanged license and DirectSide changes are in `vendor/mac-adi-python/`. Account authentication stays in the Rust engine; this helper runs Apple's Mac CoreADI under Unicorn without a network listener or remote Anisette service.

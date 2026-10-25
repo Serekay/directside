@@ -32,7 +32,8 @@ struct OnboardingView:View {
     private var hero:some View {
         VStack(alignment:.leading,spacing:15) {
             if step==0 {BrandIcon(size:82)}
-            else {Image(systemName:step==1 ? "checkmark.shield.fill":"square.stack.3d.up.fill").font(.system(size:54)).foregroundStyle(Style.accent).padding(.vertical,8)}
+            else if step==1 {Image(systemName:"checkmark.shield.fill").font(.system(size:54)).foregroundStyle(Style.accent).padding(.vertical,8)}
+            else {Image("livecontainer-directside").resizable().scaledToFit().frame(width:82,height:82).clipShape(RoundedRectangle(cornerRadius:19))}
             if step==0 {
                 Text(L("Willkommen bei")).font(.title2.weight(.semibold)).foregroundStyle(.secondary)
                 Text("DirectSide").font(.largeTitle.bold()).lineLimit(1).minimumScaleFactor(0.75)

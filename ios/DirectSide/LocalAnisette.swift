@@ -52,6 +52,29 @@ actor LocalAnisetteService {
         try prepare()
     }
 
+    /// Adopt the local machine context that issued the transferred Apple session.
+    /// Validate it in a separate interpreter before replacing the keychain identity.
+    func importIdentity(_ data:Data) throws {
+        guard inFlight==nil,data.count<=131072 else {throw LocalAnisetteError.message("Local identity import is unavailable.")}
+        let incoming=try JSONDecoder().decode(Identity.self,from:data)
+        guard incoming.host.count==16,!incoming.store.isEmpty,incoming.store.count<=65536,
+              incoming.device.count<=64,incoming.user.count==32,incoming.serial.count<=32 else {throw LocalAnisetteError.message("Local identity import is invalid.")}
+        let previous=identity;let previousHandle=handle
+        identity=incoming;handle=nil
+        do {
+            try prepare()
+            guard let handle else {throw LocalAnisetteError.message("Local identity import failed.")}
+            var mid=AdiBuf(ptr:nil,len:0),otp=AdiBuf(ptr:nil,len:0),routing:UInt64=0
+            defer {adi_buf_free(mid);adi_buf_free(otp)}
+            try check(adi_headers(handle,-2,&mid,&otp,&routing))
+            try persist()
+            if let previousHandle {adi_close(previousHandle)}
+        } catch {
+            if let handle {adi_close(handle)}
+            handle=previousHandle;identity=previous;throw error
+        }
+    }
+
     func generate() async throws -> LocalAnisettePayload {
         if let inFlight {return try await inFlight.value}
         let task=Task {try await self.makePayload()};inFlight=task

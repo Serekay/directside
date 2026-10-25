@@ -133,7 +133,8 @@ impl Application {
                 ),));
             }
         }
-        let bundle = Bundle::new(bundle_path)?;
+        let mut bundle = Bundle::new(bundle_path)?;
+        super::custom_icon::apply(&mut bundle)?;
 
         Ok(Application {
             bundle, /*temp_path*/
