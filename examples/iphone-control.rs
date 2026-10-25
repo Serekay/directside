@@ -26,7 +26,8 @@ async fn main()->Result<(),Report> {
 }
 async fn run()->Result<(),Report> {
     let args:Vec<_>=std::env::args().skip(1).collect();
-    let target=if args.first().is_some_and(|a|a=="press") {Some(args.get(1).ok_or_else(||report!("Use press <exact accessibility label>."))?.as_str())} else {None};
+    let focus_only=args.first().is_some_and(|a|a=="focus");
+    let target=if focus_only || args.first().is_some_and(|a|a=="press") {Some(args.get(1).ok_or_else(||report!("Use press/focus <exact accessibility label>."))?.as_str())} else {None};
     let mut mux=UsbmuxdConnection::default().await?;
     let devices=mux.get_devices().await?;
     if devices.len()!=1 {bail!("Connect exactly one trusted, unlocked iPhone.");}
@@ -57,7 +58,8 @@ async fn run()->Result<(),Report> {
         if !seen.insert(identity){duplicates+=1;if duplicates>=6{break}continue}
         duplicates=0;
         println!("Element: {}",if caption.contains('@'){"[account]"}else{caption});
-        if target==Some(caption) {
+        if target==Some(caption) || (target==Some("[account]") && caption.contains('@')) {
+            if focus_only {pressed=true;break}
             let element=token.ok_or_else(||report!("Selected element has no activation token."))?.clone();
             let fields:plist::Dictionary=[("AttributeNameValue_v1",Value::String("AXAction-2010".into())),("DisplayAsTree_v1",0.into()),("HumanReadableNameValue_v1","Activate".into()),("IsInternal_v1",0.into()),("PerformsActionValue_v1",1.into()),("SettableValue_v1",0.into()),("ValueTypeValue_v1",1.into())].into_iter().map(|(k,v)|(k.to_string(),pass(v))).collect();
             let action=Value::Dictionary([("ObjectType".to_string(),Value::String("AXAuditElementAttribute_v1".into())),("Value".to_string(),pass(Value::Dictionary(fields)))].into_iter().collect());
@@ -68,6 +70,6 @@ async fn run()->Result<(),Report> {
     invoke(&mut client,"deviceSetAppMonitoringEnabled:",vec![Value::Boolean(false)]).await?;
     if target.is_some() && !pressed {bail!("Target was not found or no accessibility focus events arrived.");}
     if seen.is_empty() {bail!("No accessibility elements received.");}
-    println!("Inspected {} elements; activation requested: {pressed}. Confirm any navigation with a screenshot.",seen.len());
+    println!("Inspected {} elements; activation requested: {}. Confirm any navigation with a screenshot.",seen.len(),pressed && !focus_only);
     Ok(())
 }
