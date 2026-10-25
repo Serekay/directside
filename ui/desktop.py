@@ -70,6 +70,7 @@ class DesktopBridge(QObject):
         self.release=None
         self.buffer=bytearray()
         self.initializing=True
+        self.closing=False
         self.installing=False
         self.setupWasFirstInstall=False
         self.pendingLogin=None
@@ -79,7 +80,7 @@ class DesktopBridge(QObject):
         self.process.readyReadStandardOutput.connect(self.read_events)
         self.process.readyReadStandardError.connect(self.read_errors)
         self.process.finished.connect(self.exited)
-        self.process.errorOccurred.connect(lambda _:self.fail('Signierkern konnte nicht gestartet werden.'))
+        self.process.errorOccurred.connect(self.processError)
         self.timer=QTimer(self);self.timer.setInterval(3000);self.timer.timeout.connect(self.auto_refresh)
         self.setupEvent.connect(self.onSetupEvent)
         self.releaseEvent.connect(self.onReleaseEvent)
@@ -619,9 +620,13 @@ class DesktopBridge(QObject):
             self.checkComponents()
 
     def exited(self,*_):
-        if self.process.state()==QProcess.NotRunning:self.fail('Signierkern beendet. DirectSide neu starten.')
+        if not self.closing and self.process.state()==QProcess.NotRunning:self.fail('Signierkern beendet. DirectSide neu starten.')
+
+    def processError(self,*_):
+        if not self.closing:self.fail('Signierkern konnte nicht gestartet werden.')
 
     def close(self):
+        self.closing=True
         self.pendingLogin=None
         self.pendingReleaseInstall=None
         self.timer.stop()

@@ -45,8 +45,20 @@ Entwicklermodus läuft: Am angeschlossenen Gerät wurde Modus „aus“ und nach
 gezielter Deinstallation keine der drei Setup-Apps festgestellt. Die lokale
 Build-9-IPA wurde über den echten Windows-Einrichtungsablauf installiert;
 das Ereignis `developer_mode_required` erreicht die vorgesehene Warteansicht.
-Die Aktivierung/Neustartbestätigung am iPhone und das automatische Fortsetzen
-sind noch offen. Der auf diesem Gerät bereits sichtbare Schalter belegt keinen
+Nach Aktivierung/Neustartbestätigung blieb Apples USB-Geräteliste zunächst leer,
+obwohl Windows die Treiber ohne Fehler erkannte. Einmaliges erneutes Einstecken
+stellte die Verbindung her. Anschließend setzte Windows die Kopplung automatisch
+fort und erreichte `setupReady`, ohne zweite Installation. Am Gerät bestätigt:
+Entwicklermodus aktiv, DirectSide 0.1.0 Build 9, ein belegter App-Platz und
+weiterhin 9/10 App-IDs. Der erste native Start erreichte Apples Dialog
+„Entwicklungsteam, dem nicht vertraut wird“. Nach Bestätigung durch den Betreiber
+startet DirectSide erfolgreich; native Accessibility bestätigt den frischen
+Entdecken-Bildschirm und die erste iOS-Abfrage für das lokale Netzwerk.
+LocalDevVPN ist noch nicht installiert; Installation über VPN und Selbsterneuerung
+sind durch diesen Teilschritt noch nicht belegt. Ein gezielter USB-Hinweis in der Warteansicht und ein
+Fehler beim erwarteten Beenden des Testfensters wurden korrigiert; 57 Windows-
+Tests einschließlich beider Regressionen bestanden.
+Der auf diesem Gerät bereits sichtbare Schalter belegt keinen
 Hardwaretest mit anfänglich unsichtbarem Schalter. Windows ohne installierte
 Apple-Komponenten ist ebenfalls noch nicht praktisch geprüft.
 
@@ -60,13 +72,14 @@ gepackte Startprüfung bestanden. Fehlende Vertrauensbeziehung und abgelehnte
 Bestätigung sind zusätzlich durch Ablauf-Tests abgedeckt; bestehende Kopplungen
 werden wiederverwendet.
 
-Frischstarttest vorbereitet: iPhone-Anmeldung über die echte Oberfläche
+Ausgangszustand des Frischstarttests: iPhone-Anmeldung über die echte Oberfläche
 abgemeldet; DirectSide, LiveContainer einschließlich Gastdaten und LocalDevVPN
 gezielt entfernt. Keine anderen Apps, Fotos, Apple-App-IDs oder Zertifikate
-verändert. Verifiziert: null Setup-Apps, Entwicklermodus zu diesem Zeitpunkt
-noch aktiv. Betreiber ist zum Deaktivieren/Neustarten aufgefordert. Danach
-werden nur die USB-Vertrauensbeziehung dieses PCs und der DirectSide-
-Remote-Pairing-Cache zurückgesetzt. Kontokennungen und Signieridentität bleiben
+verändert. Verifiziert: null Setup-Apps. Der Betreiber hat den Entwicklermodus
+deaktiviert und neu gestartet, vor der Neuinstallation wurde „aus“ am Gerät
+bestätigt. Eine neue USB-Vertrauensabfrage wurde in diesem Durchlauf nicht
+beobachtet; der Fall einer vollständig entfernten PC-Kopplung ist damit noch
+nicht nativ belegt. Kontokennungen und Signieridentität bleiben
 für den Test ohne neue Registrierungen erhalten. Das ist ein frischer
 Geräte-Setup-Test mit vorhandenem Apple-Konto, kein neues Apple-Konto und kein
 Werksreset des persönlichen iPhones.

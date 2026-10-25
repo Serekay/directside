@@ -216,6 +216,7 @@ ApplicationWindow {
                     ColumnLayout {anchors.fill:parent;anchors.margins:24;spacing:18
                         RowLayout {Label {text:win.t("Entwicklermodus");font.pixelSize:20;font.weight:Font.DemiBold;Layout.fillWidth:true} Badge {text:s.developerMode==="enabled"?win.t("Aktiv"):s.developerMode==="disabled"?win.t("Aus"):win.t("Nicht geprüft");tone:s.developerMode==="enabled"?"ok":s.developerMode==="disabled"?"missing":"warning"}}
                         Label {visible:s.setupPending;text:win.t("DirectSide installiert");color:win.accent;font.weight:Font.DemiBold}
+                        Text {objectName:"setupReconnectHint";visible:s.setupPending && s.devices.length===0;text:win.t("Nach dem Neustart: USB-Kabel erneut einstecken.");color:win.accent;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                         Text {visible:s.developerMode!=="enabled";text:win.t("1. Einstellungen → Datenschutz & Sicherheit → Entwicklermodus einschalten.");color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                         Text {visible:s.developerMode!=="enabled";text:win.t("2. Neustarten → Entsperren → Aktivieren bestätigen.");color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                         Text {visible:s.developerMode!=="enabled" || s.setupReady;text:win.t("Falls verlangt: Einstellungen → Allgemein → VPN & Geräteverwaltung → Vertrauen.");color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
