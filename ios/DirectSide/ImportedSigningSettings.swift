@@ -25,7 +25,6 @@ struct ImportedSigningSettings:View {
                     Text(L("Apple Account")).tag("account")
                     Text(L("Importiertes Zertifikat")).tag("imported")
                 }.disabled(engine.busy)
-                Text(L("Kostenlose und bezahlte Apple-Developer-Teams werden unterstützt. Gültigkeit, Geräte und App-Funktionen richten sich nach dem tatsächlichen Profil.")).font(.subheadline).foregroundStyle(.secondary)
             }
             if let identity=engine.importedIdentity {
                 Section(L("Gespeichertes Zertifikat")) {
@@ -41,7 +40,7 @@ struct ImportedSigningSettings:View {
                 SecureField(L("Passwort der P12-Datei"),text:$password)
                 Button {importingProfiles=true;showImporter=true}label:{Label(profiles.isEmpty ? L("Profile auswählen"):L("\(profiles.count) Profile ausgewählt"),systemImage:"doc.on.doc")}
                 Button(L("Prüfen und sicher speichern")) {if let p12 {Task{await engine.importIdentity(p12:p12,profiles:profiles,password:password);password=""}}}.buttonStyle(.borderedProminent).disabled(p12==nil || profiles.isEmpty || engine.busy)
-            } header:{Text(L("Zertifikat importieren"))} footer:{Text(L("Importiere eine P12-Datei mit privatem Schlüssel und die zugehörigen .mobileprovision-Dateien. Profile müssen zu App, Erweiterungen und iPhone passen. Die Zugangsdaten zu anderen Plattformen werden nicht benötigt."))}
+            } header:{Text(L("Zertifikat importieren"))}
         }.navigationTitle(L("Signierung"))
         .fileImporter(isPresented:$showImporter,allowedContentTypes:[.data],allowsMultipleSelection:importingProfiles){result in
             switch result {

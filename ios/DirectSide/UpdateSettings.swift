@@ -30,7 +30,7 @@ struct UpdateSettings:View {
             }
             Section {
                 Toggle(L("Automatisch nach Updates suchen"),isOn:$automaticUpdates)
-            } footer:{Text(L("Prüft beim Öffnen der App, höchstens alle sechs Stunden. Ein verfügbares Update kannst du direkt auf dem iPhone installieren."))}
+            }
         }.navigationTitle(L("DirectSide-Updates")).toolbarRole(.editor)
     }
 }
@@ -48,7 +48,6 @@ struct UpdateOffer:View {
                 if let release=updater.available {
                     Text(L("Version")+" "+release.version).foregroundStyle(.secondary)
                     if !release.notes.isEmpty {Text(release.notes)}
-                    Text(L("Die neue Version wird direkt auf diesem iPhone geprüft, signiert und installiert. LocalDevVPN muss verbunden sein.")).font(.subheadline).foregroundStyle(.secondary)
                     Button {dismiss();Task{await updater.install(engine:engine,connection:connection)}}label:{Label(L("Update installieren"),systemImage:"arrow.down.app").frame(maxWidth:.infinity)}.buttonStyle(.borderedProminent).disabled(engine.busy || updater.downloading)
                 }
                 Button(L("Später")){dismiss()}.frame(maxWidth:.infinity)

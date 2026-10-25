@@ -584,5 +584,6 @@
   "App-Start": "App launch",
   "App-Ausführung": "App runtime",
   "Teilen": "Sharing",
-  "1 Kennung frei": "1 App ID available"
+  "1 Kennung frei": "1 App ID available",
+  "Keine Updates verfügbar.": "No updates available."
 }

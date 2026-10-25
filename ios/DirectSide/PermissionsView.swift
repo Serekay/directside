@@ -5,7 +5,6 @@ struct PermissionsView: View {
     var body: some View {
         VStack(alignment:.leading,spacing:16) {
             Label(L("Zugriff & Funktionen"),systemImage:"hand.raised.fill").font(.headline)
-            Text(L("Diese Angaben stammen aus der Quelle. Geschützte Daten gibt iOS erst nach deiner Zustimmung frei. Du kannst den Zugriff später in den iPhone-Einstellungen ändern.")).font(.caption).foregroundStyle(.secondary)
             ForEach((permissions.privacy ?? [:]).keys.sorted(),id:\.self) { key in
                 row(key,privacy:true)
             }
@@ -20,10 +19,6 @@ struct PermissionsView: View {
             Image(systemName:item.icon).foregroundStyle(Style.accent).frame(width:24)
             VStack(alignment:.leading,spacing:4) {
                 Text(L(item.title)).font(.subheadline.bold())
-                Text(L(item.detail)).font(.caption).foregroundStyle(.secondary)
-                if let reason=permissions.privacy?[key],!reason.isEmpty {
-                    Text(L("Angabe des Anbieters:")+" "+reason).font(.caption).foregroundStyle(.secondary)
-                }
             }
         }
     }

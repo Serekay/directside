@@ -46,7 +46,7 @@ final class UpdateTransport:NSObject,URLSessionDownloadDelegate,@unchecked Senda
             let (bytes,response)=try await session.bytes(for:request("releases/latest"))
             guard let http=response as? HTTPURLResponse else {throw DirectSideError.message("Updateprüfung fehlgeschlagen.")}
             if http.statusCode==404 {
-                available=nil;message="Noch kein öffentliches Update verfügbar.";lastCheck=Date();return
+                available=nil;message="Keine Updates verfügbar.";lastCheck=Date();return
             }
             if http.statusCode==403 || http.statusCode==429 {throw DirectSideError.message("Updateprüfung vorübergehend nicht verfügbar. Bitte später erneut versuchen.")}
             guard http.statusCode==200 else {throw DirectSideError.message("Updateprüfung nicht möglich. Bitte die Internetverbindung prüfen.")}

@@ -374,7 +374,6 @@ ApplicationWindow {
                             Label {text:win.quotaText;Layout.fillWidth:true;font.pixelSize:16;font.weight:Font.DemiBold}
                             IconButton {objectName:"refreshAppIdsButton";text:"↻";hint:win.t("Aktualisieren");enabled:s.loggedIn && !s.appIdsLoading;onClicked:backend.loadAppIds()}
                         }
-                        Label {text:win.t("Bei Apple registrierte Kennungen einschließlich App-Erweiterungen. Updates derselben App verwenden ihre Kennung wieder.");Layout.fillWidth:true;wrapMode:Text.Wrap;color:win.muted;font.pixelSize:12}
                         Label {visible:s.appIdsLoading;text:win.t("App-Kennungen laden …");color:win.muted}
                         Label {visible:s.appIdsError.length>0;text:win.t(s.appIdsError);Layout.fillWidth:true;wrapMode:Text.Wrap;color:"#f2c45a"}
                         Label {visible:!s.loggedIn;text:win.t("Zum Nachsehen mit deinem Apple Account anmelden.");color:win.muted}
@@ -392,7 +391,6 @@ ApplicationWindow {
                         }
                         Label {visible:s.loggedIn && !s.appIdsLoading && !s.appIdsError && s.appIds.length===0;text:win.t("Keine registrierten Kennungen.");color:win.muted}
                         Item {Layout.fillHeight:true}
-                        Label {text:win.t("Keine Liste installierter Apps. Gast-Apps in LiveContainer benötigen keine zusätzlichen Kennungen.");Layout.fillWidth:true;wrapMode:Text.Wrap;color:win.muted;font.pixelSize:11}
                         RowLayout {Layout.fillWidth:true
                             IconButton {text:"‹";hint:win.t("Vorherige Seite");enabled:win.appIdPage>0;onClicked:win.appIdPage--}
                             Item {Layout.fillWidth:true}
