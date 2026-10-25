@@ -40,7 +40,7 @@ from common import ROOT, HOME, Preferences, ipa_identity, ipa_info, valid_code, 
 from components import usb_status, setup_apple, download_livecontainer
 from apple_usb import present_apple_usb, recover_apple_usb
 from i18n import ENGLISH, translate
-from updates import ReleaseClient, VERSION, version, digest, CACHE, UpdateError
+from updates import ReleaseClient, VERSION, BUILD, version, digest, CACHE, UpdateError
 
 def after_scan(method):
     """Serialize a UI action after a background scan, retaining its selected phone."""
@@ -74,7 +74,7 @@ class DesktopBridge(QObject):
         for path in [HOME/'DirectSide.ipa',ROOT/'dist'/'DirectSide.ipa']:
             if path.is_file(): self.data.update(ipa=str(path),ipaName=path.name);break
         self.data.update(language=language,savedEmail=saved.get('email',''),translations=ENGLISH,status=translate(self.data['status'],language))
-        self.data.update(version=VERSION,updateBusy=False,updateProgress=0,updateState='unchecked',updateMessage='',releaseVersion='',windowsUpdate=False,releaseIPA=False,directsideInstalling=False,customIPA='',customIPAName='',ipaSource='file',githubSaved=(CACHE/'github.dpapi').is_file())
+        self.data.update(version=VERSION,build=BUILD,updateBusy=False,updateProgress=0,updateState='unchecked',updateMessage='',releaseVersion='',windowsUpdate=False,releaseIPA=False,directsideInstalling=False,customIPA='',customIPAName='',ipaSource='file',githubSaved=(CACHE/'github.dpapi').is_file())
         self.refreshBundledIPA()
         self.data.update(certificates=[],certificatesLoaded=False,certificateTeam='',certificateLimit=False,removal={},developerMode='unknown',settingUp=False,setupPhase='')
         self.data.update(signingMode=saved.get('signing_mode','account'),importedIdentity={},identityP12='',identityProfiles=[],canSign=False)

@@ -1,9 +1,19 @@
 from pathlib import Path
+import sys
 from PyInstaller.utils.hooks import collect_all
+from PyInstaller.utils.win32.versioninfo import VSVersionInfo, FixedFileInfo, StringFileInfo, StringTable, StringStruct, VarFileInfo, VarStruct
 unicorn_data,unicorn_binaries,unicorn_imports=collect_all('unicorn')
 unicorn_data=[row for row in unicorn_data if not row[0].lower().endswith(('.lib','.a'))]
 
 root = Path(SPECPATH).parent
+sys.path.insert(0,str(root/'ui'))
+from updates import VERSION, BUILD
+number=tuple(int(part) for part in VERSION.split('.'))+(BUILD,)
+version_info=VSVersionInfo(ffi=FixedFileInfo(filevers=number,prodvers=number,mask=0x3f,flags=0,OS=0x40004,fileType=1,subtype=0,date=(0,0)),kids=[
+    StringFileInfo([StringTable('040904B0',[
+        StringStruct('FileDescription','DirectSide'),StringStruct('ProductName','DirectSide'),
+        StringStruct('FileVersion',VERSION+'.'+str(BUILD)),StringStruct('ProductVersion',VERSION+' ('+str(BUILD)+')'),
+        StringStruct('OriginalFilename','DirectSide.exe')])]),VarFileInfo([VarStruct('Translation',[1033,1200])])])
 class DirectSideEXE(EXE):
     # Official PyInstaller workaround for Unicorn's longjmp/CFG incompatibility.
     # Use only our local build; leave the installed PyInstaller bootloaders intact.
@@ -40,4 +50,4 @@ if any('codex-runtimes' in entry[1].lower() for entry in a.binaries):
 pyz = PYZ(a.pure)
 exe = DirectSideEXE(pyz, a.scripts, a.binaries, a.datas, [], name='DirectSide',
           debug=False, bootloader_ignore_signals=False, strip=False, upx=False,
-          console=False, icon=str(root / 'assets/DirectSide.ico'))
+          console=False, version=version_info, icon=str(root / 'assets/DirectSide.ico'))

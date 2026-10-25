@@ -117,7 +117,7 @@ ApplicationWindow {
                 anchors.fill:parent;anchors.leftMargin:26;anchors.rightMargin:16;spacing:12
                 Image {source:s.icon;Layout.preferredWidth:38;Layout.preferredHeight:38;sourceSize.width:76;sourceSize.height:76}
                 Label {text:"DirectSide";font.pixelSize:22;font.weight:Font.DemiBold;font.letterSpacing:-0.6}
-                Badge {text:s.version}
+                Badge {objectName:"appVersionBadge";text:s.version+" ("+s.build+")"}
                 Badge {text:s.devices.length?win.t("●  USB verbunden"):s.usbReconnectNeeded?win.t("USB unterbrochen"):win.t("Nicht verbunden");tone:s.devices.length?"ok":s.usbReconnectNeeded?"missing":"warning"}
                 Item {Layout.fillWidth:true}
                 Action {objectName:"windowsUpdateButton";visible:s.windowsUpdate && win.page!=="settings";text:win.t("Update");primary:true;implicitHeight:32;enabled:!s.updateBusy && !s.directsideInstalling && (!s.foregroundBusy || s.scanning);onClicked:backend.updateWindows();ToolTip.visible:hovered;ToolTip.text:s.releaseVersion}
@@ -341,7 +341,7 @@ ApplicationWindow {
                         RowLayout {Layout.fillWidth:true;spacing:12
                             ColumnLayout {Layout.fillWidth:true;spacing:6
                                 Label {text:win.t("Updates");font.pixelSize:16;font.weight:Font.DemiBold}
-                                Label {text:"DirectSide "+s.version;color:win.muted;font.pixelSize:12}
+                                Label {text:"DirectSide "+s.version+" ("+s.build+")";color:win.muted;font.pixelSize:12}
                             }
                             Item {Layout.fillWidth:true}
                             Badge {objectName:"settingsUpdateStatus";text:win.t(s.updateBusy?"Prüfen …":s.updateState==="current"?"Aktuell":s.updateState==="available"?"Update verfügbar":s.updateState==="empty"?"Kein Update verfügbar":s.updateState==="error"?"Prüfung fehlgeschlagen":"Nicht geprüft");tone:s.updateState==="current"?"ok":s.updateState==="error"?"missing":"warning"}
