@@ -1,5 +1,17 @@
 # Teststand vom 25. Oktober 2026
 
+## Update-Ansicht und nächster vollständiger Durchlauf
+
+Windows-Updateansicht ohne Repository-/Token-Eingabe und ohne technische
+GitHub-Badges. Fehlender Zugriff erscheint als vorübergehend nicht verfügbare
+Updateprüfung; er wird nicht als erfolgreiche Prüfung ohne Updates gewertet.
+72 Python/Qt-Tests und Paket-Startprüfung bestanden. Windows-Paket neu gebaut
+und für den Betreiber geöffnet. Das Repository bleibt unverändert privat.
+Der Betreiber führt den nächsten Ablauf selbst aus. Keine automatische
+Zurücksetzung oder verdeckte Einrichtung für diesen Durchlauf.
+Die USB-Wiederherstellung ist implementiert, ihre zuverlässige Wirkung bei
+der zuvor beobachteten PnP/usbmux-Abweichung bleibt am Gerät nachzuweisen.
+
 ## Windows-Hilfe und Entwicklermodus-Status
 
 Nach Abschluss der iPhone-Einführung zeigte die manuell geöffnete

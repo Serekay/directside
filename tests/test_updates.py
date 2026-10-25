@@ -43,7 +43,7 @@ class ReleaseTests(unittest.TestCase):
         self.client.open = Mock(side_effect=[missing, io.BytesIO(b'{}')])
         self.assertIsNone(self.client.latest())
         self.client.open = Mock(side_effect=[missing, missing])
-        with self.assertRaisesRegex(UpdateError, 'privat'): self.client.latest()
+        with self.assertRaisesRegex(UpdateError, 'vorübergehend nicht verfügbar'): self.client.latest()
 
     def test_token_not_forwarded_to_cdn_and_external_redirect_blocked(self):
         request = Request(API + '/releases/assets/123', headers={'Authorization':'Bearer fake-secret'})
