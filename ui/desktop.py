@@ -782,9 +782,12 @@ class DesktopBridge(QObject):
         if kind=='usb_pnp':
             self.usbProbeRunning=False
             if event.get('count')==1 and not self.data['devices'] and not self.usbRecoveryAttempted and self.pendingUserAction is None:
-                self.recoverUSB()
+                self.usbRecoveryAttempted=True
+                self.update(usbRepairState='available')
+        elif kind=='usb_repair_waiting':
+            self.update(usbRepairState='waiting')
         elif kind=='usb_recovered':
-            self.update(busy=False,usbRepairState='waiting' if event.get('ok') else 'failed')
+            self.update(busy=False,usbRepairState='idle' if event.get('ok') else 'cancelled' if event.get('cancelled') else 'failed')
             self.refresh()
         elif kind=='progress':self.update(progress=event.get('value',0))
         elif kind=='status':self.update(status=event.get('message',''))

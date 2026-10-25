@@ -4,6 +4,10 @@ import os
 import re
 import subprocess
 import sys
+import socket
+import struct
+import plistlib
+import time
 from pathlib import Path
 
 def recovery_target(instance, description, service):
@@ -46,16 +50,63 @@ def restart_present_apple_usb():
     """Revalidate in the elevated process; never restart a hub or multiple phones."""
     targets=present_apple_usb()
     if len(targets)!=1:return 2
+    # Restart the stuck Apple service as well as the scoped USB device. A running
+    # service alone does not prove that it can enumerate phones.
+    script="""$ErrorActionPreference='Stop'
+$svc=Get-Service -Name 'Apple Mobile Device Service'
+if ($svc.Status -ne 'Stopped') {
+ Stop-Service -InputObject $svc
+ $svc.WaitForStatus('Stopped',[TimeSpan]::FromSeconds(15))
+}
+Start-Service -InputObject $svc
+$svc.WaitForStatus('Running',[TimeSpan]::FromSeconds(15))
+"""
+    service=subprocess.run([str(Path(os.environ['SystemRoot'])/'System32/WindowsPowerShell/v1.0/powershell.exe'),
+        '-NoProfile','-NonInteractive','-Command',script],stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,
+        creationflags=subprocess.CREATE_NO_WINDOW,timeout=40)
+    if service.returncode:return 3
     result=subprocess.run([str(Path(os.environ['SystemRoot'])/'System32/pnputil.exe'),
         '/restart-device',targets[0]],stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,creationflags=subprocess.CREATE_NO_WINDOW,timeout=45)
     return result.returncode
 
+def apple_devices_available():
+    """Read usbmux's real enumeration without logging device identifiers."""
+    def read(stream,length):
+        data=b''
+        while len(data)<length:
+            chunk=stream.recv(length-len(data))
+            if not chunk:raise OSError('Apple connection closed')
+            data+=chunk
+        return data
+    with socket.create_connection(('127.0.0.1',27015),2) as stream:
+        stream.settimeout(2)
+        payload=plistlib.dumps({'MessageType':'ListDevices','ClientVersionString':'DirectSide',
+            'ProgName':'DirectSide','kLibUSBMuxVersion':3})
+        stream.sendall(struct.pack('<IIII',16+len(payload),1,8,1)+payload)
+        length,version,message,tag=struct.unpack('<IIII',read(stream,16))
+        if not 16<=length<=1024*1024 or version!=1 or message!=8 or tag!=1:return False
+        devices=plistlib.loads(read(stream,length-16)).get('DeviceList',[])
+        return any(d.get('Properties',{}).get('ConnectionType')=='USB' for d in devices)
+
 def recover_apple_usb(event):
-    from components import elevated
+    from components import elevated, ElevationCancelled
     if len(present_apple_usb())!=1:
         event({'type':'usb_recovered','ok':False});return
     args=['--recover-apple-usb']
     if not getattr(sys,'frozen',False):args.insert(0,str(Path(__file__).with_name('desktop.py')))
-    result=elevated(sys.executable,subprocess.list2cmdline(args))
-    event({'type':'usb_recovered','ok':result==0})
+    try:result=elevated(sys.executable,subprocess.list2cmdline(args))
+    except ElevationCancelled:
+        event({'type':'usb_recovered','ok':False,'cancelled':True});return
+    if result:
+        event({'type':'usb_recovered','ok':False});return
+    event({'type':'usb_repair_waiting'})
+    deadline=time.monotonic()+25
+    while time.monotonic()<deadline:
+        try:
+            if apple_devices_available():
+                event({'type':'usb_recovered','ok':True});return
+        except (OSError,ValueError,plistlib.InvalidFileException):pass
+        time.sleep(1)
+    event({'type':'usb_recovered','ok':False})

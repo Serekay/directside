@@ -79,6 +79,9 @@ def usb_status():
         if service:api.CloseServiceHandle(service)
         api.CloseServiceHandle(manager)
 
+class ElevationCancelled(RuntimeError):
+    pass
+
 def elevated(file,arguments):
     """Use Windows' normal elevation prompt; never bypass UAC or security checks."""
     from ctypes import wintypes as w
@@ -87,7 +90,7 @@ def elevated(file,arguments):
     info=Execute();info.size=ctypes.sizeof(info);info.mask=0x40;info.verb='runas';info.file=str(file);info.args=arguments;info.show=1
     shell=ctypes.WinDLL('shell32',use_last_error=True);shell.ShellExecuteExW.argtypes=[ctypes.POINTER(Execute)]
     if not shell.ShellExecuteExW(ctypes.byref(info)):
-        if ctypes.get_last_error()==1223:raise RuntimeError('Einrichtung abgebrochen.')
+        if ctypes.get_last_error()==1223:raise ElevationCancelled('Einrichtung abgebrochen.')
         raise ctypes.WinError(ctypes.get_last_error())
     kernel=ctypes.WinDLL('kernel32',use_last_error=True)
     kernel.WaitForSingleObject.argtypes=[w.HANDLE,w.DWORD];kernel.GetExitCodeProcess.argtypes=[w.HANDLE,ctypes.POINTER(w.DWORD)];kernel.CloseHandle.argtypes=[w.HANDLE]

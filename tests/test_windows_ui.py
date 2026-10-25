@@ -217,17 +217,19 @@ class WindowsUIStateTests(unittest.TestCase):
   self.assertEqual([event['command'] for event in self.sent],['devices','logout'])
   self.assertFalse(button.property('enabled'))
   root.close();engine.deleteLater();APP.processEvents()
- def test_usb_recovery_acts_once_and_never_when_device_is_available(self):
+ def test_usb_recovery_requires_explicit_action_and_cancel_does_not_retry(self):
   from unittest.mock import patch
   self.bridge.update(busy=False,usbReconnectNeeded=True,devices=[])
   with patch('desktop.threading.Thread') as worker:
    self.bridge.onSetupEvent({'type':'usb_pnp','count':2});worker.assert_not_called()
-   self.bridge.onSetupEvent({'type':'usb_pnp','count':1});self.assertEqual(worker.call_count,1)
-   self.bridge.onSetupEvent({'type':'usb_pnp','count':1});self.assertEqual(worker.call_count,1)
-   self.bridge.onSetupEvent({'type':'usb_recovered','ok':False})
+   self.bridge.onSetupEvent({'type':'usb_pnp','count':1});worker.assert_not_called()
+   self.assertEqual(self.bridge.data['usbRepairState'],'available')
+   self.bridge.recoverUSB();self.assertEqual(worker.call_count,1)
+   self.bridge.recoverUSB();self.assertEqual(worker.call_count,1)
+   self.bridge.onSetupEvent({'type':'usb_recovered','ok':False,'cancelled':True})
    self.assertEqual(self.sent[-1],{'command':'devices'})
    self.bridge.onSetupEvent({'type':'usb_pnp','count':1});self.assertEqual(worker.call_count,1)
-  self.assertEqual(self.bridge.data['usbRepairState'],'failed')
+  self.assertEqual(self.bridge.data['usbRepairState'],'cancelled')
  def test_launch_failure_keeps_setup_open_and_ignores_another_device(self):
   self.bridge.pendingSetup={'device':'phone','path':'fixture','mode':'account','email':'fixture@example.com','phase':'launch'}
   self.bridge.update(busy=False,devices=[{'id':'phone'}],launchState='checking')
