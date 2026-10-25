@@ -98,6 +98,15 @@ shipped app; coordinate swipes and text input are not implemented.
 part of a scrolling view. `iphone-screenshot --launch` opens the unique installed
 DirectSide through Instruments; it does not install or replace it.
 
+The optional `iphone-reset-setup` helper is restricted to the owner-requested
+fresh setup test. `--inventory` reads the three setup apps and Developer Mode.
+`--remove-test-apps` removes DirectSide, LiveContainer (including local guests)
+and LocalDevVPN only. After the owner disables Developer Mode and restarts,
+`--forget-pairing` refuses to proceed unless those apps are absent and the mode
+is off. It then clears this PC's USB pairing and DirectSide's remote-pairing
+cache. It never revokes certificates or deletes Apple's registered App IDs;
+reusing those identifiers keeps the test within the existing quota.
+
 The optional development example `iphone-screenshot` captures one PNG over the
 trusted USB connection. It uses the Instruments screenshot channel, including
 CoreDeviceProxy/RSD on newer iOS versions. It does not install a developer image,

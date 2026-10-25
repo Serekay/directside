@@ -27,7 +27,7 @@ Erweiterungen und Kontingent kommen nur lesend von Apple. Neun Einträge
 einschließlich Erweiterungszuordnung real abgefragt. Die Windows-Ansicht mit
 Beispieldaten in Deutsch/Englisch bei 960 × 680 visuell geprüft.
 
-54 Python-/Qt-Tests, acht Kern-Tests und drei Signierkennungs-Tests bestanden.
+55 Python-/Qt-Tests, acht Kern-Tests und drei Signierkennungs-Tests bestanden.
 Windows-Paket gebaut und Startprüfung bestanden. iPhone-Build 8 über Action
 [40150440163](https://github.com/Serekay/directside/actions/runs/40150440163)
 erfolgreich gebaut und am Gerät geprüft. Größen-/SHA256-Prüfung der IPA bestanden.
@@ -42,6 +42,27 @@ ursprünglichen Account fort. Importierte Zertifikate werden dabei unterstützt.
 Tests decken Warten, Trennen/Wiederverbinden, Fortsetzen, App-Neustart und die
 Abgrenzung zu anderen Geräten ab. Der echte Frischstarttest mit ausgeschaltetem
 Entwicklermodus ist vom Betreiber gewünscht und noch durchzuführen.
+
+Build 9 ist über Action
+[40151158809](https://github.com/Serekay/directside/actions/runs/40151158809)
+gebaut, über dieselbe Kennung installiert und auf dem iPhone gestartet worden.
+Auch die anfängliche Sitzungsprüfung bleibt ohne Fortschrittsbanner; die
+Geräteprüfung läuft nach der Anmeldung automatisch an. App-ID-Stand weiterhin
+9/10. Windows ist einschließlich automatischer USB-Vertrauensabfrage neu gebaut;
+gepackte Startprüfung bestanden. Fehlende Vertrauensbeziehung und abgelehnte
+Bestätigung sind zusätzlich durch Ablauf-Tests abgedeckt; bestehende Kopplungen
+werden wiederverwendet.
+
+Frischstarttest vorbereitet: iPhone-Anmeldung über die echte Oberfläche
+abgemeldet; DirectSide, LiveContainer einschließlich Gastdaten und LocalDevVPN
+gezielt entfernt. Keine anderen Apps, Fotos, Apple-App-IDs oder Zertifikate
+verändert. Verifiziert: null Setup-Apps, Entwicklermodus zu diesem Zeitpunkt
+noch aktiv. Betreiber ist zum Deaktivieren/Neustarten aufgefordert. Danach
+werden nur die USB-Vertrauensbeziehung dieses PCs und der DirectSide-
+Remote-Pairing-Cache zurückgesetzt. Kontokennungen und Signieridentität bleiben
+für den Test ohne neue Registrierungen erhalten. Das ist ein frischer
+Geräte-Setup-Test mit vorhandenem Apple-Konto, kein neues Apple-Konto und kein
+Werksreset des persönlichen iPhones.
 
 ## App-ID-Prüfung und feste Kennung
 
