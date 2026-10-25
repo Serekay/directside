@@ -36,7 +36,7 @@ class Preferences:
 def valid_code(value):
     return len(value) == 6 and value.isascii() and value.isdigit()
 
-def ipa_identity(path: Path) -> str:
+def ipa_info(path: Path) -> dict:
     with ZipFile(path) as archive:
         files = [n for n in archive.namelist() if n.startswith('Payload/') and n.count('/') == 2 and n.endswith('.app/Info.plist')]
         if len(files) != 1:
@@ -44,7 +44,10 @@ def ipa_identity(path: Path) -> str:
         info = archive.getinfo(files[0])
         if info.file_size > 2_000_000:
             raise ValueError('Die App-Metadaten sind ungewöhnlich groß.')
-        return str(plistlib.loads(archive.read(files[0])).get('CFBundleIdentifier', ''))
+        return plistlib.loads(archive.read(files[0]))
+
+def ipa_identity(path: Path) -> str:
+    return str(ipa_info(path).get('CFBundleIdentifier', ''))
 
 def clean_error(value: str) -> str:
     value = re.sub(r'[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}', '[Apple-ID]', value)

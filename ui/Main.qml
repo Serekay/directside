@@ -304,7 +304,7 @@ ApplicationWindow {
                             ColumnLayout {spacing:6
                                 RowLayout {spacing:8
                                     Label {text:win.t("DirectSide für iPhone");font.pixelSize:21;font.weight:Font.DemiBold;font.letterSpacing:-0.4}
-                                    Badge {objectName:"ipaVersionBadge";visible:s.releaseVersion.length>0;text:s.releaseVersion}
+                                    Badge {objectName:"ipaVersionBadge";visible:s.bundledIPAReady || s.releaseVersion.length>0;text:s.bundledIPAReady?s.bundledIPAVersion:s.releaseVersion}
                                 }
                                 Label {text:"iOS 17+ · "+win.t("Pairing inklusive");font.pixelSize:12;color:win.muted}
                             }
@@ -323,7 +323,7 @@ ApplicationWindow {
                             BusyIndicator {running:parent.visible;implicitWidth:30;implicitHeight:30}
                             Text {objectName:"deviceSetupProgressText";text:win.t(s.setupPhase);color:win.accent;wrapMode:Text.WordWrap;Layout.fillWidth:true;font.pixelSize:13}
                         }
-                        Action {objectName:"installDirectSideButton";text:s.directsideInstalling?win.t("Bitte warten …"):win.t("DirectSide installieren");primary:true;Layout.fillWidth:true;implicitHeight:48;enabled:s.canSign && s.devices.length>0 && (!s.foregroundBusy || s.scanning) && !s.updateBusy && !s.directsideInstalling && s.releaseIPA;onClicked:backend.downloadDirectSide()}
+                        Action {objectName:"installDirectSideButton";text:s.directsideInstalling?win.t("Bitte warten …"):win.t("DirectSide installieren");primary:true;Layout.fillWidth:true;implicitHeight:48;enabled:s.canSign && s.devices.length>0 && (!s.foregroundBusy || s.scanning) && !s.updateBusy && !s.directsideInstalling && (s.bundledIPAReady || s.releaseIPA);onClicked:backend.installDirectSide()}
                         Label {visible:s.developerMode!=="enabled";text:win.t("Vor dem ersten Start:")+" <a href='developer'>"+win.t("Entwicklermodus einrichten")+"</a>";textFormat:Text.RichText;linkColor:win.accent;font.pixelSize:12;color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true;onLinkActivated:win.page="developer"}
                         RowLayout {objectName:"customIPARow";Layout.fillWidth:true;spacing:8
                         Rectangle {Layout.fillWidth:true;implicitHeight:44;radius:12;color:"#15171b";border.color:"#30343b"
