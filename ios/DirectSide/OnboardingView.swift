@@ -75,8 +75,9 @@ struct OnboardingView:View {
                     .disabled(step==1 && (!engine.pairingReady || !connection.vpnReachable))
             } else {
                 if liveContainerInstalled {
-                    Button(L("Fertig")){finish()}.buttonStyle(.borderedProminent).controlSize(.large).disabled(engine.busy)
-                    Button(L("LiveContainer einrichten")){engine.configureLiveContainer()}.disabled(engine.busy || !engine.canSign)
+                    Button(L("Einrichtung abschließen")){engine.configureLiveContainer()}
+                        .buttonStyle(.borderedProminent).controlSize(.large).disabled(engine.busy || !engine.canSign)
+                    Button(L("Später einrichten")){finish()}.disabled(engine.showsProgress)
                 }
                 else {
                     Button(L(engine.preparingAccount ? "Vorbereiten …":"LiveContainer installieren")){Task{await engine.installLiveContainer(peer:connection.peer,port:connection.port);liveContainerInstalled=LiveContainerBridge.available}}
