@@ -31,11 +31,11 @@ class BootstrapTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path=Path(folder)/'settings.json'
             Preferences(path).save(' person@example.com ')
-            self.assertEqual(Preferences(path).load(),{'email':'person@example.com','language':'en'})
+            self.assertEqual(Preferences(path).load(),{'email':'person@example.com','language':'en','signing_mode':'account'})
             import json
-            self.assertEqual(set(json.loads(path.read_text())),{'email','language'})
+            self.assertEqual(set(json.loads(path.read_text())),{'email','language','signing_mode'})
             path.write_text(json.dumps({'email':'person@example.com','server':'https://obsolete.example'}))
-            self.assertEqual(Preferences(path).load(),{'email':'person@example.com','language':'en'})
+            self.assertEqual(Preferences(path).load(),{'email':'person@example.com','language':'en','signing_mode':'account'})
             path.write_text('{broken')
             self.assertEqual(Preferences(path).load(),{})
 

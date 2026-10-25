@@ -39,3 +39,19 @@ check(SignatureStatus.days(until:nil,now:now)==nil,"Unknown expiry is not invent
 check(SignatureStatus.tone(days:0)=="critical" && SignatureStatus.tone(days:1)=="critical","Critical signature warning")
 check(SignatureStatus.tone(days:2)=="warning" && SignatureStatus.tone(days:3)=="warning","Signature warning")
 check(SignatureStatus.tone(days:4)=="ok" && SignatureStatus.tone(days:nil)=="unknown","Healthy and unknown signatures")
+
+check(UpdateVersion.newer("v0.2.0",than:"0.1.9"),"New release is offered")
+check(!UpdateVersion.newer("0.1.0",than:"0.1.0"),"Same version is not an update")
+check(!UpdateVersion.newer("0.0.9",than:"0.1.0"),"No downgrade")
+for value in ["0.2.0-beta", "1.0", "1..0", "1.0.0.1", "1.0.-1", "1.0.a"] {
+    check(UpdateVersion.parts(value)==nil,"Reject non-release version")
+}
+let legacyManaged="""
+{"id":"example.app","name":"Example","cachedIPA":"/fixture.ipa","installedAt":0,"version":"1.0"}
+""".data(using:.utf8)!
+let legacyApp=try JSONDecoder().decode(ManagedApp.self,from:legacyManaged)
+check(legacyApp.installedBundleID==nil,"Old managed records remain readable")
+var signedApp=legacyApp;signedApp.installedBundleID="example.app.TEAM"
+let restoredSignedApp=try JSONDecoder().decode(ManagedApp.self,from:JSONEncoder().encode(signedApp))
+check(restoredSignedApp.installedBundleID=="example.app.TEAM","Persist real installed identifier")
+print("Release version comparisons and installed identity migration: passed")

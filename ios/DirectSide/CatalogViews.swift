@@ -75,7 +75,7 @@ struct CatalogInstallAction:View {
             else {Text(L(engine.hasUpdate(app) ? "Aktualisieren":"Laden")).font(.caption.bold()).padding(.horizontal,15).padding(.vertical,9).background(Style.accent.opacity(0.12),in:Capsule())}
         }
         .foregroundStyle(Style.accent).disabled(engine.busy || app.latest==nil)
-        .sheet(isPresented:$showContainerSetup){NavigationStack{LiveContainerSettings(connection:connection).toolbar{Button(L("Fertig")){showContainerSetup=false}}}.safeAreaInset(edge:.top){VPNStatusView(connection:connection)}}
+        .sheet(isPresented:$showContainerSetup){NavigationStack{LiveContainerSettings(connection:connection).toolbar{Button(L("Fertig")){showContainerSetup=false}}}}
     }
 }
 
@@ -158,7 +158,7 @@ struct AppDetailView: View {
                 SectionTitle(title:"Informationen")
                 VStack(spacing:0) {info("Entwickler",app.developerName ?? source.name);Divider();info("Kategorie",categoryName(app.category ?? "other"));Divider();info("Quelle",source.name);Divider();info("Bundle-ID",app.id)}.padding(16).background(Style.surface,in:RoundedRectangle(cornerRadius:17))
                 if let permissions=app.appPermissions {
-                    DisclosureGroup(L("App-Berechtigungen")) {VStack(alignment:.leading,spacing:12) {ForEach((permissions.privacy ?? [:]).keys.sorted(),id:\.self) {key in VStack(alignment:.leading,spacing:4){Text(L(key)).font(.caption.bold());Text(L(permissions.privacy?[key] ?? "")).font(.caption).foregroundStyle(.secondary)}};ForEach(permissions.entitlements ?? [],id:\.self){Text(L($0)).font(.caption).foregroundStyle(.secondary)}}.padding(.top,10)}.font(.subheadline)
+                    PermissionsView(permissions:permissions)
                 }
             }.padding(21)
         }.background(Style.background).navigationTitle(L(app.name)).navigationBarTitleDisplayMode(.inline).safeAreaInset(edge:.bottom){EngineProgress()}
@@ -183,9 +183,10 @@ struct SourcesView:View {
             ForEach(engine.sources) {source in
                 NavigationLink {SourceDetailView(source:source,connection:connection)}label:{
                     HStack(spacing:13) {
-                        Artwork(url:source.iconURL,fallback:"square.stack.3d.up.fill")
+                        Image(systemName:"tray.2.fill").font(.title2).foregroundStyle(Style.accent).frame(width:56,height:56).background(Style.accent.opacity(0.1),in:RoundedRectangle(cornerRadius:14))
                         VStack(alignment:.leading,spacing:7) {
                             Text(source.name).font(.subheadline.bold()).foregroundStyle(.primary)
+                            Text(source.sourceURL?.host ?? source.identifier ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                             HStack(spacing:10) {
                                 Text(L("\(source.apps.count) Apps"))
                                 if engine.refreshingSources {ProgressView().controlSize(.mini);Text(L("Aktualisieren …"))}
@@ -207,5 +208,5 @@ struct SourceDetailView:View {
     @EnvironmentObject var engine:Engine
     let source:SourceCatalog
     @ObservedObject var connection:Connection
-    var body:some View {ScrollView {VStack(alignment:.leading,spacing:18){HStack(spacing:14){Artwork(url:source.iconURL,size:74,fallback:"square.stack.3d.up.fill");VStack(alignment:.leading,spacing:5){Text(L(source.name)).font(.title2.bold());Text(L(source.subtitle ?? "\(source.apps.count) Apps")).font(.subheadline).foregroundStyle(.secondary)}};if let text=source.description {Text(L(text)).font(.subheadline).foregroundStyle(.secondary)};if let failure=engine.sourceFailures[source.id] {Label(L(failure),systemImage:"exclamationmark.circle").font(.caption).foregroundStyle(.orange)};ForEach(source.apps){CatalogRow(app:$0,source:source,connection:connection)};if let url=source.website,["http","https"].contains(url.scheme ?? "") {Link(L("Website der Quelle"),destination:url)}}.padding(21)}.background(Style.background).navigationTitle(L("Quelle")).navigationBarTitleDisplayMode(.inline)}
+    var body:some View {ScrollView {VStack(alignment:.leading,spacing:18){HStack(spacing:14){Image(systemName:"tray.2.fill").font(.largeTitle).foregroundStyle(Style.accent);VStack(alignment:.leading,spacing:5){Text(L(source.name)).font(.title2.bold());Text(source.sourceURL?.host ?? source.subtitle ?? "").font(.subheadline).foregroundStyle(.secondary)}};if let text=source.description {Text(L(text)).font(.subheadline).foregroundStyle(.secondary)};if let failure=engine.sourceFailures[source.id] {Label(L(failure),systemImage:"exclamationmark.circle").font(.caption).foregroundStyle(.orange)};SectionTitle(title:"Apps aus dieser Quelle");SectionTitle(title:"Apps aus dieser Quelle");ForEach(source.apps){CatalogRow(app:$0,source:source,connection:connection)};if let url=source.website,["http","https"].contains(url.scheme ?? "") {Link(L("Website der Quelle"),destination:url)}}.padding(21)}.background(Style.background).navigationTitle(L("Quelle")).navigationBarTitleDisplayMode(.inline)}
 }

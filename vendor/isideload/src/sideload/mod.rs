@@ -6,4 +6,5 @@ pub mod cert_identity;
 pub mod install;
 pub mod sideloader;
 pub mod sign;
+pub mod imported;
 pub use builder::{SideloaderBuilder, TeamSelection};

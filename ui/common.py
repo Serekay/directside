@@ -21,14 +21,16 @@ class Preferences:
             data = json.loads(self.path.read_text(encoding='utf-8'))
             result={key: data[key] for key in ('email',) if isinstance(data.get(key), str)}
             result['language']=data.get('language') if data.get('language') in ('en','de') else 'en'
+            result['signing_mode']=data.get('signing_mode') if data.get('signing_mode') in ('account','imported') else 'account'
             return result
         except (OSError, ValueError, AttributeError):
             return {}
 
-    def save(self, email, language='en'):
+    def save(self, email, language='en', signing_mode=None):
+        signing_mode=signing_mode or self.load().get('signing_mode','account')
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temp = self.path.with_suffix('.tmp')
-        temp.write_text(json.dumps({'email':email.strip(),'language':language if language in ('en','de') else 'en'}, ensure_ascii=False), encoding='utf-8')
+        temp.write_text(json.dumps({'email':email.strip(),'language':language if language in ('en','de') else 'en','signing_mode':signing_mode}, ensure_ascii=False), encoding='utf-8')
         temp.replace(self.path)
 
 def valid_code(value):

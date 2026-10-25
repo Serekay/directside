@@ -67,4 +67,13 @@ After the owner's explicit release approval, attach `DirectSide.exe` (built loca
 
 For private access use Settings → Updates with a fine-grained token limited to this repository and Contents: Read. It is saved with user-scoped Windows DPAPI, never to preferences, logs or the repository. No GitHub account credential is sent to Apple or to the iPhone. On the development machine only, an existing project-local gh login can be read without adding a runtime dependency. Public access also works without a token if visibility is changed by the owner in the future.
 
+The iPhone updater uses the same release contract, with a separate token entered on
+the iPhone and saved in its Keychain. It strips credentials on CDN redirects,
+checks the asset size/SHA-256, then asks the Rust core to validate the main app ID
+and release version before signing. The signed ID must match the running app so a
+team change cannot silently create a second installation. A pending record and
+verified IPA survive the app being replaced; the next matching-version launch
+atomically promotes that IPA to the original used for renewal. No release or
+iPhone build is triggered by these changes.
+
 Windows updates stage in LocalAppData/DirectSide/updates. The staged EXE runs its own --apply-update entry point, waits for the original Qt process to stop and preserves DirectSide.previous.exe before replacing the original file. Short retries accommodate PyInstaller's outer process cleanup. If replacement or process launch fails, the previous EXE is retained/restored. Credentials and settings are not replaced. Authentication/install operations defer the restart. Locked files or an unwritable installation folder produce an update failure rather than elevation. A successful process launch is not a post-launch health guarantee. Actual release-to-release upgrades still require a hardware check after the first release is approved.

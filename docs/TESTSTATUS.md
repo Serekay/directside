@@ -1,4 +1,47 @@
-# Teststand vom 24. Oktober 2026
+# Teststand vom 25. Oktober 2026
+
+## Neuer Korrekturstand: zwölf gemeldete Punkte
+
+Im Quellcode umgesetzt; Windows lokal gebaut. Die installierte iPhone-App und
+`dist/DirectSide.ipa` bleiben beim bisherigen Build 5. Es wurde keine iPhone-Action
+gestartet und kein neuer Release veröffentlicht. Für die iPhone-Änderungen fehlen
+noch Xcode-Build und Gerätetest; eine Syntaxprüfung beweist deren Laufzeitverhalten
+nicht.
+
+| Punkt | Änderung |
+| --- | --- |
+| 1 | VPN-Leiste aus Hauptansicht und Dialogen entfernt; Status in Einstellungen. Vor Downloads/Installationen echte Verbindungsprüfung und Hinweis mit Öffnen-/Installieren-Aktion. |
+| 2 | Entwicklermodus vor dem ersten Start in Windows-Installation, Hilfe, iPhone-Einstellungen und README. Neustart, Bestätigung, fehlender Schalter und Profilvertrauen erklärt. |
+| 3 | Fensterweiter Tastaturabschluss beim Tippen außerhalb; Textfelder und weitere Bedienelemente bleiben bedienbar. |
+| 4 | Berechtigungen mit Symbol, verständlichem Namen und Erklärung in Deutsch/Englisch. Rohkennung nur unter Technische Angabe, Anbietertext als solcher gekennzeichnet. |
+| 5 | Reguläre App-Store-Apps aus der Verwaltung ausgeschlossen, auch im Kern gegen Löschen gesperrt. Meine Apps verwendet native Wischaktionen und langes Drücken mit Löschbestätigung; Geräte-Icons über SpringBoard. Tatsächliche signierte Kennung wird gespeichert, alte IPA nach erfolgreicher Ablösung entfernt. |
+| 6 | Eigener iPhone-Updater mit Start-/manueller Prüfung, Angebot, privaten GitHub-Zugang im Schlüsselbund, Größen-/SHA256-/App-ID-/Versionsprüfung und Signierung über LocalDevVPN. Neue Original-IPA wird nach Neustart übernommen. Teamwechsel darf keine zweite DirectSide-Kopie erzeugen. |
+| 7 | iPhone-Installation von LiveContainer startet die Zertifikatsübergabe automatisch. Windows überträgt sie nach DirectSide; das nächste Öffnen von DirectSide übergibt sie an LiveContainer. Reparaturknopf bleibt. |
+| 8 | LiveContainer 3.8.0 wählt JIT-less anhand seines gespeicherten Zertifikatpassworts. Übergabe setzt diese Voraussetzung; Diagnose ist kein verpflichtender zusätzlicher Modusschalter. Gast-App-Start noch nicht bestätigt. |
+| 9 | Account oder importierte P12 plus mehrere Profile in beiden Oberflächen. Schlüssel-/Zertifikatsabgleich, Ablauf, Profilzugehörigkeit und Gerätefreigabe; keine pauschale Drei-App-Sperre für bezahlte Profile. Importierte Identität und Pairing werden beim ersten USB-Setup ebenfalls übertragen. |
+| 10 | Quellen mit Quellensymbol und Herkunft; Detail und Vorschau ohne doppeltes App-Icon. App-Liste als Apps aus dieser Quelle benannt. |
+| 11 | Dauerhafte Updates/Aktuell-Zeile entfernt. Aktualisieren nur an betroffener App, einschließlich DirectSide selbst. |
+| 12 | Add-Source-Intro entfernt; QR als Symbolknopf, Quelle prüfen als hervorgehobener Knopf erst bei nichtleerer Eingabe. |
+
+Prüfungen: 50 Python-/Qt-Tests, acht Kern-Tests und sieben Vendor-Tests erfolgreich.
+Enthalten sind Original-App-Schutz, gerätebezogene Löschbestätigung, Signieren ohne
+Apple-Anmeldung mit importierter Identität, keine Passwörter in Einstellungen,
+Fenstergrenzen sowie echter P12-Rundlauf mit falschem Passwort und falschem Profil.
+Windows-Signierkern und EXE gebaut; gepackter Qt-/QML-/Icon-/Engine-Starttest mit
+lokaler Authentifizierung erfolgreich. Zertifikatsansicht und Hilfe bei minimaler
+Fenstergröße visuell geprüft. Swift-Syntax aller App-Dateien geprüft. Neue
+Swift-Modelltests für Versionsvergleich und alte/neue Installationskennungen
+sind vorbereitet, auf diesem Windows-PC aber nicht ausgeführt.
+Die echte USB-Abfrage des neu gebauten Kerns lief erfolgreich; aktuell wurden
+keine angeschlossenen Geräte erkannt.
+
+Noch nativ zu prüfen: Tastatur und Wisch-/Langdruckgesten, VPN-Hinweis bei echter
+Unterbrechung, vollständiges Selbstupdate mit Prozessneustart, automatische
+Zertifikatsübernahme/JIT-less-Gaststart und Signierung mit bezahltem beziehungsweise
+fremdem Zertifikat. Die synthetischen Profiltests sind keine Apple- oder
+Hardware-Freigabe. Keine Zugangsdaten oder Profile im Repository.
+
+## Bisheriger veröffentlichter Stand vom 24. Oktober
 
 Release 0.1.0 vom Besitzer am 24. Oktober 2026 ausdrücklich freigegeben.
 Repository bleibt privat. EXE und IPA stammen unverändert aus dem geprüften

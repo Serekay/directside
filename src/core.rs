@@ -67,7 +67,7 @@ async fn device_components(request:&Value)->Result<(),Report> {
     let provider=dev.to_provider(UsbmuxdAddr::from_env_var()?,"DirectSide");
     let mut proxy=idevice::installation_proxy::InstallationProxyClient::connect(&provider).await?;
     let apps=proxy.get_apps(Some("User"),None).await?;
-    let developer=developer_apps(&apps);
+    let developer=sideload_apps(&apps);
     let mut overview:Vec<Value>=apps.iter().filter_map(|(bundle,value)| {
         let info=value.as_dictionary()?;
         Some(json!({"id":bundle,"name":info.get("CFBundleDisplayName").or_else(||info.get("CFBundleName")).and_then(plist::Value::as_string).unwrap_or(bundle),"developer":developer.iter().any(|app|app["id"].as_str()==Some(bundle.as_str()))}))
@@ -118,7 +118,7 @@ async fn remove_device_app(request:&Value)->Result<(),Report> {
     let device=mux.get_devices().await?.into_iter().find(|d|d.udid==id).ok_or_else(||report!("Gerät nicht verbunden."))?;
     let provider=device.to_provider(UsbmuxdAddr::from_env_var()?,"DirectSide");
     let mut proxy=idevice::installation_proxy::InstallationProxyClient::connect(&provider).await?;
-    if !proxy.get_apps(Some("User"),None).await?.contains_key(bundle) {bail!("Diese App ist auf dem ausgewählten Gerät nicht installiert.");}
+    if !sideload_apps(&proxy.get_apps(Some("User"),None).await?).iter().any(|app|app["id"].as_str()==Some(bundle)) {bail!("Nur installierte Sideload-Apps können hier entfernt werden.");}
     proxy.uninstall(bundle,None).await?;
     emit(json!({"event":"app_removed","device_id":id,"bundle_id":bundle}));Ok(())
 }
@@ -157,15 +157,20 @@ async fn revoke_certificate(engine:&mut Engine,request:&Value)->Result<(),Report
 }
 
 async fn prepare_livecontainer(engine:&mut Engine,request:&Value)->Result<(),Report> {
+    let bytes=engine.livecontainer_certificate().await?;
+    transfer_livecontainer(request,&bytes).await
+}
+async fn transfer_livecontainer(request:&Value,bytes:&[u8])->Result<(),Report> {
     let id=text(request,"device_id")?;
     let mut mux=UsbmuxdConnection::default().await?;
     let dev=mux.get_devices().await?.into_iter().find(|d|d.udid==id).ok_or_else(||report!("iPhone nicht mehr verbunden."))?;
     let provider=dev.to_provider(UsbmuxdAddr::from_env_var()?,"DirectSide");
-    let team=engine.get_team().await?;
-    let bytes=engine.livecontainer_certificate().await?;
-    let mut afc=idevice::house_arrest::HouseArrestClient::connect(&provider).await?.vend_documents(format!("com.directside.app.{}",team.team_id)).await?;
+    let apps=idevice::installation_proxy::InstallationProxyClient::connect(&provider).await?.get_apps(Some("User"),None).await?;
+    let targets:Vec<_>=apps.keys().filter(|id|*id=="com.directside.app" || id.starts_with("com.directside.app.")).collect();
+    if targets.len()!=1 {bail!("DirectSide auf diesem iPhone öffnen und das Zertifikat dort übertragen.");}
+    let mut afc=idevice::house_arrest::HouseArrestClient::connect(&provider).await?.vend_documents(targets[0].clone()).await?;
     let mut file=afc.open("/Documents/DirectSide-livecontainer.json",idevice::afc::opcode::AfcFopenMode::WrOnly).await?;
-    file.write_entire(&bytes).await?;file.close().await?;
+    file.write_entire(bytes).await?;file.close().await?;
     emit(json!({"event":"livecontainer_prepared","device_id":id}));
     Ok(())
 }
@@ -295,30 +300,67 @@ fn profile_expiry(path:&std::path::Path)->Option<String> {
     profile.plist().get("ExpirationDate")?.as_date().map(|d|d.to_xml_format())
 }
 
-async fn install(engine: &mut Engine, request: &Value) -> Result<(), Report> {
-    let id = text(request,"device_id")?;
-    let path = PathBuf::from(text(request,"path")?);
-    if !path.is_file() || !path.extension().is_some_and(|x|x.eq_ignore_ascii_case("ipa")) { bail!("Bitte eine vorhandene IPA-Datei auswählen."); }
+fn check_signed_slots(installed:&std::collections::HashMap<String,plist::Value>,signed:&std::path::Path)->Result<String,Report> {
+    let info:plist::Dictionary=plist::from_file(signed.join("Info.plist"))?;
+    let target=info.get("CFBundleIdentifier").and_then(plist::Value::as_string).ok_or_else(||report!("Signierte App-Kennung fehlt."))?.to_string();
+    let profile=apple_codesign_quick::ProvisioningProfile::parse(&std::fs::read(signed.join("embedded.mobileprovision"))?)?;
+    if profile.plist().get("LocalProvision").and_then(plist::Value::as_boolean)==Some(true) {check_slots(installed,Some(&target))?;}
+    else {emit(json!({"event":"slots","used":developer_apps(installed).len(),"limit":null,"apps":developer_apps(installed)}));}
+    Ok(target)
+}
+fn validate_self_update(request:&Value,path:&std::path::Path)->Result<(),Report> {
+    if let Some(version)=request["self_update_version"].as_str() {
+        let info=isideload::sideload::application::inspect_ipa(path)?;
+        if info.get("CFBundleIdentifier").and_then(plist::Value::as_string)!=Some("com.directside.app") || info.get("CFBundleShortVersionString").and_then(plist::Value::as_string)!=Some(version) {bail!("Die Update-IPA gehört nicht zu DirectSide oder hat eine andere Version.");}
+    }
+    Ok(())
+}
+fn validate_installed_target(request:&Value,target:&str)->Result<(),Report> {
+    if let Some(expected)=request["expected_installed_bundle_id"].as_str() {
+        if expected!=target {bail!("Zum Erneuern oder Aktualisieren von DirectSide dasselbe Signierteam und ein passendes Profil verwenden.");}
+    }
+    Ok(())
+}
+async fn install(engine:Option<&mut Engine>,request:&Value)->Result<(),Report> {
+    use isideload::dev::devices::DevicesApi;
+    let id=text(request,"device_id")?;
+    let path=PathBuf::from(text(request,"path")?);
+    if !path.is_file() || !path.extension().is_some_and(|x|x.eq_ignore_ascii_case("ipa")) {bail!("Bitte eine vorhandene IPA-Datei auswählen.");}
+    let _temporary=isideload::sideload::application::ExtractionCleanup::new(&path)?;
+    validate_self_update(request,&path)?;
     let info=isideload::sideload::application::inspect_ipa(&path)?;
-    let directside=info.get("CFBundleIdentifier").and_then(plist::Value::as_string).is_some_and(|id|id=="com.directside.app" || id.starts_with("com.directside.app."));
-    let mut mux = UsbmuxdConnection::default().await?;
-    let dev = mux.get_devices().await?.into_iter().find(|d|d.udid == id)
-        .ok_or_else(||report!("Das ausgewählte Gerät ist nicht mehr verbunden. Bitte neu verbinden und Geräte aktualisieren."))?;
-    let provider = dev.to_provider(UsbmuxdAddr::from_env_var()?,"DirectSide");
+    let directside=info.get("CFBundleIdentifier").and_then(plist::Value::as_string)==Some("com.directside.app");
+    let livecontainer=info.get("CFBundleIdentifier").and_then(plist::Value::as_string)==Some("com.kdt.livecontainer");
+    let mut mux=UsbmuxdConnection::default().await?;
+    let dev=mux.get_devices().await?.into_iter().find(|d|d.udid==id).ok_or_else(||report!("Das ausgewählte Gerät ist nicht mehr verbunden."))?;
+    let provider=dev.to_provider(UsbmuxdAddr::from_env_var()?,"DirectSide");
     let mut proxy=idevice::installation_proxy::InstallationProxyClient::connect(&provider).await?;
     let installed=proxy.get_apps(Some("User"),None).await?;
-    let team=engine.get_team().await?;
-    let target=request.get("bundle_id").and_then(Value::as_str).map(|b|format!("{}.{}",b,team.team_id));
-    check_slots(&installed,target.as_deref())?;
-    emit(json!({"event":"status","message":"Gerät prüfen, signieren und installieren …"}));
-    engine.install_app(&provider,path.clone(),false,Some(|p:f32| async move {
-        emit(json!({"event":"progress","value":(p*85.0).clamp(0.0,85.0)}));
-    }),None).await?;
-    if directside {
-        bootstrap(engine,&provider,&path).await?;
+    let imported=request["signing_mode"].as_str()==Some("imported");
+    let mut engine=engine;
+    let signed=if imported {crate::imported_identity::sign(path.clone(),id).await?} else {
+        let engine=engine.as_deref_mut().ok_or_else(||report!("Bitte zuerst anmelden."))?;
+        let mut lockdown=LockdownClient::connect(&provider).await?;
+        let name=lockdown.get_value(Some("DeviceName"),None).await?.as_string().unwrap_or("iPhone").to_string();
+        let team=engine.get_team().await?;
+        engine.get_dev_session().ensure_device_registered(&team,&name,id,None).await?;
+        engine.sign_app(path.clone(),Some(team),false,Some(|p:f32|async move {emit(json!({"event":"progress","value":p*55.0}));}),None,Some(id)).await?.0
+    };
+    let installed_bundle_id=check_signed_slots(&installed,&signed)?;
+    validate_installed_target(request,&installed_bundle_id)?;
+    let expires_at=profile_expiry(&signed.join("embedded.mobileprovision"));
+    isideload::sideload::install::install_app(&provider,&signed,|p|emit(json!({"event":"progress","value":55.0+(p as f64)*0.45}))).await?;
+    if directside {bootstrap(if imported {None}else{engine.as_deref_mut()},&provider,&path,&installed_bundle_id).await?;}
+    if livecontainer {
+        // DirectSide forwards the certificate to LiveContainer when next opened.
+        // A missing DirectSide installation must not turn a successful LC install
+        // into an installation error.
+        let transfer=if imported {
+            match crate::imported_identity::load()? {Some(identity)=>transfer_livecontainer(request,&identity.livecontainer_certificate().await?).await,None=>Err(report!("Importiertes Zertifikat fehlt."))}
+        }else if let Some(engine)=engine.as_deref_mut() {prepare_livecontainer(engine,request).await}else{Err(report!("Sitzung fehlt."))};
+        if transfer.is_err() {emit(json!({"event":"status","message":"LiveContainer installiert. Zertifikat in DirectSide unter Einstellungen → LiveContainer übertragen."}));}
     }
-    emit(json!({"event":"installed","path":request["path"],"device_id":id,"bootstrap_ready":directside}));
-    Ok(())
+    emit(json!({"event":"installed","path":request["path"],"device_id":id,"bootstrap_ready":directside,"installed_bundle_id":installed_bundle_id,"expires_at":expires_at}));Ok(())
 }
 
 async fn pairing_step<T>(message:&str,seconds:u64,future:impl std::future::Future<Output=Result<T,Report>>)->Result<T,Report> {
@@ -363,22 +405,23 @@ async fn repair_directside(engine:&mut Engine,request:&Value)->Result<(),Report>
     let mut mux=UsbmuxdConnection::default().await?;
     let device=mux.get_devices().await?.into_iter().find(|d|d.udid==id).ok_or_else(||report!("iPhone nicht mehr verbunden."))?;
     let provider=device.to_provider(UsbmuxdAddr::from_env_var()?,"DirectSide");
-    bootstrap(engine,&provider,&path).await?;
+    let team=engine.get_team().await?;
+    bootstrap(Some(engine),&provider,&path,&format!("com.directside.app.{}",team.team_id)).await?;
     emit(json!({"event":"directside_repaired","device_id":id}));Ok(())
 }
 
-async fn bootstrap(engine: &mut Engine, provider: &impl idevice::provider::IdeviceProvider, ipa: &std::path::Path) -> Result<(),Report> {
+async fn bootstrap(engine:Option<&mut Engine>, provider:&impl idevice::provider::IdeviceProvider, ipa:&std::path::Path,bundle:&str) -> Result<(),Report> {
     use idevice::house_arrest::HouseArrestClient;
     let info=pairing_step("Geräteinformationen für die Kopplung lesen …",10,async {isideload::util::device::IdeviceInfo::from_device(provider).await}).await?;
     let pairing=usb_remote_pairing(provider,&info.udid).await?;
-    let team=engine.get_team().await?;
-    let signing=pairing_step("Signierschlüssel für DirectSide vorbereiten …",35,async {engine.bootstrap_signing_identity().await}).await?;
-    let bundle=format!("com.directside.app.{}",team.team_id);
-    let mut afc=pairing_step("DirectSide für die Übertragung öffnen …",10,async {Ok(HouseArrestClient::connect(provider).await?.vend_documents(bundle).await?)}).await?;
+    let (signing_name,signing)=if let Some(engine)=engine {
+        ("DirectSide-signing.json",pairing_step("Signierschlüssel für DirectSide vorbereiten …",35,async {engine.bootstrap_signing_identity().await}).await?)
+    }else{("DirectSide-imported.json",serde_json::to_vec(&crate::imported_identity::load()?.ok_or_else(||report!("Importiertes Zertifikat fehlt."))?)?)};
+    let mut afc=pairing_step("DirectSide für die Übertragung öffnen …",10,async {Ok(HouseArrestClient::connect(provider).await?.vend_documents(bundle.to_string()).await?)}).await?;
     let mut files=vec![
         ("DirectSide-pairing.plist",pairing.to_bytes()),
         ("DirectSide-original.ipa",std::fs::read(ipa)?),
-        ("DirectSide-signing.json",signing),
+        (signing_name,signing),
     ];
     files.push(("DirectSide-bootstrap.json",serde_json::to_vec(&json!({"udid":info.udid,"name":info.name}))?));
     pairing_step("Pairing und Original-IPA übertragen und prüfen …",90,async {
@@ -457,6 +500,15 @@ async fn export_livecontainer(engine:&mut Engine,request:&Value)->Result<(),Repo
     emit(json!({"event":"livecontainer_exported"}));Ok(())
 }
 
+fn sideload_apps(installed:&std::collections::HashMap<String,plist::Value>)->Vec<Value> {
+    let mut apps=developer_apps(installed);
+    for (id,value) in installed {
+        let signer=value.as_dictionary().and_then(|d|d.get("SignerIdentity")).and_then(plist::Value::as_string).unwrap_or("");
+        if (signer.starts_with("Apple Distribution:") || signer.starts_with("iPhone Distribution:")) && !apps.iter().any(|app|app["id"].as_str()==Some(id)) {apps.push(json!({"id":id,"name":value.as_dictionary().and_then(|d|d.get("CFBundleDisplayName")).and_then(plist::Value::as_string).unwrap_or(id)}));}
+    }
+    apps
+}
+
 fn developer_apps(installed:&std::collections::HashMap<String,plist::Value>)->Vec<Value> {
     installed.iter().filter_map(|(id,value)|{
         let d=value.as_dictionary()?;
@@ -482,13 +534,29 @@ async fn inspect_local(request:&Value)->Result<(),Report> {
     let(mut handle,mut rsd)=connect_local(request).await?;
     let mut proxy=idevice::installation_proxy::InstallationProxyClient::connect_rsd(&mut handle,&mut rsd).await?;
     let apps=proxy.get_apps(Some("User"),None).await?;
-    check_slots(&apps,None)?;
-    let developer=developer_apps(&apps);
-    let overview:Vec<Value>=apps.iter().filter_map(|(id,value)|{
+    emit(json!({"event":"slots","used":developer_apps(&apps).len(),"limit":null,"apps":developer_apps(&apps)}));
+    let developer=sideload_apps(&apps);
+    let overview:Vec<Value>=apps.iter().filter(|(id,_)|developer.iter().any(|app|app["id"].as_str()==Some(id.as_str()))).filter_map(|(id,value)|{
         let info=value.as_dictionary()?;
         Some(json!({"id":id,"name":info.get("CFBundleDisplayName").or_else(||info.get("CFBundleName")).and_then(plist::Value::as_string).unwrap_or(id),"developer":developer.iter().any(|app|app["id"].as_str()==Some(id.as_str()))}))
     }).collect();
     emit(json!({"event":"local_apps","apps":overview}));Ok(())
+}
+
+async fn local_app_icons(request:&Value)->Result<(),Report> {
+    use idevice::RsdService;
+    let bundles=request["bundles"].as_array().filter(|v|v.len()<=12).ok_or_else(||report!("Ungültige Icon-Auswahl."))?;
+    let (mut handle,mut rsd)=connect_local(request).await?;
+    let mut spring=idevice::springboardservices::SpringBoardServicesClient::connect_rsd(&mut handle,&mut rsd).await?;
+    let mut icons=Vec::new();
+    for bundle in bundles {
+        if let Some(bundle)=bundle.as_str() {
+            if let Ok(Ok(data))=tokio::time::timeout(Duration::from_secs(1),spring.get_icon_pngdata(bundle.to_string())).await {
+                if data.len()<=1024*1024 {icons.push(json!({"id":bundle,"png":base64::prelude::BASE64_STANDARD.encode(data)}));}
+            }
+        }
+    }
+    emit(json!({"event":"local_app_icons","icons":icons}));Ok(())
 }
 
 async fn remove_local_app(request:&Value)->Result<(),Report> {
@@ -497,32 +565,37 @@ async fn remove_local_app(request:&Value)->Result<(),Report> {
     let bundle=text(request,"bundle_id")?;
     let (mut handle,mut rsd)=connect_local(request).await?;
     let mut proxy=idevice::installation_proxy::InstallationProxyClient::connect_rsd(&mut handle,&mut rsd).await?;
-    if !proxy.get_apps(Some("User"),None).await?.contains_key(bundle) {bail!("Diese App ist auf dem verbundenen Gerät nicht installiert.");}
+    if !sideload_apps(&proxy.get_apps(Some("User"),None).await?).iter().any(|app|app["id"].as_str()==Some(bundle)) {bail!("Nur installierte Sideload-Apps können hier entfernt werden.");}
     proxy.uninstall(bundle,None).await?;
     emit(json!({"event":"app_removed","bundle_id":bundle}));Ok(())
 }
 
-async fn install_local(engine: &mut Engine, request: &Value) -> Result<(),Report> {
+async fn install_local(engine:Option<&mut Engine>, request:&Value) -> Result<(),Report> {
     use idevice::RsdService;
     use isideload::dev::devices::DevicesApi;
     let path=PathBuf::from(text(request,"path")?);
     if !path.is_file() || !path.extension().is_some_and(|x|x.eq_ignore_ascii_case("ipa")) {bail!("IPA-Datei fehlt.");}
+    let _temporary=isideload::sideload::application::ExtractionCleanup::new(&path)?;
+    validate_self_update(request,&path)?;
     let udid=text(request,"udid")?;
     let name=text(request,"device_name")?;
     let(mut handle,mut rsd)=connect_local(request).await?;
-    let team=engine.get_team().await?;
     let mut proxy=idevice::installation_proxy::InstallationProxyClient::connect_rsd(&mut handle,&mut rsd).await?;
-    let target=text(request,"bundle_id").map(|b|format!("{}.{}",b,team.team_id))?;
-    check_slots(&proxy.get_apps(Some("User"),None).await?,Some(&target))?;
-    engine.get_dev_session().ensure_device_registered(&team,name,udid,None).await?;
-    emit(json!({"event":"status","message":"IPA wird auf dem iPhone signiert …"}));
-    let (signed,_)=engine.sign_app(path,Some(team),false,Some(|p:f32|async move {emit(json!({"event":"progress","value":p*55.0}));}),None,Some(udid)).await?;
+    let installed=proxy.get_apps(Some("User"),None).await?;
+    let signed=if request["signing_mode"].as_str()==Some("imported") {crate::imported_identity::sign(path,udid).await?} else {
+        let engine=engine.ok_or_else(||report!("Bitte zuerst anmelden."))?;
+        let team=engine.get_team().await?;
+        engine.get_dev_session().ensure_device_registered(&team,name,udid,None).await?;
+        engine.sign_app(path,Some(team),false,Some(|p:f32|async move {emit(json!({"event":"progress","value":p*55.0}));}),None,Some(udid)).await?.0
+    };
+    let installed_bundle_id=check_signed_slots(&installed,&signed)?;
+    validate_installed_target(request,&installed_bundle_id)?;
     emit(json!({"event":"status","message":"Signierte App wird installiert …"}));
     let expires_at=profile_expiry(&signed.join("embedded.mobileprovision"));
     let result=isideload::sideload::install::install_app_rsd(&mut handle,&mut rsd,&signed,|p|emit(json!({"event":"progress","value":55.0+(p as f64)*0.45}))).await;
     let _=std::fs::remove_dir_all(&signed);
     result?;
-    emit(json!({"event":"installed","path":request["path"],"device_id":udid,"expires_at":expires_at}));
+    emit(json!({"event":"installed","path":request["path"],"device_id":udid,"installed_bundle_id":installed_bundle_id,"expires_at":expires_at}));
     Ok(())
 }
 
@@ -547,9 +620,21 @@ pub async fn run() {
             "remove_local_app"=>match tokio::time::timeout(Duration::from_secs(45),remove_local_app(&request)).await {Ok(r)=>r,Err(_)=>Err(report!("App konnte nicht rechtzeitig entfernt werden. Verbindung erneut prüfen."))},
             "certificates"=>match engine.as_mut() {Some(e)=>certificates(e).await,None=>Err(report!("Bitte zuerst anmelden."))},
             "revoke_certificate"=>match engine.as_mut() {Some(e)=>revoke_certificate(e,&request).await,None=>Err(report!("Bitte zuerst anmelden."))},
+            "prepare_livecontainer" if request["signing_mode"].as_str()==Some("imported")=>match crate::imported_identity::load() {Ok(Some(identity))=>match identity.livecontainer_certificate().await {Ok(bytes)=>transfer_livecontainer(&request,&bytes).await,Err(e)=>Err(e)},Ok(None)=>Err(report!("Zertifikat fehlt.")),Err(e)=>Err(e)},
             "prepare_livecontainer" => match engine.as_mut() {Some(e)=>prepare_livecontainer(e,&request).await,None=>Err(report!("Bitte zuerst anmelden."))},
+            "export_livecontainer" if request["signing_mode"].as_str()==Some("imported")=>async {
+                let bytes=crate::imported_identity::load()?.ok_or_else(||report!("Zertifikat fehlt."))?.livecontainer_certificate().await?;
+                std::fs::write(text(&request,"path")?,bytes)?;emit(json!({"event":"livecontainer_exported"}));Ok(())
+            }.await,
             "export_livecontainer"=>match engine.as_mut() {Some(e)=>export_livecontainer(e,&request).await,None=>Err(report!("Bitte zuerst anmelden."))},
+            "import_identity"=>{
+                let result=crate::imported_identity::import(&request).map(|metadata|emit(json!({"event":"imported_identity","identity":metadata})));
+                request.as_object_mut().map(|value|value.remove("password"));result
+            },
+            "imported_identity"=>crate::imported_identity::metadata().map(|metadata|emit(json!({"event":"imported_identity","identity":metadata}))),
+            "forget_identity"=>crate::imported_identity::forget().map(|_|emit(json!({"event":"imported_identity","identity":null}))),
             "pair_local"=>pair_local(&request).await,
+            "local_app_icons"=>match tokio::time::timeout(Duration::from_secs(18),local_app_icons(&request)).await {Ok(r)=>r,Err(_)=>Err(report!("Icons konnten nicht geladen werden."))},
             "reveal_developer_mode"=>reveal_developer_mode(&request).await,
             "repair_directside"=>match engine.as_mut() {Some(e)=>repair_directside(e,&request).await,None=>Err(report!("Zum Übertragen des Signierschlüssels bitte am PC anmelden."))},
             "restore" => {
@@ -588,12 +673,14 @@ pub async fn run() {
                     Err(_) => Err(report!("Die Anmeldung hat zu lange gedauert. Bitte erneut anmelden.")),
                 }
             },
+            "install" if request["signing_mode"].as_str()==Some("imported")=>install(None,&request).await,
+            "install_local" if request["signing_mode"].as_str()==Some("imported")=>install_local(None,&request).await,
             "install" => match engine.as_mut() {
-                Some(e) => {let result=install(e,&request).await;refresh_account_quota(e).await;result},
+                Some(e) => {let result=install(Some(&mut *e),&request).await;refresh_account_quota(e).await;result},
                 None => Err(report!("Bitte zuerst mit deiner Apple-ID anmelden.")),
             },
             "install_local" => match engine.as_mut() {
-                Some(e)=>install_local(e,&request).await,
+                Some(e)=>install_local(Some(e),&request).await,
                 None=>Err(report!("Bitte zuerst anmelden.")),
             },
             "logout" => {engine=None;let _=KeyringStorage::new("DirectSide.session".to_string()).delete("active");emit(json!({"event":"logged_out"}));Ok(())},
@@ -635,5 +722,34 @@ mod tests {
         }
         assert!(check_slots(&apps,Some("one")).is_ok());
         assert!(check_slots(&apps,Some("four")).is_err());
+    }
+    #[test]
+    fn distribution_apps_are_managed_but_do_not_consume_personal_development_slots() {
+        let mut apps=std::collections::HashMap::new();
+        for (id,signer) in [("store","Apple iPhone OS Application Signing"),("paid","Apple Distribution: Fixture"),("dev","Apple Development: Fixture")] {
+            let mut info=plist::Dictionary::new();info.insert("SignerIdentity".into(),plist::Value::String(signer.into()));apps.insert(id.into(),plist::Value::Dictionary(info));
+        }
+        let managed=sideload_apps(&apps);
+        assert_eq!(managed.len(),2);assert!(!managed.iter().any(|app|app["id"]=="store"));
+        assert_eq!(developer_apps(&apps).len(),1);
+    }
+    #[test]
+    fn self_update_rejects_malformed_archive_before_signing() {
+        let directory=std::env::temp_dir().join(format!("directside-update-test-{}",std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        std::fs::create_dir_all(&directory).unwrap();
+        let path=directory.join("update.ipa");
+        // inspect_ipa is shared with normal imports; malformed archives are never
+        // passed to signing merely because an update version was supplied.
+        std::fs::write(&path,b"not an IPA").unwrap();
+        assert!(validate_self_update(&json!({"self_update_version":"0.2.0"}),&path).is_err());
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+    #[test]
+    fn self_updates_must_replace_the_current_app_instead_of_installing_a_second_team_copy() {
+        let request=json!({"expected_installed_bundle_id":"com.directside.app.ORIGINAL"});
+        assert!(validate_installed_target(&request,"com.directside.app.ORIGINAL").is_ok());
+        assert!(validate_installed_target(&request,"com.directside.app.OTHER").is_err());
+        assert!(validate_installed_target(&request,"com.directside.app").is_err());
+        assert!(validate_installed_target(&json!({}),"com.directside.app.OTHER").is_ok());
     }
 }
