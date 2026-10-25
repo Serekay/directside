@@ -1,5 +1,13 @@
 # Änderungen
 
+## 0.1.2 (17) - 2026-10-25
+
+- Security release with patched TLS, certificate root stores, Tokio, constant-time utility and ZIP dependencies.
+- Hardened manual iPhone builds: pinned Actions, read-only tokens, history secret scanning and dependency checks.
+- Unsigned IPA publication checks reject private signing/pairing files and unsafe archive paths.
+- Regression coverage for malicious ZIP symlinks, IPA inspection and build security gates.
+- Replaces withdrawn releases 0.1.0 and 0.1.1. The documented upstream RSA advisory remains; see [security review](docs/SECURITY-AUDIT.md).
+
 ## 0.1.1 (16) - 2026-10-25
 
 - 0.1.1 (16): Version und Buildnummer in Windows und iPhone sichtbar, Windows-Dateieigenschaften versioniert, vier iPhone-Ansichten in der vereinfachten README.
