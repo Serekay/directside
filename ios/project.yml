@@ -19,9 +19,13 @@ targets:
         buildPhase: resources
       - path: ../assets/apple_root.cer
         buildPhase: resources
+      - path: ../assets/livecontainer-directside.png
+        buildPhase: resources
       - path: ../licenses/Unicorn-GPL-2.0.txt
         buildPhase: resources
       - path: ../licenses/Unicorn-LGPL-2.1.txt
+        buildPhase: resources
+      - path: ../licenses/image-MIT.txt
         buildPhase: resources
       - path: ../vendor/mac-adi-rust/LICENSE
         buildPhase: resources
@@ -58,7 +62,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.directside.app
         PRODUCT_NAME: DirectSide
         MARKETING_VERSION: '0.1.0'
-        CURRENT_PROJECT_VERSION: '11'
+        CURRENT_PROJECT_VERSION: '12'
         GENERATE_INFOPLIST_FILE: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_CFBundleDisplayName: DirectSide

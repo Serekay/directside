@@ -8,4 +8,5 @@ pub mod sideloader;
 pub mod sign;
 pub mod imported;
 pub mod identifier;
+pub mod custom_icon;
 pub use builder::{SideloaderBuilder, TeamSelection};

@@ -518,7 +518,15 @@ async fn bootstrap(engine:Option<&mut Engine>, provider:&impl idevice::provider:
         let identity:Value=serde_json::from_slice(&signing)?;
         let team=engine.get_team().await?;
         let saved=KeyringStorage::new("DirectSide.session".into()).retrieve_data("active")?;
-        let account=saved.map(|bytes|session_transfer(&bytes,text(&identity,"email")?,&team.team_id)).transpose()?;
+        let mut account=saved.map(|bytes|session_transfer(&bytes,text(&identity,"email")?,&team.team_id)).transpose()?;
+        #[cfg(windows)]
+        if let Some(bytes)=account.as_mut() {
+            let mut transfer:Value=serde_json::from_slice(bytes)?;
+            let local=LocalAnisetteProvider::new()?.export_identity().await?;
+            transfer["local_identity"]=serde_json::from_slice(&local)?;
+            *bytes=serde_json::to_vec(&transfer)?;
+            if bytes.len()>131072 {bail!("Kontoübernahme zu groß.");}
+        }
         ("DirectSide-signing.json",signing,account)
     }else{("DirectSide-imported.json",serde_json::to_vec(&crate::imported_identity::load()?.ok_or_else(||report!("Importiertes Zertifikat fehlt."))?)?,None)};
     let mut afc=pairing_step("DirectSide für die Übertragung öffnen …",10,async {Ok(HouseArrestClient::connect(provider).await?.vend_documents(bundle.to_string()).await?)}).await?;
