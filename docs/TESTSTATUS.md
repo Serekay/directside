@@ -1,5 +1,15 @@
 # Teststand vom 25. Oktober 2026
 
+## Release v0.1.1 (16) veröffentlicht
+
+Nach ausdrücklicher Betreiberfreigabe als stabiler aktueller GitHub-Release
+veröffentlicht: https://github.com/Serekay/directside/releases/tag/v0.1.1.
+DirectSide.exe, DirectSide.ipa und SHA256SUMS.txt hochgeladen; sämtliche
+GitHub-Digests und Dateigrößen mit lokalen Dateien verglichen. Der Windows-
+ReleaseClient akzeptiert die tatsächlichen Latest-Metadaten und beide Assets.
+Das Repository bleibt privat, daher kein anonymer iPhone-Updatezugriff.
+Keine Installation oder erfolgreiche native Selbstaktualisierung behauptet.
+
 ## Repository- und Release-Prüfung
 
 Gitleaks 8.30.1 über die gesamte erreichbare Historie: keine Geheimnisse
