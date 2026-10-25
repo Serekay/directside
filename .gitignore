@@ -19,3 +19,25 @@ bin/
 ios/Resources/AnisetteRuntime/
 ios/Resources/MacAnisetteRuntime/
 vendor/mac-adi-rust/target/
+
+# Local credentials, signing identities and diagnostics
+.env
+.env.*
+!.env.example
+*.dpapi
+*.p8
+*.pem
+*.key
+*.keystore
+*.log
+*.sqlite
+*.sqlite3
+credentials*.json
+*session*.json
+*signing*.json
+.claude/
+.codex/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
