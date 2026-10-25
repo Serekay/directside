@@ -76,4 +76,26 @@ verified IPA survive the app being replaced; the next matching-version launch
 atomically promotes that IPA to the original used for renewal. No release or
 iPhone build is triggered by these changes.
 
+## iPhone screenshots for the README
+
+The optional development example `iphone-screenshot` captures one PNG over the
+trusted USB connection. It uses the Instruments screenshot channel, including
+CoreDeviceProxy/RSD on newer iOS versions. It does not install a developer image,
+collect photo-library files, distribute screenshots or add code to the app UI.
+Exactly one unlocked, trusted iPhone must be connected.
+
+With the same local Rust environment used for Windows builds:
+
+```powershell
+cargo run --release --example iphone-screenshot --features iphone-screenshots -- --probe
+cargo run --release --example iphone-screenshot --features iphone-screenshots -- --installed-version
+cargo run --release --example iphone-screenshot --features iphone-screenshots -- build/iphone-discover.png
+```
+
+The probe only opens the screenshot channel. For a capture, first open DirectSide
+on the phone and display the intended view. Review the resulting PNG for account
+details and private source addresses before copying it into `docs/screenshots/`
+and referencing it from the README. The current device passed the channel probe;
+capture of the newly installed build is still pending.
+
 Windows updates stage in LocalAppData/DirectSide/updates. The staged EXE runs its own --apply-update entry point, waits for the original Qt process to stop and preserves DirectSide.previous.exe before replacing the original file. Short retries accommodate PyInstaller's outer process cleanup. If replacement or process launch fails, the previous EXE is retained/restored. Credentials and settings are not replaced. Authentication/install operations defer the restart. Locked files or an unwritable installation folder produce an update failure rather than elevation. A successful process launch is not a post-launch health guarantee. Actual release-to-release upgrades still require a hardware check after the first release is approved.

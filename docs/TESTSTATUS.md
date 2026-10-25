@@ -2,11 +2,16 @@
 
 ## Neuer Korrekturstand: zwölf gemeldete Punkte
 
-Im Quellcode umgesetzt; Windows lokal gebaut. Die installierte iPhone-App und
-`dist/DirectSide.ipa` bleiben beim bisherigen Build 5. Es wurde keine iPhone-Action
-gestartet und kein neuer Release veröffentlicht. Für die iPhone-Änderungen fehlen
-noch Xcode-Build und Gerätetest; eine Syntaxprüfung beweist deren Laufzeitverhalten
-nicht.
+Windows lokal gebaut. Auf ausdrücklichen Buildauftrag wurde iPhone-Build 6
+erfolgreich über Action [40146215784](https://github.com/Serekay/directside/actions/runs/40146215784)
+gebaut: Swift-Modell-/Quellentests, lokale Apple-Provisionierungsprüfung,
+Rust-Kern für aarch64-apple-ios und Xcode-App bestanden. Quellstand `e6f4ab4`.
+`dist/DirectSide.ipa`: Version 0.1.0, Build 6, 10.470.986 Bytes,
+SHA256 `fe072e3495ccc7dcd9501dffa52212650603ec9b96fb47acb64079db1ef92772`.
+App-Kennung und Buildnummer nach Download direkt aus der IPA geprüft.
+Kein Release veröffentlicht; Gerätetest der neuen Oberfläche durch den Besitzer
+steht aus. Drüberinstallieren dieser lokalen IPA aktualisiert die App;
+Signaturerneuerung verwendet dagegen die auf dem iPhone gespeicherte Original-IPA.
 
 | Punkt | Änderung |
 | --- | --- |
@@ -31,9 +36,10 @@ Windows-Signierkern und EXE gebaut; gepackter Qt-/QML-/Icon-/Engine-Starttest mi
 lokaler Authentifizierung erfolgreich. Zertifikatsansicht und Hilfe bei minimaler
 Fenstergröße visuell geprüft. Swift-Syntax aller App-Dateien geprüft. Neue
 Swift-Modelltests für Versionsvergleich und alte/neue Installationskennungen
-sind vorbereitet, auf diesem Windows-PC aber nicht ausgeführt.
-Die echte USB-Abfrage des neu gebauten Kerns lief erfolgreich; aktuell wurden
-keine angeschlossenen Geräte erkannt.
+sind jetzt auf dem macOS-Buildhost erfolgreich ausgeführt worden.
+Das iPhone wurde anschließend per USB erkannt. Der direkte Screenshot-Kanal
+über CoreDeviceProxy/RSD/DTX ließ sich erfolgreich öffnen, ohne Bildschirmbild
+aufzunehmen. Native README-Aufnahmen warten auf die neue installierte App.
 
 Noch nativ zu prüfen: Tastatur und Wisch-/Langdruckgesten, VPN-Hinweis bei echter
 Unterbrechung, vollständiges Selbstupdate mit Prozessneustart, automatische

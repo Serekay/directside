@@ -47,6 +47,6 @@ This repository is private. Release downloads require repository access. Save a 
 
 ## Project
 
-The previously built iPhone artifact is **0.1.0, build 5**. The changes described above require a new iPhone build; editing this repository does not update the installed app. Previous Windows and iPhone sign-in, installation and USB setup transfer were confirmed on hardware. The new self-updater, imported signing and automatic LiveContainer handoff still require verification with the new iPhone build; see [test status](docs/TESTSTATUS.md).
+The published release remains **0.1.0, build 5**. The new **0.1.0, build 6** test IPA is built and available locally at `dist/DirectSide.ipa`; it has not been published as a release. To test it, choose that file using **Other IPA** in Windows. The release-install button continues to download the published release. Signature renewal on iPhone reuses its stored original IPA; it does not fetch a new app version. Installing the new IPA over the existing app with the same signing team updates it while normally preserving its data. Previous Windows and iPhone sign-in, installation and USB setup transfer were confirmed on hardware. The new self-updater, imported signing and automatic LiveContainer handoff still require owner verification; see [test status](docs/TESTSTATUS.md).
 
 [Build guide](docs/DEVELOPMENT.md) | [Architecture](docs/ARCHITECTURE.md) | [Changelog](CHANGELOG.md) | [Third-party notices](THIRD_PARTY.md) | [License](LICENSE)
