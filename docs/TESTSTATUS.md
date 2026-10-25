@@ -1,14 +1,17 @@
 # Teststand vom 25. Oktober 2026
 
-## Oberflächenkorrektur und App-ID-Übersicht, Build 7
+## Oberflächenkorrektur, App-ID-Übersicht und Erststart
 
 USB-Screenshots und echte Accessibility-Navigation auf dem iPhone eingerichtet.
 Die vorhandene App wurde durch Entdecken, Meine Apps, Quellenliste/-details,
 App-Details samt Berechtigungen, Quelle hinzufügen sowie Einstellungen,
 Updateprüfung, Entwicklermodus, Verbindung, Signierung und LiveContainer
 navigiert und ausgelesen. Screenshots bleiben lokal; Accountangaben und
-private Quellen werden nicht in die README übernommen. Keine App installiert,
-entfernt oder Signatur erneuert, keine zusätzliche App-ID angelegt.
+private Quellen werden nicht in die README übernommen. Build 7 und 8 wurden
+anschließend über dieselbe Kennung installiert und gestartet; App-ID-Kontingent
+weiterhin 9/10. Quellenüberschrift, Berechtigungen, VPN-Badge, Updateansicht und
+App-ID-Liste am Gerät geprüft. Build 8 zeigt nur Labels/Status/Aktionen und
+lokalisierte Ablaufdaten. Der aktuelle Folgebuild ist 9.
 
 Korrigiert: Geräteprüfung im Hintergrund ohne allgemeines Busy/Progress-Banner,
 kurzer Cache gegen Prüfungen bei jedem Tabwechsel, Wisch-Erklärung entfernt,
@@ -24,10 +27,21 @@ Erweiterungen und Kontingent kommen nur lesend von Apple. Neun Einträge
 einschließlich Erweiterungszuordnung real abgefragt. Die Windows-Ansicht mit
 Beispieldaten in Deutsch/Englisch bei 960 × 680 visuell geprüft.
 
-52 Python-/Qt-Tests, acht Kern-Tests und drei Signierkennungs-Tests bestanden.
-Swift-Syntax lokal geprüft; neuer iPhone-Build und Gerätetest der Änderungen
-stehen noch aus. Die bereits geprüften Gerätescreenshots zeigen den vorherigen
-App-Stand, nicht die neuen Oberflächen.
+54 Python-/Qt-Tests, acht Kern-Tests und drei Signierkennungs-Tests bestanden.
+Windows-Paket gebaut und Startprüfung bestanden. iPhone-Build 8 über Action
+[40150440163](https://github.com/Serekay/directside/actions/runs/40150440163)
+erfolgreich gebaut und am Gerät geprüft. Größen-/SHA256-Prüfung der IPA bestanden.
+
+Erststartlücke korrigiert: Eine erfolgreich installierte Entwickler-App wartet
+bei ausgeschaltetem/unbekanntem Entwicklermodus auf den Benutzerschritt, statt
+direkt die noch nicht mögliche Kopplung zu versuchen. AMFI bereitet den Schalter
+vor; Windows zeigt die zwei nötigen Geräteschritte. Ein kleines lokales
+Setup-Protokoll überlebt den App-Neustart. Nach bestätigtem Entwicklermodus
+setzt Windows die Kopplung/Schlüsselübertragung für genau dieses Gerät und den
+ursprünglichen Account fort. Importierte Zertifikate werden dabei unterstützt.
+Tests decken Warten, Trennen/Wiederverbinden, Fortsetzen, App-Neustart und die
+Abgrenzung zu anderen Geräten ab. Der echte Frischstarttest mit ausgeschaltetem
+Entwicklermodus ist vom Betreiber gewünscht und noch durchzuführen.
 
 ## App-ID-Prüfung und feste Kennung
 

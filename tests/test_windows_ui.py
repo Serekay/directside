@@ -275,7 +275,7 @@ class WindowsUIStateTests(unittest.TestCase):
   self.assertFalse(self.bridge.repairDirectSide());self.assertEqual(self.sent,[])
   self.bridge.update(loggedIn=True)
   self.assertTrue(self.bridge.repairDirectSide())
-  self.assertEqual(self.sent,[{'command':'repair_directside','device_id':'tablet','path':str(ipa)}])
+  self.assertEqual(self.sent,[{'command':'repair_directside','signing_mode':'account','device_id':'tablet','path':str(ipa)}])
   self.assertTrue(self.bridge.data['settingUp']);self.assertEqual(self.bridge.data['challenge'],'')
   self.assertFalse(self.bridge.repairDirectSide());self.assertEqual(len(self.sent),1)
 
@@ -297,7 +297,7 @@ class WindowsUIStateTests(unittest.TestCase):
   self.bridge.update(busy=False,devices=[{'id':'phone','name':'iPhone','label':'iPhone'}])
   engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
   engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')));root=engine.rootObjects()[0]
-  self.bridge.handle({'event':'device_components','device_id':'phone','developer_mode':False});APP.processEvents()
+  self.bridge.handle({'event':'device_components','device_id':'phone','developer_mode':False,'directside':True});APP.processEvents()
   self.assertEqual(self.bridge.data['developerMode'],'disabled');self.assertEqual(root.property('page'),'developer')
   self.assertTrue(root.findChild(QObject,'developerModeGuide').property('visible'));self.assertEqual(self.sent,[])
   self.bridge.revealDeveloperMode();self.assertEqual(self.sent,[{'command':'reveal_developer_mode','device_id':'phone'}])
@@ -374,5 +374,38 @@ class WindowsUIStateTests(unittest.TestCase):
   self.assertFalse(self.bridge.data['error'])
   self.bridge.handle({'event':'logged_out'})
   self.assertEqual(self.bridge.data['appIds'],[])
+
+ def test_fresh_setup_waits_for_developer_mode_and_resumes_after_reconnect(self):
+  ipa=Path(self.folder.name)/'DirectSide.ipa';ipa.write_bytes(b'pending original fixture')
+  self.bridge.initializing=False
+  self.bridge.update(busy=False,loggedIn=True,email='person@example.com',devices=[{'id':'phone'}])
+  self.bridge.handle({'event':'installed','device_id':'phone','path':str(ipa),'developer_mode_required':True,'bootstrap_ready':False})
+  self.assertTrue(self.bridge.data['setupPending']);self.assertFalse(self.bridge.data['success'])
+  self.assertTrue(self.bridge.setupRecord.is_file())
+  self.sent.clear()
+  self.bridge.handle({'event':'device_components','device_id':'phone','developer_mode':False,'directside':True})
+  self.assertFalse(any(e['command']=='repair_directside' for e in self.sent))
+  self.bridge.handle({'event':'devices','devices':[]})
+  self.assertTrue(self.bridge.data['setupPending'])
+  self.bridge.handle({'event':'devices','devices':[{'id':'phone','name':'iPhone'}]})
+  self.sent.clear()
+  self.bridge.handle({'event':'device_components','device_id':'phone','developer_mode':True,'directside':True})
+  self.assertEqual(self.sent,[{'command':'repair_directside','signing_mode':'account','device_id':'phone','path':str(ipa)}])
+  self.assertTrue(self.bridge.data['settingUp'])
+  self.bridge.handle({'event':'directside_repaired','device_id':'phone'})
+  self.assertFalse(self.bridge.data['setupPending']);self.assertTrue(self.bridge.data['setupReady'])
+  self.assertFalse(self.bridge.setupRecord.exists())
+
+ def test_pending_setup_survives_restart_and_cannot_target_another_phone(self):
+  ipa=Path(self.folder.name)/'DirectSide.ipa';ipa.write_bytes(b'pending fixture')
+  self.bridge.setupRecord.write_text(__import__('json').dumps({'device':'original','path':str(ipa),'mode':'account','email':'person@example.com'}))
+  restored=DesktopBridge(start=False,preferences=self.bridge.preferences);sent=[];restored.send=sent.append
+  try:
+   restored.update(busy=False,loggedIn=True,email='person@example.com',devices=[{'id':'different'}],developerMode='enabled')
+   restored.resumeSetup();self.assertEqual(sent,[])
+   restored.update(devices=[{'id':'original'}],developerMode='unknown');restored.resumeSetup();self.assertEqual(sent,[])
+   restored.update(developerMode='enabled');restored.resumeSetup()
+   self.assertEqual(sent[0]['device_id'],'original')
+  finally:restored.timer.stop()
 
 if __name__=='__main__':unittest.main()

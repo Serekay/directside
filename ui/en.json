@@ -247,7 +247,7 @@
   "Entwicklermodus einrichten": "Set up Developer Mode",
   "Selbst signierte Entwickler-Apps benötigen ab iOS 16 den Entwicklermodus. Richte ihn nach der ersten Installation ein, bevor du DirectSide oder eine andere Entwickler-App öffnest.": "Self-signed development apps require Developer Mode on iOS 16 and later. Enable it after the first installation, before opening DirectSide or another development app.",
   "Auf dem iPhone": "On your iPhone",
-  "1. Einstellungen → Datenschutz & Sicherheit → Entwicklermodus einschalten.": "1. Open Settings → Privacy & Security → Developer Mode and enable it.",
+  "1. Einstellungen → Datenschutz & Sicherheit → Entwicklermodus einschalten.": "1. Settings → Privacy & Security → turn on Developer Mode.",
   "2. Das iPhone neu starten und den Entwicklermodus nach dem Entsperren bestätigen.": "2. Restart your iPhone, unlock it and confirm Developer Mode.",
   "3. Falls verlangt: Einstellungen → Allgemein → VPN & Geräteverwaltung öffnen und deinem Entwicklerprofil vertrauen.": "3. If requested, open Settings → General → VPN & Device Management and trust your developer profile.",
   "Fehlt der Schalter, installiere zuerst eine Entwickler-App über die Windows-App und öffne die Einstellungen erneut. Bei Verteilungszertifikaten kann der Entwicklermodus entfallen.": "If the switch is missing, install a development app using Windows first, then reopen Settings. Distribution certificates may not require Developer Mode.",
@@ -432,5 +432,13 @@
   "Prüft beim Öffnen der App, höchstens alle sechs Stunden. Ein verfügbares Update kannst du direkt auf dem iPhone installieren.": "Checks when you open the app, at most once every six hours. You can install an available update directly on your iPhone.",
   "App-Start": "App launch",
   "App-Ausführung": "App runtime",
-  "Teilen": "Sharing"
+  "Teilen": "Sharing",
+  "DirectSide installiert": "DirectSide installed",
+  "2. Neustarten → Entsperren → Aktivieren bestätigen.": "2. Restart → unlock → confirm Turn On.",
+  "Falls verlangt: Einstellungen → Allgemein → VPN & Geräteverwaltung → Vertrauen.": "If requested: Settings → General → VPN & Device Management → Trust.",
+  "Schalter anzeigen": "Show switch",
+  "Warte auf das iPhone …": "Waiting for iPhone…",
+  "Einrichtung abschließen …": "Completing setup…",
+  "DirectSide auf dem iPhone öffnen.": "Open DirectSide on your iPhone.",
+  "Original-IPA auswählen.": "Select the original IPA."
 }

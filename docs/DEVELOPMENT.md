@@ -87,12 +87,16 @@ installing an automation app or registering another App ID. Protocol reference:
 ```powershell
 cargo run --release --example iphone-control --features iphone-control -- list
 cargo run --release --example iphone-control --features iphone-control -- press 'Quellen, Button, Tab'
+cargo run --release --example iphone-control --features iphone-control -- focus '9 / 10'
 ```
 
 Open DirectSide on the unlocked phone first. Inspect labels before activating
 them and verify navigation with a screenshot. A successfully sent activation
 alone does not prove that the view changed. This helper is separate from the
 shipped app; coordinate swipes and text input are not implemented.
+`focus` only moves accessibility focus so screenshots can show the desired
+part of a scrolling view. `iphone-screenshot --launch` opens the unique installed
+DirectSide through Instruments; it does not install or replace it.
 
 The optional development example `iphone-screenshot` captures one PNG over the
 trusted USB connection. It uses the Instruments screenshot channel, including

@@ -10,6 +10,7 @@ import CryptoKit
     @Published var deviceIcons:[String:Data]=[:]
     @Published var busy = true
     private var restoring=true
+    var showsProgress:Bool {busy && !restoring}
     @Published var loggedIn = false
     @Published var signingMode=UserDefaults.standard.string(forKey:"signingMode") ?? "account"
     @Published var importedIdentity:ImportedSigningIdentity?

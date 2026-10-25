@@ -58,11 +58,18 @@ class DesktopBridge(QObject):
         self.data.update(certificates=[],certificatesLoaded=False,certificateTeam='',certificateLimit=False,removal={},developerMode='unknown',settingUp=False,setupPhase='')
         self.data.update(signingMode=saved.get('signing_mode','account'),importedIdentity={},identityP12='',identityProfiles=[],canSign=False)
         self.data.update(appIds=[],appIdsLoading=False,appIdsError='')
+        self.setupRecord=self.preferences.path.with_name('pending-setup.json')
+        try:
+            self.pendingSetup=json.loads(self.setupRecord.read_text(encoding='utf-8'))
+            if not isinstance(self.pendingSetup,dict) or not all(isinstance(self.pendingSetup.get(k),str) for k in ('device','path','mode','email')):self.pendingSetup=None
+        except (OSError,ValueError):self.pendingSetup=None
+        self.data.update(setupPending=bool(self.pendingSetup),setupReady=False)
         self.releaseClient=ReleaseClient(HOME if getattr(sys,'frozen',False) else ROOT)
         self.release=None
         self.buffer=bytearray()
         self.initializing=True
         self.installing=False
+        self.setupWasFirstInstall=False
         self.pendingLogin=None
         self.pendingReleaseInstall=None
         self.componentDevice=None;self.componentTime=0
@@ -165,6 +172,7 @@ class DesktopBridge(QObject):
             self.update(loggedIn=logged,authState=state,email=email,team=event.get('team',''),busy=False,challenge='',status='Bereit' if logged else 'Sitzung abgelaufen · bitte anmelden' if state=='expired' else 'Anmeldung erforderlich',**({} if logged else dict(appIdsLimit=-1,appIdsAvailable=-1,appIdsRegistered=-1)))
             if email:self.persist(email)
             if self.initializing:self.initializing=False;self.refresh()
+            elif logged and self.pendingSetup:self.componentDevice=None;self.inspectDevice()
         elif kind=='imported_identity':
             identity=event.get('identity') or {}
             self.update(importedIdentity=identity,busy=False,status='Zertifikat geprüft.' if identity else 'Kein Zertifikat importiert.')
@@ -188,9 +196,10 @@ class DesktopBridge(QObject):
             for device in devices:device['label']=device.get('name','Apple-Gerät')+' · '+device['id'][-4:]
             index=next((i for i,d in enumerate(devices) if d.get('id')==selected),0)
             if devices and devices[index]['id']!=selected:self.update(installedApps=[],slotsUsed=-1,developerApps=[],lcPrepared=False,developerMode='unknown')
-            self.update(devices=devices,deviceIndex=index,busy=False,scanning=False)
+            pending_here=bool(self.pendingSetup and (not devices or devices[index]['id']==self.pendingSetup['device']))
+            self.update(devices=devices,deviceIndex=index,busy=False,scanning=False,setupPending=pending_here)
             if devices:
-                if devices[index]['id']!=self.componentDevice or time.monotonic()-self.componentTime>30:self.inspectDevice()
+                if devices[index]['id']!=self.componentDevice or time.monotonic()-self.componentTime>(3 if self.pendingSetup else 30):self.inspectDevice()
             else:
                 self.componentDevice=None
                 self.update(vpnState='unknown',lcState='unknown',directsidePresent=False,lcPrepared=False,slotsUsed=-1,developerApps=[],installedApps=[],developerMode='unknown')
@@ -201,6 +210,7 @@ class DesktopBridge(QObject):
                 apps=[dict(app,icon=cached.get(app['id'],{}).get('icon',''),iconChecked=cached.get(app['id'],{}).get('iconChecked',False)) for app in event.get('apps',[])]
                 mode=event.get('developer_mode')
                 self.update(developerMode='enabled' if mode is True else 'disabled' if mode is False else 'unknown',vpnState='installed' if event.get('localdevvpn') else 'missing',lcState='installed' if event.get('livecontainer') else 'missing',directsidePresent=bool(event.get('directside')),slotsUsed=event.get('slots_used',-1),developerApps=event.get('developer_apps',[]),installedApps=apps,busy=False,scanning=False)
+                self.resumeSetup()
         elif kind=='app_icons':
             if self.data['devices'] and event.get('device_id')==self.data['devices'][self.data['deviceIndex']]['id']:
                 icons={icon['id']:icon.get('png','') for icon in event.get('icons',[])}
@@ -231,8 +241,32 @@ class DesktopBridge(QObject):
             if event.get('command')=='login' and 'Auth error -80046:' in event.get('message',''):
                 self.update(loggedIn=False,authState='rejected',error='Apple verweigert die lokale Anmeldung (−80046).',status='Anmeldung erforderlich')
             if event.get('command')=='local_auth_probe' and self.initializing:self.initializing=False;self.refresh()
-        elif kind=='installed':self.installing=False;self.update(busy=False,success=True,progress=100,status='Installiert',challenge='',directsideInstalling=False,settingUp=False,setupPhase='');self.inspectDevice()
-        elif kind=='directside_repaired':self.update(busy=False,success=True,progress=100,settingUp=False,setupPhase='',status='Einrichtung repariert. DirectSide auf dem iPhone erneut öffnen.');self.inspectDevice()
+        elif kind=='installed':
+            self.installing=False
+            if event.get('developer_mode_required'):
+                self.pendingSetup={'device':event['device_id'],'path':event['path'],'mode':self.data['signingMode'],'email':self.data['email']}
+                self.setupRecord.parent.mkdir(parents=True,exist_ok=True)
+                self.setupRecord.write_text(json.dumps(self.pendingSetup),encoding='utf-8')
+                self.update(busy=False,success=False,progress=100,status='Entwicklermodus aktivieren',challenge='',directsideInstalling=False,settingUp=False,setupPhase='',setupPending=True,setupReady=False)
+            else:self.update(busy=False,success=True,progress=100,status='Installiert',challenge='',directsideInstalling=False,settingUp=False,setupPhase='',setupReady=self.setupWasFirstInstall and bool(event.get('bootstrap_ready')))
+            self.inspectDevice()
+        elif kind=='directside_repaired':
+            self.pendingSetup=None;self.setupRecord.unlink(missing_ok=True)
+            self.update(busy=False,success=True,progress=100,settingUp=False,setupPhase='',setupPending=False,setupReady=True,status='DirectSide auf dem iPhone öffnen.')
+            self.inspectDevice()
+
+    def resumeSetup(self):
+        pending=self.pendingSetup
+        if not pending or self.data['busy'] or self.data['developerMode']!='enabled' or not self.data['devices']:return
+        if self.data['devices'][self.data['deviceIndex']]['id']!=pending['device']:return
+        if pending['mode']=='account' and (not self.data['loggedIn'] or self.data['email'].casefold()!=pending['email'].casefold()):return
+        if pending['mode']=='imported' and not self.data['importedIdentity'].get('name'):return
+        if not Path(pending['path']).is_file():self.update(error='Original-IPA auswählen.');return
+        self.update(busy=True,settingUp=True,setupPhase='Einrichtung abschließen …',error='')
+        self.send({'command':'repair_directside','signing_mode':pending['mode'],'device_id':pending['device'],'path':pending['path']})
+
+    @Slot()
+    def acknowledgeSetup(self):self.update(setupReady=False)
 
     @Slot(result=bool)
     def loadAppIds(self):
@@ -514,6 +548,7 @@ class DesktopBridge(QObject):
         try:bundle=ipa_identity(path)
         except Exception:self.fail('Keine gültige IPA ausgewählt.');return
         self.installing=True
+        self.setupWasFirstInstall=bundle=='com.directside.app' and not self.data['directsidePresent']
         self.update(busy=True,progress=0,error='',success=False,status='Installation vorbereiten …')
         self.send({'command':'install','signing_mode':self.data['signingMode'],'device_id':self.data['devices'][self.data['deviceIndex']]['id'],'path':str(path),'bundle_id':bundle,'bootstrap':bundle=='com.directside.app'})
 
@@ -523,7 +558,7 @@ class DesktopBridge(QObject):
     @Slot(result=bool)
     def repairDirectSide(self):
         if self.data['busy'] or self.data['updateBusy'] or not self.data['devices']:return False
-        if not self.data['loggedIn']:self.fail('Zum Übertragen des Signierschlüssels bitte am PC anmelden.');return False
+        if not self.data['canSign']:self.fail('Bitte anmelden oder ein Zertifikat importieren.');return False
         paths=[Path(self.data['ipa']),HOME/'DirectSide.ipa',ROOT/'dist'/'DirectSide.ipa']
         for path in paths:
             try:
@@ -531,7 +566,7 @@ class DesktopBridge(QObject):
             except Exception:pass
         else:self.fail('Für die Einrichtung bitte die DirectSide-IPA auswählen.');return False
         self.update(busy=True,settingUp=True,setupPhase='Geräteinformationen für die Kopplung lesen …',error='',success=False)
-        self.send({'command':'repair_directside','device_id':self.data['devices'][self.data['deviceIndex']]['id'],'path':str(path)})
+        self.send({'command':'repair_directside','signing_mode':self.data['signingMode'],'device_id':self.data['devices'][self.data['deviceIndex']]['id'],'path':str(path)})
         return True
 
     @Slot()
