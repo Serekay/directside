@@ -63,7 +63,7 @@ struct CertificateManagementView:View {
             Section {
                 HStack {Text(L(engine.teamName));Spacer();Text(L("\(engine.signingCertificates.count) Zertifikate")).foregroundStyle(.secondary)}
                 Button(L("Zertifikate aktualisieren")){engine.loadCertificates()}.disabled(engine.busy || !engine.loggedIn)
-            } footer:{Text(L("Ein Zertifikat kann mehrere Apps signieren. Zum Löschen einer App unter Meine Apps nach links wischen oder die App gedrückt halten."))}
+            }
             Section(L("Signierzertifikate")) {
                 ForEach(engine.signingCertificates) {certificate in
                     HStack {

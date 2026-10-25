@@ -14,7 +14,6 @@ struct AppIDsView:View {
                     }
                 }
                 if let free=engine.appIDsAvailable {Text(L(free==1 ? "1 Kennung frei":"\(free) Kennungen frei")).font(.subheadline).foregroundStyle(.secondary)}
-                Text(L("Hier siehst du die bei Apple registrierten Kennungen. Auch App-Erweiterungen zählen. Updates derselben App verwenden ihre vorhandene Kennung wieder.")).font(.subheadline).foregroundStyle(.secondary)
             }
             if !engine.loggedIn {
                 Section {Label(L("Zum Nachsehen mit deinem Apple Account anmelden."),systemImage:"person.crop.circle")}
@@ -35,7 +34,6 @@ struct AppIDsView:View {
                     if engine.appIDs.isEmpty,!engine.loadingAppIDs,engine.appIDsError==nil {Text(L("Keine registrierten Kennungen.")).foregroundStyle(.secondary)}
                 }
             }
-            Section {Text(L("Diese Liste zeigt keine installierten Apps. Deren Plätze findest du unter Meine Apps. Gast-Apps in LiveContainer benötigen keine zusätzlichen Kennungen.")).font(.caption).foregroundStyle(.secondary)}
         }.navigationTitle(L("App-Kennungen")).toolbarRole(.editor).task{engine.loadAppIDs()}
         .onChange(of:engine.loggedIn){_,value in if value {engine.loadAppIDs()}}
     }

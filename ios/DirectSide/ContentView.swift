@@ -19,7 +19,7 @@ struct ContentView:View {
             if connection.vpnInstalled {Button(L("LocalDevVPN öffnen")){connection.openVPN()}}
             else {Button(L("LocalDevVPN installieren")){UIApplication.shared.open(URL(string:"https://apps.apple.com/app/id6755608044")!)}}
             Button(L("Abbrechen"),role:.cancel){}
-        } message:{Text(L("Zum Installieren muss LocalDevVPN verbunden sein. Öffne LocalDevVPN, aktiviere die Verbindung und versuche es anschließend erneut."))}
+        }
         .alert(L("DirectSide"),isPresented:Binding(get:{engine.error != nil},set:{if !$0 {engine.error=nil}})){Button(L("OK")){engine.error=nil}}message:{Text(L(engine.error ?? ""))}
     }
     private var tabContent:some View {

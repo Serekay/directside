@@ -17,9 +17,9 @@ struct SettingsView:View {
                     .listRowInsets(EdgeInsets(top:0,leading:0,bottom:0,trailing:0))
             }
             Section(L("Gerät & Signierung")) {
-                NavigationLink {DeveloperModeHelp()} label:{Label(L("Entwicklermodus · vor dem ersten Start"),systemImage:"hammer")}
+                NavigationLink {DeveloperModeHelp()} label:{Label(L("Entwicklermodus"),systemImage:"hammer")}
                 NavigationLink {ConnectionSettings(connection:connection)} label:{SettingsRow(title:"Verbindung",icon:"network",value:engine.pairingReady ? "Gekoppelt":"Einrichten",ok:engine.pairingReady)}
-                NavigationLink {ImportedSigningSettings()} label:{Label(L("Signierung · Account oder Zertifikat"),systemImage:"checkmark.seal")}
+                NavigationLink {ImportedSigningSettings()} label:{Label(L("Signierung"),systemImage:"checkmark.seal")}
                 NavigationLink {CertificateManagementView()} label:{Label(L("Zertifikate"),systemImage:"signature")}.disabled(!engine.loggedIn)
                 NavigationLink {AppIDsView()} label:{
                     HStack {Label(L("App-Kennungen"),systemImage:"app.badge.checkmark");Spacer();if let limit=engine.appIDsLimit,let free=engine.appIDsAvailable {Text("\(max(0,limit-free)) / \(limit)").font(.caption.weight(.semibold)).foregroundStyle(.secondary)}}
@@ -56,7 +56,7 @@ struct AppleAccountSettings:View {
                     SecureField(L("Passwort"),text:$password).textContentType(.password)
                     Button(L("Anmelden")){engine.login(email:email,password:password);password=""}.disabled(engine.busy || email.isEmpty || password.isEmpty)
                 }
-            } footer:{Text(L("Sitzung und Signierschlüssel werden sicher auf diesem Gerät gespeichert. Dein Passwort wird nicht gespeichert."))}
+            }
         }.navigationTitle(L("Apple Account")).onAppear{email=engine.accountEmail}.safeAreaInset(edge:.bottom){EngineProgress()}
     }
 }
@@ -68,11 +68,10 @@ struct ConnectionSettings:View {
         Form {
             Section {
                 NavigationLink {DeveloperModeHelp()} label:{Label(L("Entwicklermodus einrichten"),systemImage:"hammer")}
-            } footer:{Text(L("Entwickler-Apps benötigen ab iOS 16 den Entwicklermodus. Nach der ersten Installation einschalten, neu starten und bestätigen."))}
+            }
             Section(L("Gerätekopplung")) {
                 Label(L(engine.pairingReady ? "Dieses Gerät ist gekoppelt":"Dieses Gerät koppeln"),systemImage:engine.pairingReady ? "checkmark.circle.fill":"link").foregroundStyle(engine.pairingReady ? Color.green:Color.orange)
                 if !engine.pairingReady {
-                    Text(L("LocalDevVPN verbinden. Dann koppeln und den angezeigten Systemcode bestätigen.")).font(.subheadline).foregroundStyle(.secondary)
                     Button(L("Jetzt koppeln")){engine.pairDevice(peer:connection.peer,port:connection.port)}.disabled(engine.busy || !connection.vpnReachable)
                 }
             }
@@ -100,18 +99,12 @@ struct LiveContainerSettings:View {
         List {
             Section {
                 Label(L("LiveContainer"),systemImage:"square.stack.3d.up.fill").font(.title2.bold())
-                Text(L("Mehrere Apps innerhalb einer Container-App ausführen. Bei kostenlosen Accounts belegen Gast-Apps keine zusätzlichen der drei App-Plätze. Nicht jede App ist kompatibel.")).foregroundStyle(.secondary)
             }
             Section {
                 Label(L(installed ? "Installiert":"Nicht installiert"),systemImage:installed ? "checkmark.circle.fill":"arrow.down.app").foregroundStyle(installed ? Color.green:Color.orange)
                 if !installed {Button(L("LiveContainer installieren")){Task{await engine.installLiveContainer(peer:connection.peer,port:connection.port);installed=LiveContainerBridge.available}}.disabled(engine.busy)}
                 else {Button(L("Zertifikat übertragen")){engine.configureLiveContainer()}.disabled(engine.busy || !engine.canSign);Button(L("LiveContainer öffnen")){LiveContainerBridge.open()}}
-            } header:{Text(L("Einrichten"))} footer:{Text(L("Bei kostenlosen Accounts belegen DirectSide und LiveContainer zusammen zwei App-Plätze."))}
-            Section(L("So geht’s")) {
-                Label(L("1. LiveContainer installieren. Das Zertifikat wird automatisch übertragen."),systemImage:"arrow.down.circle")
-                Label(L("2. Zertifikat und JIT-less werden automatisch eingerichtet. Bei Problemen die Diagnose in LiveContainer öffnen."),systemImage:"checkmark.shield")
-                Label(L("3. Bei einer App Laden → In LiveContainer wählen. Dort installieren und starten."),systemImage:"play.circle")
-            }
+            } header:{Text(L("Einrichten"))}
         }.navigationTitle(L("LiveContainer")).onChange(of:phase){_,value in if value == .active {installed=LiveContainerBridge.available}}.safeAreaInset(edge:.bottom){EngineProgress()}
     }
 }
