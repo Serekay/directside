@@ -51,7 +51,14 @@ struct CatalogRow: View {
     var body: some View {
         HStack(spacing:13) {
             NavigationLink { AppDetailView(app:app,source:source,connection:connection) } label: {
-                HStack(spacing:13) { Artwork(url:app.iconURL); VStack(alignment:.leading,spacing:4) { Text(L(app.name)).font(.subheadline.weight(.semibold)).foregroundStyle(.primary); Text(L(app.subtitle ?? app.developerName ?? source.name)).font(.caption).foregroundStyle(.secondary).lineLimit(2) } }
+                HStack(spacing:13) {
+                    Artwork(url:app.iconURL)
+                    VStack(alignment:.leading,spacing:4) {
+                        Text(L(app.name)).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
+                        Text(L(app.subtitle ?? app.developerName ?? source.name)).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                        if engine.hasUpdate(app),let latest=app.latest {Text(L("Version \(latest.displayVersion) verfügbar")).font(.caption.weight(.medium)).foregroundStyle(Style.accent)}
+                    }
+                }
             }.buttonStyle(.plain)
             Spacer(minLength:4)
             CatalogInstallAction(app:app,source:source,connection:connection)
@@ -68,10 +75,10 @@ struct CatalogInstallAction:View {
     @State private var showContainerSetup=false
     var body:some View {
         Menu {
-            Button {if let installed=engine.installed(app),!engine.hasUpdate(app) {engine.refresh(installed,peer:connection.peer,port:connection.port)}else{Task{await engine.install(app,source:source,peer:connection.peer,port:connection.port)}}} label:{Label(L("Auf diesem Gerät"),systemImage:"iphone")}
+            Button {if let installed=engine.installed(app),!installed.cachedIPA.isEmpty,!engine.hasUpdate(app) {engine.refresh(installed,peer:connection.peer,port:connection.port)}else{Task{await engine.install(app,source:source,peer:connection.peer,port:connection.port)}}} label:{Label(L("Auf diesem Gerät"),systemImage:"iphone")}
             Button {if LiveContainerBridge.available {LiveContainerBridge.importApp(app,engine:engine)}else{showContainerSetup=true}} label:{Label(L("In LiveContainer"),systemImage:"square.stack.3d.up")}
         }label:{
-            if let installed=engine.installed(app),!engine.hasUpdate(app) {SignatureLabel(expiresAt:installed.expiresAt)}
+            if let installed=engine.installed(app),!installed.cachedIPA.isEmpty,!engine.hasUpdate(app) {SignatureLabel(expiresAt:installed.expiresAt)}
             else {Text(L(engine.hasUpdate(app) ? "Aktualisieren":"Laden")).font(.caption.bold()).padding(.horizontal,15).padding(.vertical,9).background(Style.accent.opacity(0.12),in:Capsule())}
         }
         .foregroundStyle(Style.accent).disabled(engine.busy || app.latest==nil)
@@ -114,9 +121,9 @@ struct DiscoverView: View {
                         if let url=story.url,["http","https"].contains(url.scheme ?? "") {Link(L("Mehr erfahren"),destination:url).font(.subheadline.weight(.medium))}
                     }.padding(17).background(Style.surface,in:RoundedRectangle(cornerRadius:21))
                 }
-            }.padding(21)
+            }.padding(21).background(SourceRefreshControl(refreshing:engine.refreshingSources){await engine.refreshSources()})
         }.background(Style.background).navigationTitle(L("Entdecken")).toolbar(.hidden,for:.navigationBar)
-         .refreshable {await engine.refreshSources()}.safeAreaInset(edge:.bottom) {EngineProgress()}
+         .safeAreaInset(edge:.bottom) {EngineProgress()}
     }
     private func featured(_ entry:CatalogEntry)->some View {
         NavigationLink {AppDetailView(app:entry.app,source:entry.source,connection:connection)} label: {
@@ -141,6 +148,8 @@ struct AppDetailView: View {
     @State private var showHistory=false
     @State private var selectedImage:AppScreenshot?
     var body: some View {
+        let source=engine.sources.first(where:{$0.id==self.source.id}) ?? self.source
+        let app=source.apps.first(where:{$0.id==self.app.id}) ?? self.app
         ScrollView {
             VStack(alignment:.leading,spacing:22) {
                 HStack(alignment:.top,spacing:17) {
@@ -160,7 +169,7 @@ struct AppDetailView: View {
                 if let permissions=app.appPermissions {
                     PermissionsView(permissions:permissions)
                 }
-            }.padding(21)
+            }.padding(21).background(SourceRefreshControl(refreshing:engine.refreshingSources){await engine.refreshSources()})
         }.background(Style.background).navigationTitle(L(app.name)).navigationBarTitleDisplayMode(.inline).safeAreaInset(edge:.bottom){EngineProgress()}
          .sheet(isPresented:$showHistory) {NavigationStack {List(app.versions ?? [],id:\.displayVersion) {version in VStack(alignment:.leading,spacing:9) {Text(L(version.displayVersion)).font(.headline);Text(L(version.date ?? "")).font(.caption).foregroundStyle(.secondary);Text(L(version.localizedDescription ?? "Keine Versionshinweise.")).font(.subheadline)}}.navigationTitle(L("Versionsverlauf")).toolbar {Button(L("Fertig")){showHistory=false}}}}
          .sheet(item:$selectedImage) {shot in ZStack(alignment:.topTrailing) {Color.black.ignoresSafeArea();AsyncImage(url:shot.imageURL){$0.resizable().scaledToFit()} placeholder:{ProgressView()};Button(L("Schließen")){selectedImage=nil}.padding().buttonStyle(.borderedProminent)}}
@@ -179,7 +188,7 @@ struct SourcesView:View {
                 Text(L("Quellen")).font(.largeTitle.bold()).tracking(-1)
                 Spacer()
                 Button(action:addSource){Image(systemName:"plus").font(.title3.weight(.semibold)).padding(11).background(Style.surface,in:Circle())}.accessibilityLabel(L("Quelle hinzufügen"))
-            }.listRowBackground(Color.clear).listRowSeparator(.hidden).listRowInsets(EdgeInsets(top:14,leading:21,bottom:18,trailing:21))
+            }.background(SourceRefreshControl(refreshing:engine.refreshingSources){await engine.refreshSources()}).listRowBackground(Color.clear).listRowSeparator(.hidden).listRowInsets(EdgeInsets(top:14,leading:21,bottom:18,trailing:21))
             ForEach(engine.sources) {source in
                 NavigationLink {SourceDetailView(source:source,connection:connection)}label:{
                     HStack(spacing:13) {
@@ -189,8 +198,9 @@ struct SourcesView:View {
                             Text(source.sourceURL?.host ?? source.identifier ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                             HStack(spacing:10) {
                                 Text(L(source.apps.count==1 ? "1 App":"\(source.apps.count) Apps"))
-                                if engine.refreshingSources {ProgressView().controlSize(.mini);Text(L("Aktualisieren …"))}
-                                else {Label(L(engine.sourceFailures[source.id] != nil ? "Nicht erreichbar":source.refreshedAt == nil ? "Nicht geprüft":"Aktuell"),systemImage:engine.sourceFailures[source.id] != nil ? "exclamationmark.circle":"checkmark.circle")}
+                                if let _=engine.sourceFailures[source.id] {Label(L("Nicht erreichbar"),systemImage:"exclamationmark.circle")}
+                                else if engine.updateCount(in:source)>0 {Label(L(engine.updateCount(in:source)==1 ? "1 Update verfügbar":"\(engine.updateCount(in:source)) Updates verfügbar"),systemImage:"arrow.down.circle.fill").foregroundStyle(Style.accent)}
+                                else {Label(L(source.refreshedAt == nil ? "Nicht geprüft":"Quelle geladen"),systemImage:"checkmark.circle")}
                             }.font(.caption2).foregroundStyle(engine.sourceFailures[source.id] != nil ? Color.orange:Color.secondary)
                         }
                     }.padding(.vertical,10)
@@ -200,7 +210,6 @@ struct SourcesView:View {
                 }
             }
         }.listStyle(.plain).scrollContentBackground(.hidden).background(Style.background).navigationTitle(L("Quellen")).toolbar(.hidden,for:.navigationBar)
-        .refreshable {await engine.refreshSources()}
     }
 }
 
@@ -209,6 +218,7 @@ struct SourceDetailView:View {
     let source:SourceCatalog
     @ObservedObject var connection:Connection
     var body:some View {
+        let source=engine.sources.first(where:{$0.id==self.source.id}) ?? self.source
         ScrollView {
             VStack(alignment:.leading,spacing:18) {
                 HStack(spacing:14) {
@@ -223,7 +233,7 @@ struct SourceDetailView:View {
                 SectionTitle(title:"Apps aus dieser Quelle")
                 ForEach(source.apps){CatalogRow(app:$0,source:source,connection:connection)}
                 if let url=source.website,["http","https"].contains(url.scheme ?? "") {Link(L("Website der Quelle"),destination:url)}
-            }.padding(21)
+            }.padding(21).background(SourceRefreshControl(refreshing:engine.refreshingSources){await engine.refreshSources()})
         }.background(Style.background).navigationTitle(L("Quelle")).navigationBarTitleDisplayMode(.inline)
     }
 }

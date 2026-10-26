@@ -683,7 +683,7 @@ async fn inspect_local(request:&Value)->Result<(),Report> {
     let developer=sideload_apps(&apps);
     let overview:Vec<Value>=apps.iter().filter(|(id,_)|developer.iter().any(|app|app["id"].as_str()==Some(id.as_str()))).filter_map(|(id,value)|{
         let info=value.as_dictionary()?;
-        Some(json!({"id":id,"name":info.get("CFBundleDisplayName").or_else(||info.get("CFBundleName")).and_then(plist::Value::as_string).unwrap_or(id),"developer":developer.iter().any(|app|app["id"].as_str()==Some(id.as_str()))}))
+        Some(json!({"id":id,"name":info.get("CFBundleDisplayName").or_else(||info.get("CFBundleName")).and_then(plist::Value::as_string).unwrap_or(id),"developer":developer.iter().any(|app|app["id"].as_str()==Some(id.as_str())),"version":info.get("CFBundleShortVersionString").and_then(plist::Value::as_string),"buildVersion":info.get("CFBundleVersion").and_then(plist::Value::as_string)}))
     }).collect();
     emit(json!({"event":"local_apps","apps":overview}));Ok(())
 }

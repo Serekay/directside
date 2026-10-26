@@ -74,3 +74,33 @@ do {_=try AppRelease.decode(publicRelease,installed:"0.1.0");fatalError("Accepte
 let idRecord=try JSONDecoder().decode(RegisteredAppID.self,from:Data("{\"identifier\":\"example.app.TEST.Widget\",\"name\":\"Widget\",\"parent_name\":\"Example\",\"expires_at\":\"2026-10-30T12:00:00Z\"}".utf8))
 check(idRecord.parent_name=="Example" && idRecord.expiration != nil,"Explain extension ownership and expiry")
 print("Public release validation and registered App ID details: passed")
+
+
+let buildSourceJSON="""
+{"name":"Build updates","apps":[{"name":"Example","bundleIdentifier":"example.app","version":"1.0","buildVersion":"10","downloadURL":"https://example.com/app.ipa"}]}
+""".data(using:.utf8)!
+var buildSource=try JSONDecoder().decode(SourceCatalog.self,from:buildSourceJSON)
+buildSource.sourceURL=URL(string:"https://example.com/source.json")
+let candidate=buildSource.apps[0].latest!
+check(candidate.buildVersion=="10","Classic source preserves build number")
+var installed=ManagedApp(id:"example.app",name:"Example",cachedIPA:"fixture.ipa",installedAt:Date(),version:"1.0",buildVersion:"9")
+check(CatalogUpdates.isNewer(candidate,than:installed),"Same bundle/version with newer numeric build is an update")
+check(CatalogUpdates.entry(for:installed,in:[buildSource])?.source.id==buildSource.id,"Imported IPA without a source ID is matched by bundle ID")
+installed.buildVersion="10"
+check(!CatalogUpdates.isNewer(candidate,than:installed),"Installed update no longer produces an update badge")
+installed.buildVersion="11"
+check(!CatalogUpdates.isNewer(candidate,than:installed),"Older source builds are not offered as updates")
+installed.version="v1.0.0";installed.buildVersion="10"
+check(!CatalogUpdates.isNewer(candidate,than:installed),"Equivalent version spellings are not updates")
+var alternative=buildSource;alternative.sourceURL=URL(string:"https://other.example/source.json")
+check(CatalogUpdates.entry(for:installed,in:[buildSource,alternative])==nil,"Do not guess between competing sources")
+installed.sourceID=buildSource.id
+check(CatalogUpdates.entry(for:installed,in:[buildSource,alternative])?.source.id==buildSource.id,"Preserve explicit source association")
+var unordered=buildSource.apps[0]
+unordered.versions=[CatalogVersion(version:"1.0",downloadURL:URL(string:"https://example.com/old.ipa")!),CatalogVersion(version:"2.0",downloadURL:URL(string:"https://example.com/new.ipa")!)]
+check(unordered.latest?.version=="2.0","Do not assume sources put the newest release first")
+let sourceRequest=SourceURL.request(URL(string:"http://example.com/source.json")!)
+check(sourceRequest.cachePolicy == .reloadIgnoringLocalCacheData && sourceRequest.value(forHTTPHeaderField:"Cache-Control")=="no-cache","Pull refresh revalidates source metadata")
+let deviceVersion=try JSONDecoder().decode(DeviceApp.self,from:Data("{\"id\":\"example.app\",\"name\":\"Example\",\"developer\":true,\"version\":\"1.0\",\"buildVersion\":\"9\"}".utf8))
+check(deviceVersion.version=="1.0" && deviceVersion.buildVersion=="9","Read installed versions for apps installed outside DirectSide")
+print("Source update badges: build comparison, source matching, stale cache and installed version regression tests passed")

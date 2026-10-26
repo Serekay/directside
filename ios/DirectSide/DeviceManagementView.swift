@@ -8,11 +8,6 @@ struct ImportedIPA:Identifiable {
     let version:String?
 }
 
-struct DeviceApp:Decodable,Identifiable {
-    let id:String
-    let name:String
-    let developer:Bool
-}
 struct SigningCertificate:Decodable,Identifiable {
     var id:String {serial}
     let serial:String

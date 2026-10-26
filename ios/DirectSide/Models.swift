@@ -40,10 +40,14 @@ struct CatalogApp: Codable, Identifiable {
     var appPermissions: AppPermissions?
     var versions: [CatalogVersion]?
     var version: String?
+    var buildVersion: String?
+    var marketingVersion: String?
     var downloadURL: URL?
     var id: String { bundleIdentifier }
     var latest: CatalogVersion? {
-        versions?.first(where: { $0.beta != true && $0.isCompatible }) ?? downloadURL.map { CatalogVersion(version: version ?? "?", downloadURL: $0, beta: false) }
+        let compatible=versions?.filter { $0.beta != true && $0.isCompatible } ?? []
+        if let newest=compatible.max(by:{CatalogUpdates.compare($0, $1) == .orderedAscending}) {return newest}
+        return downloadURL.map { CatalogVersion(version: version ?? "?", downloadURL: $0, beta: false, buildVersion:buildVersion,marketingVersion:marketingVersion) }
     }
 }
 
@@ -58,7 +62,7 @@ struct CatalogVersion: Codable {
     var size: Int64?
     var minOSVersion: String?
     var maxOSVersion: String?
-    var displayVersion: String { marketingVersion ?? version + (buildVersion.map { " (\($0))" } ?? "") }
+    var displayVersion: String { (marketingVersion ?? version) + (buildVersion.map { " (\($0))" } ?? "") }
     var isCompatible: Bool {
         let os=ProcessInfo.processInfo.operatingSystemVersion
         let current="\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)"
@@ -79,6 +83,48 @@ struct ManagedApp: Codable, Identifiable {
     var iconURL: URL?
     var expiresAt: Date?
     var installedBundleID: String?
+}
+
+struct DeviceApp:Decodable,Identifiable {
+    let id:String
+    let name:String
+    let developer:Bool
+    var version:String?
+    var buildVersion:String?
+}
+
+enum CatalogUpdates {
+    private static func normalized(_ value:String?)->String? {
+        guard var value=value?.trimmingCharacters(in:.whitespacesAndNewlines),!value.isEmpty,value != "?" else {return nil}
+        if value.lowercased().hasPrefix("v") {value.removeFirst()}
+        var parts=value.split(separator:".").map(String.init)
+        if parts.allSatisfy({Int($0) != nil}) {
+            while parts.count>1 && Int(parts.last!)==0 {parts.removeLast()}
+            value=parts.joined(separator:".")
+        }
+        return value
+    }
+    static func compare(_ lhs:CatalogVersion,_ rhs:CatalogVersion)->ComparisonResult {
+        let version=(normalized(lhs.version) ?? "").compare(normalized(rhs.version) ?? "",options:[.numeric,.caseInsensitive])
+        if version != .orderedSame {return version}
+        return (normalized(lhs.buildVersion) ?? "").compare(normalized(rhs.buildVersion) ?? "",options:[.numeric,.caseInsensitive])
+    }
+    static func isNewer(_ candidate:CatalogVersion,than installed:ManagedApp)->Bool {
+        guard let next=normalized(candidate.version),let current=normalized(installed.version) else {return false}
+        let order=next.compare(current,options:[.numeric,.caseInsensitive])
+        if order != .orderedSame {return order == .orderedDescending}
+        guard let nextBuild=normalized(candidate.buildVersion) else {return false}
+        guard let currentBuild=normalized(installed.buildVersion) else {return true}
+        return nextBuild.compare(currentBuild,options:[.numeric,.caseInsensitive]) == .orderedDescending
+    }
+    static func entry(for installed:ManagedApp,in sources:[SourceCatalog])->(app:CatalogApp,source:SourceCatalog)? {
+        let candidates=sources.filter{installed.sourceID == nil || $0.id==installed.sourceID}.flatMap{source in
+            source.apps.filter{$0.id==installed.id}.map{(app:$0,source:source)}
+        }
+        // Imported IPAs can be linked when their bundle ID identifies one source.
+        // Never silently switch between competing sources for the same app.
+        return candidates.count==1 ? candidates.first:nil
+    }
 }
 
 struct SourceNews: Codable,Identifiable {
@@ -161,6 +207,11 @@ enum Paths {
 }
 
 enum SourceURL {
+    static func request(_ url:URL)->URLRequest {
+        var request=URLRequest(url:url,cachePolicy:.reloadIgnoringLocalCacheData,timeoutInterval:20)
+        request.setValue("no-cache",forHTTPHeaderField:"Cache-Control")
+        return request
+    }
     static func isCancellation(_ error:Error)->Bool {
         if error is CancellationError {return true}
         let ns=error as NSError
