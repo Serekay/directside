@@ -1,4 +1,30 @@
-# Teststand vom 25. Oktober 2026
+# Test status - 26 October 2026
+
+## 0.1.3 (18): pending update indicators and native refresh
+
+Owner requested the update presentation and refresh-indicator fixes and explicitly
+requested immediate release after validation. Source commit `cf18dff`.
+
+- Sources distinguish a successful catalog fetch (Source loaded) from pending app
+  updates. Source counts and app/version update actions use the same pending-update
+  data. Open details resolve the current catalog rather than a stale value snapshot.
+- Native UIRefreshControl attaches to the public scroll-view ancestor and enables
+  vertical bounce for short content. Shared source operations still survive view
+  cancellation and keep the control active until completion.
+- Classic source build numbers, source matching for imported IPAs, actual installed
+  version metadata and no-downgrade comparisons have regression coverage.
+- Local Windows build: 90 Python/UI tests, 12 Rust core tests and packaged Qt/QML,
+  icon, signing-engine and local-authentication startup checks passed.
+- Manual iPhone build [40409207230](https://github.com/Serekay/directside/actions/runs/40409207230)
+  passed: source/update regression tests, shared-refresh cancellation tests, real
+  local authentication-runtime probe, Rust and SwiftUI compilation and IPA checks.
+- Downloaded IPA verified as com.directside.app, 0.1.3 (18). Embedded translations,
+  runtime hash, secret scan and unsigned-publication checks passed. Both release
+  asset hashes are verified against the local files before publication.
+- Physical iPhone pull-gesture behavior has not yet been verified for this build.
+  No device installation, Apple login or self-renewal test is claimed. LiveContainer
+  UI and its installation dialog remain unchanged.
+
 
 ## Sicherheitsrelease 0.1.2 (17)
 
