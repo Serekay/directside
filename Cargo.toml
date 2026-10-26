@@ -27,7 +27,7 @@ required-features = ["iphone-screenshots"]
 ns-keyed-archive = { version = "0.1.5", optional = true }
 isideload = { path = "vendor/isideload" }
 idevice = { version = "0.1.61", default-features = false, features = ["usbmuxd", "ring", "tcp", "tunnel_tcp_stack", "house_arrest", "springboardservices", "amfi", "pair"] }
-base64 = "0.22"
+base64 = "0.23"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 serde_json = "1"
 rootcause = "0.12"
