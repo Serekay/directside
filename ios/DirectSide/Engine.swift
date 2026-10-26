@@ -187,17 +187,29 @@ import CryptoKit
     private func expiryText(_ date:Date)->String {date.timeIntervalSinceNow<=0 ? "Signatur abgelaufen":"Signatur noch \(max(1,Int(ceil(date.timeIntervalSinceNow/86400)))) Tage gültig"}
 
     var updates: [(app:CatalogApp,source:SourceCatalog)] {
-        managed.compactMap { installed in
-            guard let source=sources.first(where: { $0.id == installed.sourceID }),
-                  let app=source.apps.first(where: { $0.id == installed.id }),let latest=app.latest,
-                  latest.version != installed.version || latest.buildVersion != installed.buildVersion else { return nil }
-            return (app,source)
+        updateRecords.compactMap { installed in
+            guard let entry=CatalogUpdates.entry(for:installed,in:sources),let latest=entry.app.latest,
+                  CatalogUpdates.isNewer(latest,than:installed) else {return nil}
+            return entry
         }
     }
-    func installed(_ app:CatalogApp) -> ManagedApp? { managed.first { $0.id == app.id } }
+    private var updateRecords:[ManagedApp] {
+        managed + deviceApps.filter{device in !managed.contains{deviceApp(for:$0)?.id==device.id}}.compactMap {device in
+            guard device.developer,let version=device.version else {return nil}
+            let candidates=sources.flatMap(\.apps).filter{$0.id==device.id || (!certificateTeam.isEmpty && device.id==$0.id+"."+certificateTeam)}
+            let ids=Set(candidates.map(\.id))
+            guard ids.count==1,let id=ids.first else {return nil}
+            return ManagedApp(id:id,name:device.name,cachedIPA:"",installedAt:Date(),version:version,buildVersion:device.buildVersion,installedBundleID:device.id)
+        }
+    }
+    func installed(_ app:CatalogApp) -> ManagedApp? {updateRecords.first{$0.id==app.id}}
+    func updateCount(in source:SourceCatalog)->Int {updates.filter{$0.source.id==source.id}.count}
+    func update(for device:DeviceApp)->(app:CatalogApp,source:SourceCatalog)? {
+        updates.first{installed($0.app)?.installedBundleID==device.id}
+    }
     func hasUpdate(_ app:CatalogApp) -> Bool {
         guard let installed=installed(app),let latest=app.latest else { return false }
-        return installed.version != latest.version || installed.buildVersion != latest.buildVersion
+        return CatalogUpdates.isNewer(latest,than:installed)
     }
 
     init() {
@@ -336,8 +348,12 @@ import CryptoKit
             case "local_apps":
                 inspecting=false;lastInspection=Date()
                 if let bytes=try? JSONSerialization.data(withJSONObject:event["apps"] ?? []),let apps=try? JSONDecoder().decode([DeviceApp].self,from:bytes) {deviceApps=apps.filter{$0.developer}.sorted{($0.developer ? "0":"1")+$0.name.lowercased()<($1.developer ? "0":"1")+$1.name.lowercased()}}
-                for index in managed.indices where managed[index].installedBundleID==nil {
-                    if let device=deviceApp(for:managed[index]) {managed[index].installedBundleID=device.id}
+                for index in managed.indices {
+                    if let device=deviceApp(for:managed[index]) {
+                        managed[index].installedBundleID=device.id
+                        if let version=device.version {managed[index].version=version}
+                        if let build=device.buildVersion {managed[index].buildVersion=build}
+                    }
                 }
                 save(managed,"apps.json")
                 if let (peer,port)=inspectionConnection {
@@ -407,7 +423,7 @@ import CryptoKit
         let continuation=installContinuation; installContinuation=nil; continuation?.resume(throwing:DirectSideError.message(reason))
     }
     private func fetchSource(_ url:URL) async throws -> SourceCatalog {
-        var request=URLRequest(url:try SourceURL.parse(url.absoluteString)); request.timeoutInterval=20
+        let request=SourceURL.request(try SourceURL.parse(url.absoluteString))
         let (bytes,response)=try await URLSession.shared.bytes(for:request)
         guard let http=response as? HTTPURLResponse,http.statusCode==200,let final=http.url,(try? SourceURL.parse(final.absoluteString)) != nil else { throw DirectSideError.message("Quelle nicht erreichbar.") }
         var data=Data()
@@ -458,7 +474,7 @@ import CryptoKit
         defer { busy=false }
         do {
             let url=try SourceURL.parse(raw)
-            var request=URLRequest(url:url); request.timeoutInterval=20
+            let request=SourceURL.request(url)
             let (bytes,response)=try await URLSession.shared.bytes(for:request)
             guard let http=response as? HTTPURLResponse, http.statusCode==200,let final=http.url,(try? SourceURL.parse(final.absoluteString)) != nil else { throw DirectSideError.message("Die Quelle konnte nicht geladen werden.") }
             var data=Data()

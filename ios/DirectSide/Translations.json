@@ -609,5 +609,9 @@
   "3. Dort verbinden und anschließend zu DirectSide zurückkehren.": "3. Connect there, then return to DirectSide.",
   "LiveContainer einrichten": "Set up LiveContainer",
   "Einrichtung abschließen": "Complete setup",
-  "Später einrichten": "Set up later"
+  "Später einrichten": "Set up later",
+  "Version %@ verfügbar": "Version %@ available",
+  "%@ Updates verfügbar": "%@ updates available",
+  "1 Update verfügbar": "1 update available",
+  "Quelle geladen": "Source loaded"
 }

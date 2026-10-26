@@ -1,5 +1,13 @@
 # Änderungen
 
+## 0.1.3 (18) - 2026-10-26
+
+- Pending source-app updates show version labels, per-source update counts and update actions instead of a misleading source-wide "Up to date" status.
+- Source and app detail pages follow refreshed catalog data while open.
+- Native pull-to-refresh spinner for Discover, Sources, My Apps and detail pages, including short content.
+- Preserve classic-source build numbers, match imported IPAs to unambiguous sources and read installed app versions from the device. Prevent older source versions from being offered as updates.
+- LiveContainer's own interface and replacement dialog are unchanged.
+
 ## 0.1.2 (17) - 2026-10-25
 
 - Security release with patched TLS, certificate root stores, Tokio, constant-time utility and ZIP dependencies.

@@ -14,7 +14,7 @@ struct LibraryView:View {
                 Text(L("Meine Apps")).font(.largeTitle.bold()).tracking(-1)
                 Spacer()
                 Button {showImporter=true}label:{Image(systemName:"plus").font(.title3.weight(.semibold)).padding(12).background(Style.surface,in:Circle())}.accessibilityLabel(L("IPA importieren")).disabled(engine.busy)
-            }.listRowBackground(Color.clear).listRowSeparator(.hidden)
+            }.background(SourceRefreshControl(refreshing:engine.refreshingSources){await engine.refreshSources();engine.inspectConnection(peer:connection.peer,port:connection.port,force:true)}).listRowBackground(Color.clear).listRowSeparator(.hidden)
             Section {
                 Button {Task{await engine.renewAll(peer:connection.peer,port:connection.port)}}label:{Label(L("Alle Signaturen erneuern"),systemImage:"arrow.clockwise").frame(maxWidth:.infinity)}.buttonStyle(.borderedProminent).disabled(engine.busy || !engine.canSign || !engine.pairingReady)
             }
@@ -28,7 +28,8 @@ struct LibraryView:View {
                     let deviceApp=engine.deviceApp(for:app)
                     HStack(spacing:12) {
                         if let icon=engine.deviceIcons[deviceApp?.id ?? ""] {DeviceArtwork(data:icon,name:app.name)} else {Artwork(url:app.iconURL,size:50)}
-                        VStack(alignment:.leading,spacing:4) {Text(app.name).font(.subheadline.bold());Text(L("Sideload-App")).font(.caption).foregroundStyle(.secondary)}
+                        VStack(alignment:.leading,spacing:4) {Text(app.name).font(.subheadline.bold());if let update=engine.updates.first(where:{$0.app.id==app.id}),let latest=update.app.latest {Text(L("Version \(latest.displayVersion) verfügbar")).font(.caption.weight(.medium)).foregroundStyle(Style.accent)}
+                            else {Text(app.version ?? L("Sideload-App")).font(.caption).foregroundStyle(.secondary)}}
                         Spacer()
                         if let update=engine.updates.first(where:{$0.app.id==app.id}) {Button(L("Aktualisieren")){Task{await engine.install(update.app,source:update.source,peer:connection.peer,port:connection.port)}}.font(.caption.bold()).buttonStyle(.borderedProminent).disabled(engine.busy)}
                         SignatureBadge(expiresAt:app.expiresAt){engine.refresh(app,peer:connection.peer,port:connection.port)}.disabled(engine.busy || !engine.canSign || !engine.pairingReady)
@@ -37,14 +38,22 @@ struct LibraryView:View {
                     .contextMenu{deleteButton(deviceApp)}
                 }
                 ForEach(otherApps) {app in
-                    HStack(spacing:12) {DeviceArtwork(data:engine.deviceIcons[app.id],name:app.name);VStack(alignment:.leading,spacing:4){Text(app.name).font(.subheadline.bold());Text(L("Entwickler-App · auf diesem Gerät")).font(.caption).foregroundStyle(.secondary)}}.padding(.vertical,8)
+                    HStack(spacing:12) {
+                        DeviceArtwork(data:engine.deviceIcons[app.id],name:app.name)
+                        VStack(alignment:.leading,spacing:4) {
+                            Text(app.name).font(.subheadline.bold())
+                            if let update=engine.update(for:app),let latest=update.app.latest {Text(L("Version \(latest.displayVersion) verfügbar")).font(.caption.weight(.medium)).foregroundStyle(Style.accent)}
+                            else {Text(app.version ?? L("Entwickler-App · auf diesem Gerät")).font(.caption).foregroundStyle(.secondary)}
+                        }
+                        Spacer()
+                        if let update=engine.update(for:app) {Button(L("Aktualisieren")){Task{await engine.install(update.app,source:update.source,peer:connection.peer,port:connection.port)}}.font(.caption.bold()).buttonStyle(.borderedProminent).disabled(engine.busy)}
+                    }.padding(.vertical,8)
                     .swipeActions(edge:.trailing,allowsFullSwipe:false){deleteButton(app)}.contextMenu{deleteButton(app)}
                 }
             } header:{HStack{Text(L("Installiert"));Spacer();if let slots=engine.slotsUsed {Text(L("\(slots) Entwickler-Apps"))}}}
         }.listStyle(.insetGrouped).scrollContentBackground(.hidden).background(Style.background).toolbar(.hidden,for:.navigationBar)
         .scrollDismissesKeyboard(.interactively)
         .task{engine.inspectConnection(peer:connection.peer,port:connection.port)}
-        .refreshable{await engine.refreshSources();engine.inspectConnection(peer:connection.peer,port:connection.port,force:true)}
         .safeAreaInset(edge:.bottom){EngineProgress()}
         .confirmationDialog(L("App und Daten löschen?"),isPresented:Binding(get:{selected != nil},set:{if !$0 {selected=nil}}),titleVisibility:.visible) {
             if let app=selected {Button(L("\(app.name) entfernen"),role:.destructive){engine.removeDeviceApp(app,peer:connection.peer,port:connection.port);selected=nil}}
