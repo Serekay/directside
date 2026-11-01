@@ -117,6 +117,16 @@ DirectSide and LiveContainer each use one app slot. Updating the same app with t
 ## Troubleshooting
 
 <details>
+<summary><strong>LiveContainer expired or its original IPA is missing</strong></summary>
+
+Update DirectSide first. On Windows, connect the iPhone, sign in with the original Apple account, open its app list and select the renewal arrow on LiveContainer. On iPhone, use **Settings > LiveContainer > Renew LiveContainer** with LocalDevVPN connected.
+
+DirectSide restores a missing LiveContainer IPA and signs it over the existing installation. LiveContainer itself does not need to open. Use the same signing team, or a compatible imported certificate/profile. **Do not delete LiveContainer**, because its guest apps and data are stored inside it.
+
+</details>
+
+
+<details>
 <summary><strong>Windows does not detect my iPhone</strong></summary>
 
 1. Unlock the iPhone and connect it directly to the PC with a data-capable USB cable.
