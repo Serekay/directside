@@ -403,9 +403,10 @@ fn profile_expiry(path:&std::path::Path)->Option<String> {
     profile.plist().get("ExpirationDate")?.as_date().map(|d|d.to_xml_format())
 }
 
-fn check_signed_slots(installed:&std::collections::HashMap<String,plist::Value>,signed:&std::path::Path)->Result<String,Report> {
+fn check_signed_slots(installed:&std::collections::HashMap<String,plist::Value>,signed:&std::path::Path,request:&Value)->Result<String,Report> {
     let info:plist::Dictionary=plist::from_file(signed.join("Info.plist"))?;
     let target=info.get("CFBundleIdentifier").and_then(plist::Value::as_string).ok_or_else(||report!("Signierte App-Kennung fehlt."))?.to_string();
+    validate_installed_target(request,&target)?;
     let profile=apple_codesign_quick::ProvisioningProfile::parse(&std::fs::read(signed.join("embedded.mobileprovision"))?)?;
     if profile.plist().get("LocalProvision").and_then(plist::Value::as_boolean)==Some(true) {check_slots(installed,Some(&target))?;}
     else {emit(json!({"event":"slots","used":developer_apps(installed).len(),"limit":null,"apps":developer_apps(installed)}));}
@@ -420,9 +421,25 @@ fn validate_self_update(request:&Value,path:&std::path::Path)->Result<(),Report>
 }
 fn validate_installed_target(request:&Value,target:&str)->Result<(),Report> {
     if let Some(expected)=request["expected_installed_bundle_id"].as_str() {
-        if expected!=target {bail!("Zum Erneuern oder Aktualisieren von DirectSide dasselbe Signierteam und ein passendes Profil verwenden.");}
+        if expected!=target {bail!("Zum Erneuern dieselbe Apple-ID und dasselbe Signierteam wie bei der vorhandenen App verwenden. Bei Zertifikaten ein passendes Profil importieren. Die installierte App nicht löschen.");}
     }
     Ok(())
+}
+fn livecontainer_id(id:&str)->bool {
+    let base="com.kdt.livecontainer";
+    id==base || id.strip_prefix(&format!("{base}.")).is_some_and(|suffix|suffix.len()==10 && suffix.bytes().all(|b|b.is_ascii_uppercase() || b.is_ascii_digit()))
+}
+fn protect_livecontainer_reinstall(request:&Value,installed:&std::collections::HashMap<String,plist::Value>,original:&str)->Result<Value,Report> {
+    let mut result=request.clone();
+    if !livecontainer_id(original) {return Ok(result)}
+    if let Some(expected)=request["expected_installed_bundle_id"].as_str() {
+        if !livecontainer_id(expected) || !installed.contains_key(expected) {bail!("Die ausgewählte LiveContainer-Installation wurde auf diesem Gerät nicht gefunden. App-Liste aktualisieren.");}
+        return Ok(result)
+    }
+    let matches:Vec<_>=installed.keys().filter(|id|livecontainer_id(id)).collect();
+    if matches.len()>1 {bail!("Mehrere LiveContainer-Installationen gefunden. Die gewünschte App in der App-Übersicht zum Erneuern auswählen.");}
+    if let Some(id)=matches.first() {result["expected_installed_bundle_id"]=json!(id)}
+    Ok(result)
 }
 async fn install(engine:Option<&mut Engine>,request:&Value)->Result<(),Report> {
     use isideload::dev::devices::DevicesApi;
@@ -439,6 +456,8 @@ async fn install(engine:Option<&mut Engine>,request:&Value)->Result<(),Report> {
     let provider=dev.to_provider(UsbmuxdAddr::from_env_var()?,"DirectSide");
     let mut proxy=idevice::installation_proxy::InstallationProxyClient::connect(&provider).await?;
     let installed=proxy.get_apps(Some("User"),None).await?;
+    let protected_request=protect_livecontainer_reinstall(request,&installed,info.get("CFBundleIdentifier").and_then(plist::Value::as_string).unwrap_or(""))?;
+    let request=&protected_request;
     let imported=request["signing_mode"].as_str()==Some("imported");
     let mut engine=engine;
     let signed=if imported {crate::imported_identity::sign(path.clone(),id).await?} else {
@@ -449,8 +468,7 @@ async fn install(engine:Option<&mut Engine>,request:&Value)->Result<(),Report> {
         engine.get_dev_session().ensure_device_registered(&team,&name,id,None).await?;
         engine.sign_app(path.clone(),Some(team),false,Some(|p:f32|async move {emit(json!({"event":"progress","value":p*55.0}));}),None,Some(id)).await?.0
     };
-    let installed_bundle_id=check_signed_slots(&installed,&signed)?;
-    validate_installed_target(request,&installed_bundle_id)?;
+    let installed_bundle_id=check_signed_slots(&installed,&signed,request)?;
     let expires_at=profile_expiry(&signed.join("embedded.mobileprovision"));
     isideload::sideload::install::install_app(&provider,&signed,|p|emit(json!({"event":"progress","value":55.0+(p as f64)*0.45}))).await?;
     if directside {
@@ -727,14 +745,16 @@ async fn install_local(engine:Option<&mut Engine>, request:&Value) -> Result<(),
     let(mut handle,mut rsd)=connect_local(request).await?;
     let mut proxy=idevice::installation_proxy::InstallationProxyClient::connect_rsd(&mut handle,&mut rsd).await?;
     let installed=proxy.get_apps(Some("User"),None).await?;
+    let info=isideload::sideload::application::inspect_ipa(&path)?;
+    let protected_request=protect_livecontainer_reinstall(request,&installed,info.get("CFBundleIdentifier").and_then(plist::Value::as_string).unwrap_or(""))?;
+    let request=&protected_request;
     let signed=if request["signing_mode"].as_str()==Some("imported") {crate::imported_identity::sign(path,udid).await?} else {
         let engine=engine.ok_or_else(||report!("Bitte zuerst anmelden."))?;
         let team=engine.get_team().await?;
         engine.get_dev_session().ensure_device_registered(&team,name,udid,None).await?;
         engine.sign_app(path,Some(team),false,Some(|p:f32|async move {emit(json!({"event":"progress","value":p*55.0}));}),None,Some(udid)).await?.0
     };
-    let installed_bundle_id=check_signed_slots(&installed,&signed)?;
-    validate_installed_target(request,&installed_bundle_id)?;
+    let installed_bundle_id=check_signed_slots(&installed,&signed,request)?;
     emit(json!({"event":"status","message":"Signierte App wird installiert …"}));
     let expires_at=profile_expiry(&signed.join("embedded.mobileprovision"));
     let result=isideload::sideload::install::install_app_rsd(&mut handle,&mut rsd,&signed,|p|emit(json!({"event":"progress","value":55.0+(p as f64)*0.45}))).await;
@@ -937,5 +957,24 @@ mod tests {
         assert!(validate_installed_target(&request,"com.directside.app.OTHER").is_err());
         assert!(validate_installed_target(&request,"com.directside.app").is_err());
         assert!(validate_installed_target(&json!({}),"com.directside.app.OTHER").is_ok());
+    }
+    #[test]
+    fn expired_livecontainer_recovery_pins_the_existing_identity_on_usb_and_local_paths() {
+        let old="com.kdt.livecontainer.OLDTEAM001";
+        let mut apps=std::collections::HashMap::new();
+        apps.insert(old.to_string(),plist::Value::Dictionary(plist::Dictionary::new()));
+        let protected=protect_livecontainer_reinstall(&json!({}),&apps,"com.kdt.livecontainer").unwrap();
+        assert_eq!(protected["expected_installed_bundle_id"],old);
+        assert!(validate_installed_target(&protected,old).is_ok());
+        assert!(validate_installed_target(&protected,"com.kdt.livecontainer.NEWTEAM001").is_err());
+        apps.insert("com.kdt.livecontainer.NEWTEAM001".into(),plist::Value::Boolean(true));
+        assert!(protect_livecontainer_reinstall(&json!({}),&apps,"com.kdt.livecontainer").is_err());
+        let selected=json!({"expected_installed_bundle_id":old});
+        assert_eq!(protect_livecontainer_reinstall(&selected,&apps,"com.kdt.livecontainer").unwrap(),selected);
+        assert!(protect_livecontainer_reinstall(&json!({"expected_installed_bundle_id":"unrelated.app"}),&apps,"com.kdt.livecontainer").is_err());
+        apps.clear();
+        assert!(protect_livecontainer_reinstall(&selected,&apps,"com.kdt.livecontainer").is_err());
+        assert!(protect_livecontainer_reinstall(&json!({}),&apps,"com.kdt.livecontainer").unwrap()["expected_installed_bundle_id"].is_null());
+        assert!(!livecontainer_id("com.kdt.livecontainer.lookalike"));
     }
 }

@@ -94,16 +94,22 @@ struct LiveContainerSettings:View {
     @ObservedObject var connection:Connection
     @Environment(\.scenePhase) private var phase
     @State private var installed=LiveContainerBridge.available
+    private var knownApp:ManagedApp? {engine.managed.first{RenewalPackage.isLiveContainer($0.id)}}
+    private var present:Bool {installed || knownApp != nil || engine.deviceApps.contains{RenewalPackage.isLiveContainer($0.id)}}
     var body:some View {
         List {
             Section {
                 Label(L("LiveContainer"),systemImage:"square.stack.3d.up.fill").font(.title2.bold())
             }
             Section {
-                Label(L(installed ? "Installiert":"Nicht installiert"),systemImage:installed ? "checkmark.circle.fill":"arrow.down.app").foregroundStyle(installed ? Color.green:Color.orange)
-                if !installed {Button(L("LiveContainer installieren")){Task{await engine.installLiveContainer(peer:connection.peer,port:connection.port);installed=LiveContainerBridge.available}}.disabled(engine.busy)}
-                else {Button(L("Zertifikat übertragen")){engine.configureLiveContainer()}.disabled(engine.busy || !engine.canSign);Button(L("LiveContainer öffnen")){LiveContainerBridge.open()}}
+                if let app=knownApp {SignatureLabel(expiresAt:app.expiresAt)}
+                else {Label(L(present ? "Installiert · Gültigkeit nicht geprüft":"Nicht installiert"),systemImage:present ? "questionmark.circle":"arrow.down.app").foregroundStyle(.secondary)}
+                Button(L(present ? "LiveContainer erneuern":"LiveContainer installieren")){Task{await engine.installLiveContainer(peer:connection.peer,port:connection.port);installed=LiveContainerBridge.available}}.disabled(engine.busy || !engine.canSign || !engine.pairingReady)
+                if present {Button(L("Zertifikat übertragen")){engine.configureLiveContainer()}.disabled(engine.busy || !engine.canSign);Button(L("LiveContainer öffnen")){LiveContainerBridge.open()}}
             } header:{Text(L("Einrichten"))}
+            if !engine.canSign {Section {NavigationLink {if engine.signingMode=="imported" {ImportedSigningSettings()}else{AppleAccountSettings()}} label:{Label(L("Signierung einrichten"),systemImage:"person.crop.circle.badge.checkmark")}}}
+            if !engine.pairingReady {Section {NavigationLink {ConnectionSettings(connection:connection)} label:{Label(L("Verbindung einrichten"),systemImage:"network")}}}
+            Section {Text(L("Erneuern funktioniert auch, wenn LiveContainer nicht mehr startet. Die vorhandene App wird neu signiert. LiveContainer nicht löschen."))}
         }.navigationTitle(L("LiveContainer")).onChange(of:phase){_,value in if value == .active {installed=LiveContainerBridge.available}}.safeAreaInset(edge:.bottom){EngineProgress()}
     }
 }

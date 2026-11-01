@@ -414,7 +414,10 @@ ApplicationWindow {
                                             Label {text:modelData.name;Layout.fillWidth:true;font.pixelSize:12;font.weight:Font.DemiBold}
                                             Label {text:modelData.developer?win.t("Entwickler-App"):win.t("Installiert");color:modelData.developer?win.accent:win.muted;font.pixelSize:10;Layout.fillWidth:true}
                                         }
-                                        IconButton {text:"⌫";hint:win.t("App entfernen");enabled:!s.foregroundBusy && !s.updateBusy && !s.directsideInstalling;onClicked:{backend.requestAppRemoval(modelData.id);if(backend.state.removal.kind)win.page="confirm"}}
+                                        ColumnLayout {spacing:2
+                                            IconButton {objectName:"renewLiveContainerButton";visible:!!modelData.liveContainer;text:"↻";hint:win.t("LiveContainer erneuern");enabled:s.canSign && !s.foregroundBusy && !s.updateBusy && !s.directsideInstalling;onClicked:backend.renewLiveContainer(modelData.id)}
+                                            IconButton {text:"⌫";hint:win.t("App entfernen");enabled:!s.foregroundBusy && !s.updateBusy && !s.directsideInstalling;onClicked:{backend.requestAppRemoval(modelData.id);if(backend.state.removal.kind)win.page="confirm"}}
+                                        }
                                     }
                                 }
                             }

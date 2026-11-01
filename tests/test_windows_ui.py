@@ -18,6 +18,61 @@ class WindowsUIStateTests(unittest.TestCase):
   self.bridge=DesktopBridge(start=False,preferences=Preferences(Path(self.folder.name)/'preferences.json'))
   self.sent=[];self.bridge.send=self.sent.append
  def tearDown(self):self.bridge.timer.stop();self.folder.cleanup()
+ def test_livecontainer_can_be_renewed_without_working_directside_or_a_local_ipa(self):
+  import plistlib,zipfile
+  from unittest.mock import patch
+  bundle='com.kdt.livecontainer.TESTTEAM01'
+  ipa=Path(self.folder.name)/'LiveContainer.ipa'
+  with zipfile.ZipFile(ipa,'w') as z:z.writestr('Payload/App.app/Info.plist',plistlib.dumps({'CFBundleIdentifier':'com.kdt.livecontainer'}))
+  self.bridge.update(busy=False,loggedIn=True,devices=[{'id':'phone','label':'iPhone'}],directsidePresent=False,installedApps=[{'id':bundle,'name':'LiveContainer','developer':True}])
+  class InlineThread:
+   def __init__(self,**kwargs):self.target=kwargs['target']
+   def start(self):self.target()
+  with patch('desktop.threading.Thread',side_effect=InlineThread),patch('desktop.download_livecontainer',side_effect=lambda emit:emit({'type':'livecontainer_downloaded','path':str(ipa)})):
+   self.bridge.renewLiveContainer(bundle)
+  self.assertEqual(len(self.sent),1)
+  request=self.sent[0]
+  self.assertEqual(request['command'],'install')
+  self.assertEqual(request['expected_installed_bundle_id'],bundle)
+  self.assertEqual(request['device_id'],'phone')
+  self.assertFalse(request['bootstrap'])
+  self.assertNotIn('remove_app',[r['command'] for r in self.sent])
+ def test_recovery_does_not_follow_a_different_connected_device(self):
+  from unittest.mock import patch
+  bundle='com.kdt.livecontainer.TESTTEAM01';work=[]
+  self.bridge.update(busy=False,loggedIn=True,devices=[{'id':'phone'}],installedApps=[{'id':bundle,'developer':True}])
+  class DeferredThread:
+   def __init__(self,**kwargs):work.append(kwargs['target'])
+   def start(self):pass
+  with patch('desktop.threading.Thread',side_effect=DeferredThread),patch('desktop.download_livecontainer',side_effect=lambda emit:emit({'type':'livecontainer_downloaded','path':'fixture.ipa'})):
+   self.bridge.renewLiveContainer(bundle)
+   self.bridge.update(devices=[{'id':'tablet'}])
+   work[0]()
+  self.assertEqual(self.sent,[])
+  self.assertTrue(self.bridge.data['error'])
+ def test_recovery_button_is_visible_for_an_installed_livecontainer(self):
+  bundle='com.kdt.livecontainer.TESTTEAM01'
+  self.bridge.update(busy=False,loggedIn=True,devices=[{'id':'phone','label':'iPhone'}],installedApps=[{'id':bundle,'name':'LiveContainer','developer':True,'liveContainer':True,'iconChecked':True}])
+  engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
+  engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')))
+  root=engine.rootObjects()[0];root.setProperty('page','apps')
+  for _ in range(8):APP.processEvents()
+  root.grabWindow();APP.processEvents()
+  def find(item):
+   if item.objectName()=='renewLiveContainerButton':return item
+   for child in item.childItems():
+    match=find(child)
+    if match is not None:return match
+  button=find(root.contentItem())
+  self.assertIsNotNone(button)
+  self.assertTrue(button.property('visible'));self.assertTrue(button.property('enabled'))
+  root.close()
+ def test_recovery_rejects_a_bundle_that_is_not_in_the_selected_device_list(self):
+  from unittest.mock import patch
+  self.bridge.update(busy=False,loggedIn=True,devices=[{'id':'phone'}],installedApps=[])
+  with patch('desktop.threading.Thread') as worker:
+   self.bridge.renewLiveContainer('com.kdt.livecontainer.TESTTEAM01')
+   worker.assert_not_called()
  def test_code_validation_and_cancel_stay_inline(self):
   self.bridge.handle({'event':'two_factor'})
   self.bridge.submitCode('123');self.assertEqual(self.sent,[])

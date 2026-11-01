@@ -85,6 +85,33 @@ struct ManagedApp: Codable, Identifiable {
     var installedBundleID: String?
 }
 
+enum RenewalPackage {
+    static let liveContainerID="com.kdt.livecontainer"
+    static func isLiveContainer(_ id:String)->Bool {
+        if id==liveContainerID {return true}
+        guard id.hasPrefix(liveContainerID+".") else {return false}
+        let suffix=id.dropFirst(liveContainerID.count+1)
+        return suffix.utf8.count==10 && suffix.utf8.allSatisfy{(48...57).contains($0) || (65...90).contains($0)}
+    }
+    /// Data-container paths can change after restore/reinstallation. Resolve only
+    /// the saved filename inside this app's current support directory, never an
+    /// arbitrary stale absolute path or a symlink outside the sandbox directory.
+    static func cachedURL(_ path:String,support:URL)->URL? {
+        guard !path.isEmpty else {return nil}
+        let old=URL(fileURLWithPath:path)
+        guard old.pathExtension.lowercased()=="ipa" else {return nil}
+        let file=support.appendingPathComponent(old.lastPathComponent)
+        guard file.resolvingSymlinksInPath().deletingLastPathComponent()==support.resolvingSymlinksInPath(),
+              let values=try? file.resourceValues(forKeys:[.isRegularFileKey]),values.isRegularFile==true else {return nil}
+        return file
+    }
+    static func resolve(_ app:ManagedApp,support:URL,downloadLiveContainer:() async throws->URL) async throws->URL {
+        if let file=cachedURL(app.cachedIPA,support:support) {return file}
+        if isLiveContainer(app.id) {return try await downloadLiveContainer()}
+        throw DirectSideError.message("Das Installationspaket für \(app.name) fehlt. Die IPA erneut importieren oder die App aus ihrer Quelle laden. Die installierte App nicht löschen.")
+    }
+}
+
 struct DeviceApp:Decodable,Identifiable {
     let id:String
     let name:String

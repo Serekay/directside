@@ -104,3 +104,22 @@ check(sourceRequest.cachePolicy == .reloadIgnoringLocalCacheData && sourceReques
 let deviceVersion=try JSONDecoder().decode(DeviceApp.self,from:Data("{\"id\":\"example.app\",\"name\":\"Example\",\"developer\":true,\"version\":\"1.0\",\"buildVersion\":\"9\"}".utf8))
 check(deviceVersion.version=="1.0" && deviceVersion.buildVersion=="9","Read installed versions for apps installed outside DirectSide")
 print("Source update badges: build comparison, source matching, stale cache and installed version regression tests passed")
+
+
+let renewalSupport=FileManager.default.temporaryDirectory.appendingPathComponent("directside-renewal-"+UUID().uuidString,isDirectory:true)
+try FileManager.default.createDirectory(at:renewalSupport,withIntermediateDirectories:true)
+defer {try? FileManager.default.removeItem(at:renewalSupport)}
+let currentPackage=renewalSupport.appendingPathComponent("saved-app.ipa")
+try Data("fixture".utf8).write(to:currentPackage)
+let stalePath="/previous-data-container/Application Support/DirectSide/saved-app.ipa"
+check(RenewalPackage.cachedURL(stalePath,support:renewalSupport)==currentPackage,"Resolve saved IPA filename after data-container relocation")
+check(RenewalPackage.cachedURL("/outside/private.key",support:renewalSupport)==nil,"Never use a private key as a renewal package")
+check(RenewalPackage.cachedURL("/outside/missing.ipa",support:renewalSupport)==nil,"Missing renewal cache is explicit")
+check(RenewalPackage.isLiveContainer("com.kdt.livecontainer") && RenewalPackage.isLiveContainer("com.kdt.livecontainer.TESTTEAM01"),"LiveContainer missing-cache recovery is available for signed and unsigned IDs")
+check(!RenewalPackage.isLiveContainer("com.kdt.livecontainer.other") && !RenewalPackage.isLiveContainer("unrelated.app"),"Do not recover an unrelated application as LiveContainer")
+let outside=FileManager.default.temporaryDirectory.appendingPathComponent("outside-"+UUID().uuidString+".ipa")
+try Data("outside fixture".utf8).write(to:outside)
+defer {try? FileManager.default.removeItem(at:outside)}
+try FileManager.default.createSymbolicLink(at:renewalSupport.appendingPathComponent("escape.ipa"),withDestinationURL:outside)
+check(RenewalPackage.cachedURL("escape.ipa",support:renewalSupport)==nil,"Renewal cache cannot escape its support directory through symlinks")
+print("Renewal package relocation, missing cache and application identity regressions: passed")

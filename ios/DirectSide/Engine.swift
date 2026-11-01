@@ -97,23 +97,42 @@ import CryptoKit
         busy=true;error=nil;message="Zertifikat vorbereiten …"
         send(["command":"export_livecontainer","path":Paths.support.appendingPathComponent("livecontainer-transfer.json").path,"signing_mode":signingMode])
     }
-    func installLiveContainer(peer:String,port:Int) async {
+    func installLiveContainer(peer:String,port:Int,targetBundleID:String?=nil) async {
         guard !busy else {return}
         guard canSign,pairingReady else {fail("In den Einstellungen anmelden oder ein Zertifikat importieren und dieses Gerät koppeln.");return}
         busy=true;error=nil
         guard await requireInstallConnection(peer:peer,port:port) else {return}
-        message="LiveContainer herunterladen …"
         do {
-            let (temp,response)=try await URLSession.shared.download(from:URL(string:"https://github.com/LiveContainer/LiveContainer/releases/download/3.8.0/LiveContainer.ipa")!)
-            defer{try? FileManager.default.removeItem(at:temp)}
-            guard (response as? HTTPURLResponse)?.statusCode==200,response.url?.scheme=="https" else {throw DirectSideError.message("LiveContainer-Download fehlgeschlagen.")}
-            let bytes=try Data(contentsOf:temp,options:.mappedIfSafe)
-            guard bytes.count==4_707_271,SHA256.hash(data:bytes).map({String(format:"%02x",$0)}).joined()=="b6fea95e30083382e29ffef88fa1aaa40b5069e1112e5307d490dab04648bba6" else {throw DirectSideError.message("LiveContainer-Prüfsumme stimmt nicht.")}
-            let saved=Paths.support.appendingPathComponent("LiveContainer-3.8.0.ipa")
-            try bytes.write(to:saved,options:[.atomic,.completeFileProtectionUntilFirstUserAuthentication])
-            try await waitForInstall(saved,app:ManagedApp(id:"com.kdt.livecontainer",name:"LiveContainer",cachedIPA:saved.path,installedAt:Date(),version:"3.8.0"),peer:peer,port:port)
+            let candidates=managed.filter{RenewalPackage.isLiveContainer($0.id)}
+            let existing=targetBundleID.flatMap{target in candidates.first{$0.installedBundleID==target || $0.id==target}} ?? (targetBundleID==nil && candidates.count==1 ? candidates.first:nil)
+            let package:URL
+            if let existing {package=try await renewalPackage(for:existing)} else {package=try await downloadLiveContainerPackage()}
+            var app=existing ?? ManagedApp(id:RenewalPackage.liveContainerID,name:"LiveContainer",cachedIPA:package.path,installedAt:Date(),version:"3.8.0")
+            app.cachedIPA=package.path
+            if let targetBundleID {app.installedBundleID=targetBundleID}
+            try await waitForInstall(package,app:app,peer:peer,port:port)
             configureLiveContainer(openWhenReady:false)
         }catch{fail(error.localizedDescription)}
+    }
+    private func downloadLiveContainerPackage() async throws->URL {
+        let saved=Paths.support.appendingPathComponent("LiveContainer-3.8.0.ipa")
+        func valid(_ bytes:Data)->Bool {bytes.count==4_707_271 && SHA256.hash(data:bytes).map({String(format:"%02x",$0)}).joined()=="b6fea95e30083382e29ffef88fa1aaa40b5069e1112e5307d490dab04648bba6"}
+        if let bytes=try? Data(contentsOf:saved,options:.mappedIfSafe),valid(bytes) {return saved}
+        message="LiveContainer herunterladen …"
+        let (temp,response)=try await URLSession.shared.download(from:URL(string:"https://github.com/LiveContainer/LiveContainer/releases/download/3.8.0/LiveContainer.ipa")!)
+        defer{try? FileManager.default.removeItem(at:temp)}
+        guard (response as? HTTPURLResponse)?.statusCode==200,response.url?.scheme=="https" else {throw DirectSideError.message("LiveContainer-Download fehlgeschlagen.")}
+        let bytes=try Data(contentsOf:temp,options:.mappedIfSafe)
+        guard valid(bytes) else {throw DirectSideError.message("LiveContainer-Prüfsumme stimmt nicht.")}
+        try bytes.write(to:saved,options:[.atomic,.completeFileProtectionUntilFirstUserAuthentication])
+        return saved
+    }
+    private func renewalPackage(for app:ManagedApp) async throws->URL {
+        let file=try await RenewalPackage.resolve(app,support:Paths.support){try await self.downloadLiveContainerPackage()}
+        if let index=managed.firstIndex(where:{$0.id==app.id}),managed[index].cachedIPA != file.path {
+            managed[index].cachedIPA=file.path;save(managed,"apps.json")
+        }
+        return file
     }
 
     func importIPA(_ url:URL) async {
@@ -464,7 +483,10 @@ import CryptoKit
         guard !busy else { return }
         busy=true
         do {
-            for app in managed where app.id != "com.directside.app" {try await waitForInstall(URL(fileURLWithPath:app.cachedIPA),app:app,peer:peer,port:port)}
+            for var app in managed where app.id != "com.directside.app" {
+                let file=try await renewalPackage(for:app);app.cachedIPA=file.path
+                try await waitForInstall(file,app:app,peer:peer,port:port)
+            }
             try await waitForInstall(Paths.original,app:ManagedApp(id:"com.directside.app",name:"DirectSide",cachedIPA:Paths.original.path,installedAt:Date(),version:Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String),peer:peer,port:port)
         }catch{fail(error.localizedDescription)}
     }
@@ -514,8 +536,12 @@ import CryptoKit
     }
     func refresh(_ app: ManagedApp, peer: String, port: Int) {
         guard !busy else { return }
+        if RenewalPackage.isLiveContainer(app.id) {Task{await installLiveContainer(peer:peer,port:port,targetBundleID:app.installedBundleID)};return}
         busy=true
-        Task {do { try await waitForInstall(URL(fileURLWithPath:app.cachedIPA),app:app,peer:peer,port:port) } catch { fail(error.localizedDescription) }}
+        Task {do {
+            let file=try await renewalPackage(for:app);var renewed=app;renewed.cachedIPA=file.path
+            try await waitForInstall(file,app:renewed,peer:peer,port:port)
+        } catch {fail(error.localizedDescription)}}
     }
     func refreshSelf(peer: String, port: Int) {
         guard !busy else { return }
@@ -543,17 +569,20 @@ import CryptoKit
         guard canSign else { throw DirectSideError.message("In den Einstellungen anmelden oder ein Zertifikat importieren.") }
         guard let bootstrap, pairingReady else { throw DirectSideError.message("Dieses Gerät unter Einstellungen → Verbindung koppeln.") }
         guard port>0 && port<=65535 else { throw DirectSideError.message("Remote-Pairing-Port fehlt. Unter Verbindung suchen.") }
-        guard FileManager.default.fileExists(atPath:url.path) else { throw DirectSideError.message("Die Original-IPA fehlt. Bitte erneut vom PC übertragen.") }
+        guard FileManager.default.fileExists(atPath:url.path) else {
+            throw DirectSideError.message(app.id=="com.directside.app" ? "Das DirectSide-Erneuerungspaket fehlt. DirectSide am PC erneut installieren oder die Einrichtung reparieren.":"Das Installationspaket für \(app.name) fehlt. Die IPA erneut importieren oder die App aus ihrer Quelle laden. Die installierte App nicht löschen.")
+        }
         busy=true; progress=0; pendingApp=app
         var request:[String:Any] = ["command":"install_local","path":url.path,"peer":peer,"port":port,"udid":bootstrap.udid,"device_name":bootstrap.name,"pairing_path":Paths.pairing.path,"bundle_id":app.id]
         request["signing_mode"]=signingMode
         if app.id=="com.directside.app",let id=Bundle.main.bundleIdentifier {request["expected_installed_bundle_id"]=id}
+        if RenewalPackage.isLiveContainer(app.id),let id=app.installedBundleID {request["expected_installed_bundle_id"]=id}
         if let selfUpdate {request["self_update_version"]=selfUpdate}
         send(request)
     }
     private func removeUnusedIPA(_ path:String) {
         let file=URL(fileURLWithPath:path).standardizedFileURL
-        guard file.deletingLastPathComponent()==Paths.support.standardizedFileURL,file.pathExtension=="ipa",file != Paths.original,!managed.contains(where:{$0.cachedIPA==path}) else {return}
+        guard file.deletingLastPathComponent()==Paths.support.standardizedFileURL,file.pathExtension=="ipa",file != Paths.original,file.lastPathComponent != "LiveContainer-3.8.0.ipa",!managed.contains(where:{$0.cachedIPA==path}) else {return}
         try? FileManager.default.removeItem(at:file)
     }
     private func load<T: Decodable>(_ name: String) -> T? { guard let data=try? Data(contentsOf:Paths.support.appendingPathComponent(name)) else { return nil }; return try? JSONDecoder().decode(T.self,from:data) }

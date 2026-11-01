@@ -37,7 +37,7 @@ from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuick import QQuickWindow  # PyInstaller includes the Qt Quick runtime.
 from PySide6.QtQuickControls2 import QQuickStyle
 from common import ROOT, HOME, Preferences, ipa_identity, ipa_info, valid_code, clean_error
-from components import usb_status, setup_apple, download_livecontainer
+from components import usb_status, setup_apple, download_livecontainer, is_livecontainer_id
 from apple_usb import present_apple_usb, recover_apple_usb
 from i18n import ENGLISH, translate
 from updates import ReleaseClient, VERSION, BUILD, version, digest, CACHE, UpdateError
@@ -260,7 +260,7 @@ class DesktopBridge(QObject):
             if self.data['devices'] and event.get('device_id')==self.data['devices'][self.data['deviceIndex']]['id']:
                 self.componentDevice=event['device_id'];self.componentTime=time.monotonic()
                 cached={app['id']:app for app in self.data['installedApps']}
-                apps=[dict(app,icon=cached.get(app['id'],{}).get('icon',''),iconChecked=cached.get(app['id'],{}).get('iconChecked',False)) for app in event.get('apps',[])]
+                apps=[dict(app,liveContainer=is_livecontainer_id(app['id']),icon=cached.get(app['id'],{}).get('icon',''),iconChecked=cached.get(app['id'],{}).get('iconChecked',False)) for app in event.get('apps',[])]
                 mode=event.get('developer_mode')
                 self.update(developerMode='enabled' if mode is True else 'disabled' if mode is False else 'unknown',vpnState='installed' if event.get('localdevvpn') else 'missing',lcState='installed' if event.get('livecontainer') else 'missing',directsidePresent=bool(event.get('directside')),slotsUsed=event.get('slots_used',-1),developerApps=event.get('developer_apps',[]),installedApps=apps,busy=False,scanning=False)
                 self.resumeSetup()
@@ -269,7 +269,7 @@ class DesktopBridge(QObject):
                 icons={icon['id']:icon.get('png','') for icon in event.get('icons',[])}
                 apps=[dict(app,icon=('data:image/png;base64,'+icons[app['id']]) if icons[app['id']] else '',iconChecked=True) if app['id'] in icons else app for app in self.data['installedApps']]
                 self.update(installedApps=apps,busy=False,scanning=False)
-        elif kind=='livecontainer_prepared':self.update(busy=self.installing,lcPrepared=True,status='DirectSide auf dem iPhone öffnen. Das Zertifikat wird automatisch an LiveContainer übergeben.')
+        elif kind=='livecontainer_prepared':self.update(busy=self.installing,lcPrepared=True,status='LiveContainer ist installiert. Bei Bedarf in DirectSide unter Einstellungen → LiveContainer das Zertifikat übertragen.')
         elif kind=='status':
             message=event.get('message','')
             self.update(status=message,**({'settingUp':True,'setupPhase':message} if event.get('phase')=='device_setup' else {}));self.append_log(message)
@@ -555,12 +555,23 @@ class DesktopBridge(QObject):
     @Slot()
     @after_scan
     def installLiveContainer(self):
+        self.startLiveContainerInstall('')
+
+    @Slot(str)
+    @after_scan
+    def renewLiveContainer(self,bundle):
+        if not is_livecontainer_id(bundle) or not any(app['id']==bundle and app.get('developer') for app in self.data['installedApps']):return
+        self.startLiveContainerInstall(bundle)
+
+    def startLiveContainerInstall(self,expected):
         if self.data['busy'] or not self.data['canSign'] or not self.data['devices']:return
         self.update(busy=True,setupBusy=True,error='',progress=0,status='LiveContainer vorbereiten …')
         self.lcDevice=self.data['devices'][self.data['deviceIndex']]['id']
+        device=self.lcDevice
+        def report(event):self.setupEvent.emit(dict(event,device_id=device,expected_installed_bundle_id=expected))
         def worker():
-            try:download_livecontainer(self.setupEvent.emit)
-            except Exception as error:self.setupEvent.emit({'type':'error','message':str(error)})
+            try:download_livecontainer(report)
+            except Exception as error:report({'type':'error','message':str(error)})
         threading.Thread(target=worker,daemon=True).start()
 
     @Slot()
@@ -790,13 +801,18 @@ class DesktopBridge(QObject):
         elif kind=='status':self.update(status=event.get('message',''))
         elif kind=='error':self.update(setupBusy=False,usbState=usb_status());self.fail(event.get('message','Einrichtung fehlgeschlagen.'))
         elif kind=='livecontainer_downloaded':
+            device=event.get('device_id',getattr(self,'lcDevice',None))
+            if not device or not any(item['id']==device for item in self.data['devices']):
+                self.update(setupBusy=False);self.fail('Das ausgewählte Gerät ist nicht mehr verbunden. Erneut verbinden und LiveContainer erneuern.');return
             try:
                 path=Path(event['path']);bundle=ipa_identity(path)
                 if bundle!='com.kdt.livecontainer':raise ValueError('Unerwartete LiveContainer-Bundle-ID.')
             except Exception as error:self.update(setupBusy=False);self.fail(str(error));return
             self.installing=True
             self.update(setupBusy=False,status='LiveContainer signieren und installieren …',progress=0)
-            self.send({'command':'install','signing_mode':self.data['signingMode'],'device_id':self.lcDevice,'path':str(path),'bundle_id':bundle,'bootstrap':False})
+            request={'command':'install','signing_mode':self.data['signingMode'],'device_id':device,'path':str(path),'bundle_id':bundle,'bootstrap':False}
+            if event.get('expected_installed_bundle_id'):request['expected_installed_bundle_id']=event['expected_installed_bundle_id']
+            self.send(request)
         elif kind=='done':
             self.update(busy=False,setupBusy=False,usbState=usb_status(),status=event.get('message',''),progress=0)
             self.checkComponents()

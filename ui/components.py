@@ -17,6 +17,12 @@ LIVECONTAINER_VERSION='3.8.0'
 LIVECONTAINER_URL='https://github.com/LiveContainer/LiveContainer/releases/download/3.8.0/LiveContainer.ipa'
 LIVECONTAINER_SHA256='b6fea95e30083382e29ffef88fa1aaa40b5069e1112e5307d490dab04648bba6'
 
+def is_livecontainer_id(bundle):
+    base='com.kdt.livecontainer'
+    if bundle==base:return True
+    suffix=bundle[len(base)+1:] if bundle.startswith(base+'.') else ''
+    return len(suffix)==10 and suffix.isascii() and suffix.isalnum() and suffix.upper()==suffix
+
 def download_livecontainer(event):
     folder=Path(os.environ.get('LOCALAPPDATA',Path.home()))/'DirectSide'/'downloads';folder.mkdir(parents=True,exist_ok=True)
     path=folder/f'LiveContainer-{LIVECONTAINER_VERSION}.ipa'

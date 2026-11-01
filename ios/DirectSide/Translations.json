@@ -613,5 +613,16 @@
   "Version %@ verfügbar": "Version %@ available",
   "%@ Updates verfügbar": "%@ updates available",
   "1 Update verfügbar": "1 update available",
-  "Quelle geladen": "Source loaded"
+  "Quelle geladen": "Source loaded",
+  "LiveContainer erneuern": "Renew LiveContainer",
+  "Installiert · Gültigkeit nicht geprüft": "Installed · signature not checked",
+  "Erneuern funktioniert auch, wenn LiveContainer nicht mehr startet. Die vorhandene App wird neu signiert. LiveContainer nicht löschen.": "Renewal works even when LiveContainer cannot open. The existing app is signed again. Do not delete LiveContainer.",
+  "Signierung einrichten": "Set up signing",
+  "Das DirectSide-Erneuerungspaket fehlt. DirectSide am PC erneut installieren oder die Einrichtung reparieren.": "The DirectSide renewal package is missing. Reinstall DirectSide from the PC or repair its setup.",
+  "Das Installationspaket für %@ fehlt. Die IPA erneut importieren oder die App aus ihrer Quelle laden. Die installierte App nicht löschen.": "The installation package for %@ is missing. Import its IPA again or download it from its source. Do not delete the installed app.",
+  "Zum Erneuern dieselbe Apple-ID und dasselbe Signierteam wie bei der vorhandenen App verwenden. Bei Zertifikaten ein passendes Profil importieren. Die installierte App nicht löschen.": "Use the same Apple ID and signing team as the existing app. For imported certificates, use a matching profile. Do not delete the installed app.",
+  "Die ausgewählte LiveContainer-Installation wurde auf diesem Gerät nicht gefunden. App-Liste aktualisieren.": "The selected LiveContainer installation was not found on this device. Refresh the app list.",
+  "Mehrere LiveContainer-Installationen gefunden. Die gewünschte App in der App-Übersicht zum Erneuern auswählen.": "Multiple LiveContainer installations found. Select the app you want to renew in the app list.",
+  "Das ausgewählte Gerät ist nicht mehr verbunden. Erneut verbinden und LiveContainer erneuern.": "The selected device is no longer connected. Reconnect it and renew LiveContainer.",
+  "LiveContainer ist installiert. Bei Bedarf in DirectSide unter Einstellungen → LiveContainer das Zertifikat übertragen.": "LiveContainer is installed. If needed, transfer its certificate in DirectSide under Settings > LiveContainer."
 }

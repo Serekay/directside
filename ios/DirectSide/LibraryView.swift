@@ -46,6 +46,7 @@ struct LibraryView:View {
                             else {Text(app.version ?? L("Entwickler-App · auf diesem Gerät")).font(.caption).foregroundStyle(.secondary)}
                         }
                         Spacer()
+                        if RenewalPackage.isLiveContainer(app.id) {Button(L("Erneuern")){Task{await engine.installLiveContainer(peer:connection.peer,port:connection.port,targetBundleID:app.id)}}.font(.caption.bold()).buttonStyle(.borderedProminent).disabled(engine.busy || !engine.canSign || !engine.pairingReady)}
                         if let update=engine.update(for:app) {Button(L("Aktualisieren")){Task{await engine.install(update.app,source:update.source,peer:connection.peer,port:connection.port)}}.font(.caption.bold()).buttonStyle(.borderedProminent).disabled(engine.busy)}
                     }.padding(.vertical,8)
                     .swipeActions(edge:.trailing,allowsFullSwipe:false){deleteButton(app)}.contextMenu{deleteButton(app)}
