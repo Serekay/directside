@@ -7,6 +7,8 @@ private enum AppSheet:String,Identifiable {case add,scan,preview,code,team,ipa,p
 struct ContentView:View {
     @EnvironmentObject var engine:Engine
     @EnvironmentObject var updater:AppUpdater
+    @EnvironmentObject var reminders:RenewalNotifications
+    @AppStorage("language") private var language="en"
     @StateObject private var connection=Connection()
     @State private var tab=0
     @State private var sheet:AppSheet?
@@ -17,11 +19,11 @@ struct ContentView:View {
     @AppStorage("onboardingStep") private var onboardingStep=0
     var body:some View {
         presentedContent
-        .alert(L("LocalDevVPN verbinden"),isPresented:$engine.vpnRequired) {
-            if connection.vpnInstalled {Button(L("LocalDevVPN öffnen")){connection.openVPN()}}
-            else {Button(L("LocalDevVPN installieren")){UIApplication.shared.open(URL(string:"https://apps.apple.com/app/id6755608044")!)}}
+        .alert(L(connection.connectionState == .noWiFi ? "WLAN nicht verfügbar":"Lokale Verbindung prüfen"),isPresented:$engine.vpnRequired) {
+            if connection.vpnInstalled && connection.connectionState != .noWiFi {Button(L("LocalDevVPN öffnen")){connection.openVPN()}}
+            else if !connection.vpnInstalled {Button(L("LocalDevVPN installieren")){UIApplication.shared.open(URL(string:"https://apps.apple.com/app/id6755608044")!)}}
             Button(L("Abbrechen"),role:.cancel){}
-        }
+        } message:{Text(L(connection.connectionState == .noWiFi ? "Mit einem WLAN verbinden und erneut versuchen.":"WLAN und die Verbindung in LocalDevVPN prüfen."))}
         .alert(L("DirectSide"),isPresented:Binding(get:{engine.error != nil},set:{if !$0 {engine.error=nil}})){Button(L("OK")){engine.error=nil}}message:{Text(L(engine.error ?? ""))}
     }
     private var tabContent:some View {
@@ -31,7 +33,7 @@ struct ContentView:View {
         TabView(selection:$tab) {
             NavigationStack{DiscoverView(connection:connection,addSource:{sheet = .add})}.tabItem{Label(L("Entdecken"),systemImage:"safari")}.tag(0)
             NavigationStack{LibraryView(connection:connection)}.tabItem{Label(L("Meine Apps"),systemImage:"square.stack")}.badge(engine.updates.count+(updater.available == nil ? 0:1)).tag(1)
-            NavigationStack{SourcesView(connection:connection,addSource:{sheet = .add})}.tabItem{Label(L("Quellen"),systemImage:"square.stack.3d.up")}.tag(2)
+            NavigationStack{SourcesView(connection:connection,addSource:{sheet = .add})}.tabItem{Label(L("Quellen"),systemImage:"square.stack.3d.up")}.badge(engine.sourceUpdateCount).tag(2)
             NavigationStack{SettingsView(connection:connection)}.tabItem{Label(L("Einstellungen"),systemImage:"gearshape")}.tag(3)
         }.tint(Style.accent)
         }
@@ -42,8 +44,10 @@ struct ContentView:View {
         .background(KeyboardDismissal().frame(width:0,height:0))
         .task {startConnectionIfNeeded();await engine.refreshSources()}
         .task {await updater.check()}
+        .task(id:engine.reminderApps) {reminders.update(apps:engine.reminderApps,language:language)}
+        .onChange(of:reminders.showLibrary){_,show in if show {tab=1;reminders.showLibrary=false}}
         .onChange(of:phase){_,value in
-            if value == .active {engine.refreshBootstrap();startConnectionIfNeeded();Task{await updater.check()}}
+            if value == .active {engine.refreshBootstrap();startConnectionIfNeeded();reminders.update(apps:engine.reminderApps,language:language);Task{await updater.check()};Task{await engine.refreshSources()}}
             else if value == .background {connection.stopMonitoring()}
         }
         .onChange(of:onboardingStep){_,_ in startConnectionIfNeeded()}

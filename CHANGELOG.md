@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Distinguish unavailable Wi-Fi from an unreachable local installation connection.
+- Add optional local reminders two days and one day before signature expiry.
+- Show persistent source-version notices and clearer update badges; improve matching of signed application identifiers.
+
 ## 0.1.6 (21) - 2026-11-05
 
 - Maintenance release for Windows and iPhone.

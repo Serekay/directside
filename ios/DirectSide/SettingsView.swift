@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView:View {
     @EnvironmentObject var engine:Engine
+    @EnvironmentObject var reminders:RenewalNotifications
     @ObservedObject var connection:Connection
     @AppStorage("language") private var language="en"
     @AppStorage("onboardingComplete") private var onboardingComplete=false
@@ -30,6 +31,15 @@ struct SettingsView:View {
             Section(L("Darstellung")) {
                 Picker(L("Sprache"),selection:$language) {Text(L("English")).tag("en");Text(L("Deutsch")).tag("de")}
             }
+            Section {
+                Toggle(isOn:Binding(get:{reminders.enabled},set:{value in Task{await reminders.setEnabled(value)}})) {
+                    Label(L("Ablauferinnerungen"),systemImage:"bell.badge")
+                }
+                if reminders.enabled && !reminders.allowed {
+                    Button(L("Mitteilungen in iOS erlauben")){UIApplication.shared.open(URL(string:UIApplication.openNotificationSettingsURLString)!)}
+                }
+                if let error=reminders.error {Text(L(error)).font(.caption).foregroundStyle(.orange)}
+            } footer:{Text(L("Erinnert 2 Tage und 1 Tag vor Ablauf der Signatur."))}
             Section {NavigationLink {UpdateSettings(connection:connection)} label:{Label(L("DirectSide-Updates"),systemImage:"arrow.down.app")}}
             Section {Button {onboardingStep=0;onboardingComplete=false} label:{Label(L("Einführung ansehen"),systemImage:"sparkles")}}
             Section {HStack{Text(L("DirectSide"));Spacer();Text("\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""))").foregroundStyle(.secondary)}}

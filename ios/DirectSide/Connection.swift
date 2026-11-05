@@ -8,6 +8,10 @@ import UIKit
     @Published var port = UserDefaults.standard.integer(forKey:"port")
     @Published var status = "LocalDevVPN verbinden, dann Port suchen."
     @Published var vpnReachable=false
+    @Published private(set) var wifiAvailable:Bool?
+    private var pathMonitor:NWPathMonitor?
+    private var pathGeneration=UUID()
+    var connectionState:LocalConnectionStatus { .resolve(installed:vpnInstalled,reachable:vpnReachable,wifi:wifiAvailable) }
     private var monitor:Timer?
     private var probe:NWConnection?
     private var probeID:UUID?
@@ -16,11 +20,26 @@ import UIKit
     private var timeout: Timer?
     override init() { super.init(); browser.delegate=self }
     func startMonitoring() {
+        if pathMonitor==nil {
+            let generation=UUID();pathGeneration=generation
+            let path=NWPathMonitor(requiredInterfaceType:.wifi);pathMonitor=path
+            path.pathUpdateHandler={[weak self] update in
+                let available=update.status == .satisfied && update.usesInterfaceType(.wifi)
+                Task {@MainActor in
+                    guard let self,self.pathGeneration==generation else {return}
+                    let changed=self.wifiAvailable != available
+                    self.wifiAvailable=available
+                    if changed {self.checkVPN();if available {self.discover()}}
+                }
+            }
+            path.start(queue:.global(qos:.utility))
+        }
         monitor?.invalidate();checkVPN()
         monitor=Timer.scheduledTimer(withTimeInterval:5,repeats:true){[weak self] _ in Task{@MainActor in self?.checkVPN()}}
         discover()
     }
     func stopMonitoring() {
+        pathGeneration=UUID();pathMonitor?.cancel();pathMonitor=nil;wifiAvailable=nil
         monitor?.invalidate();monitor=nil;probeID=nil;probe?.cancel();probe=nil;vpnReachable=false
         browser.stop();timeout?.invalidate()
     }

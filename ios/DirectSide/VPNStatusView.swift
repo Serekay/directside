@@ -9,11 +9,13 @@ struct VPNStatusView:View {
             HStack {
                 Label("LocalDevVPN",systemImage:"network").font(.subheadline.bold())
                 Spacer()
-                Label(L(connection.vpnReachable ? "Verbunden":connection.vpnInstalled ? "Nicht verbunden":"Nicht installiert"),systemImage:connection.vpnReachable ? "checkmark.circle.fill":"exclamationmark.circle.fill")
+                Label(L(connection.connectionState.title),systemImage:connection.vpnReachable ? "checkmark.circle.fill":"exclamationmark.circle.fill")
                     .font(.caption.weight(.semibold)).foregroundStyle(tone)
                     .padding(.horizontal,11).padding(.vertical,7).background(tone.opacity(0.12),in:Capsule())
             }
-            if showsSetupGuide && !connection.vpnReachable {
+            if connection.connectionState == .noWiFi {
+                Text(L("Mit einem WLAN verbinden und erneut versuchen.")).font(.subheadline).foregroundStyle(.secondary)
+            } else if showsSetupGuide && !connection.vpnReachable {
                 VStack(alignment:.leading,spacing:10) {
                     if !connection.vpnInstalled {
                         Text(L("1. LocalDevVPN aus dem App Store installieren und öffnen."))
@@ -26,8 +28,8 @@ struct VPNStatusView:View {
             }
             if !connection.vpnInstalled {
                 Link(L("LocalDevVPN installieren"),destination:URL(string:"https://apps.apple.com/app/id6755608044")!).font(.subheadline.bold())
-            } else if !connection.vpnReachable {
-                Button(L(showsSetupGuide ? "LocalDevVPN öffnen":"Verbinden")){connection.openVPN()}.font(.subheadline.bold())
+            } else if !connection.vpnReachable && connection.connectionState != .noWiFi {
+                Button(L("LocalDevVPN öffnen")){connection.openVPN()}.font(.subheadline.bold())
             }
         }.padding(18).background(Style.surface,in:RoundedRectangle(cornerRadius:18))
     }

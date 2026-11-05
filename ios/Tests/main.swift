@@ -123,3 +123,35 @@ defer {try? FileManager.default.removeItem(at:outside)}
 try FileManager.default.createSymbolicLink(at:renewalSupport.appendingPathComponent("escape.ipa"),withDestinationURL:outside)
 check(RenewalPackage.cachedURL("escape.ipa",support:renewalSupport)==nil,"Renewal cache cannot escape its support directory through symlinks")
 print("Renewal package relocation, missing cache and application identity regressions: passed")
+
+check(LocalConnectionStatus.resolve(installed:true,reachable:false,wifi:false) == .noWiFi,"No Wi-Fi must not be reported as VPN switched off")
+check(LocalConnectionStatus.resolve(installed:true,reachable:true,wifi:false) == .connected,"A working local route takes precedence over physical Wi-Fi")
+check(LocalConnectionStatus.resolve(installed:true,reachable:false,wifi:true) == .unreachable,"Wi-Fi plus a failed probe is unreachable, not proof that VPN is off")
+check(LocalConnectionStatus.resolve(installed:true,reachable:false,wifi:nil) == .checking,"Unknown network state is still checking")
+check(LocalConnectionStatus.resolve(installed:false,reachable:false,wifi:true) == .missingVPN,"Missing VPN application stays distinct")
+
+let reminderNow=Date(timeIntervalSince1970:2_000_000_000)
+let reminderApp=RenewalReminderApp(id:"example.app",name:"Example",expiresAt:reminderNow.addingTimeInterval(7*86400))
+let reminderPlan=RenewalReminderPlan.make(apps:[reminderApp],now:reminderNow)
+check(reminderPlan.count==2 && reminderPlan.map(\.days)==[2,1],"Two expiry reminders per application")
+check(reminderPlan.map(\.date)==[5,6].map{reminderNow.addingTimeInterval(Double($0)*86400)},"Reminders are exactly two days and one day before expiry")
+var renewedReminderApp=reminderApp;renewedReminderApp.expiresAt=reminderNow.addingTimeInterval(9*86400)
+let renewedPlan=RenewalReminderPlan.make(apps:[reminderApp,renewedReminderApp],now:reminderNow)
+check(renewedPlan.count==2 && renewedPlan.map(\.id)==reminderPlan.map(\.id),"Renewal replaces requests instead of duplicating them")
+check(RenewalReminderPlan.make(apps:[reminderApp],now:reminderApp.expiresAt).isEmpty,"Never schedule notifications in the past")
+check(RenewalReminderPlan.make(apps:[reminderApp],now:reminderNow,limit:1).first?.days==2,"Keep earliest reminders when reaching the notification limit")
+
+let noticeURL=URL(string:"https://example.test/app.ipa")!
+let noticeSourceURL=URL(string:"https://example.test/source.json")!
+let noticeOldApp=CatalogApp(name:"Example",bundleIdentifier:"example.app",version:"1.0",downloadURL:noticeURL)
+var noticeNewApp=noticeOldApp;noticeNewApp.version="1.1"
+let noticeOldSource=SourceCatalog(name:"Example source",apps:[noticeOldApp],sourceURL:noticeSourceURL)
+var noticeNewSource=noticeOldSource;noticeNewSource.apps=[noticeNewApp]
+let versionNotices=SourceVersionChanges.updating(previous:noticeOldSource,current:noticeNewSource,pending:[])
+check(versionNotices.count==1,"Source versions are visible even without native installed-app metadata")
+check(SourceVersionChanges.updating(previous:noticeNewSource,current:noticeNewSource,pending:versionNotices).count==1,"An unchanged refresh keeps the pending source notice")
+check(SourceVersionChanges.updating(previous:noticeNewSource,current:noticeOldSource,pending:versionNotices).isEmpty,"A rolled-back source version removes the outdated notice")
+check(SourceVersionChanges.updating(previous:noticeOldSource,current:noticeOldSource,pending:[]).isEmpty,"No fake update for an unchanged source")
+check(CatalogUpdates.matchesInstalledID("example.app.TESTTEAM01",bundle:"example.app"),"Source matching works before opening certificate settings")
+check(!CatalogUpdates.matchesInstalledID("example.app.extension",bundle:"example.app"),"Do not match an arbitrary extension as the parent app")
+print("Connection states, expiry reminder plans and source version indicators: passed")

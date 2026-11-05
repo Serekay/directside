@@ -60,6 +60,7 @@ import CryptoKit
     private var installContinuation: CheckedContinuation<Void,Error>?
     @Published var sourceFailures: [String:String] = [:]
     @Published var refreshingSources = false
+    @Published var sourceNotices:[SourceVersionNotice]=[]
     private let sourceRefresh=SourceRefreshCoordinator()
     @Published var selfExpiration:Date?
     @Published var slotsUsed:Int?
@@ -215,14 +216,26 @@ import CryptoKit
     private var updateRecords:[ManagedApp] {
         managed + deviceApps.filter{device in !managed.contains{deviceApp(for:$0)?.id==device.id}}.compactMap {device in
             guard device.developer,let version=device.version else {return nil}
-            let candidates=sources.flatMap(\.apps).filter{$0.id==device.id || (!certificateTeam.isEmpty && device.id==$0.id+"."+certificateTeam)}
+            let candidates=sources.flatMap(\.apps).filter{CatalogUpdates.matchesInstalledID(device.id,bundle:$0.id)}
             let ids=Set(candidates.map(\.id))
             guard ids.count==1,let id=ids.first else {return nil}
             return ManagedApp(id:id,name:device.name,cachedIPA:"",installedAt:Date(),version:version,buildVersion:device.buildVersion,installedBundleID:device.id)
         }
     }
     func installed(_ app:CatalogApp) -> ManagedApp? {updateRecords.first{$0.id==app.id}}
-    func updateCount(in source:SourceCatalog)->Int {updates.filter{$0.source.id==source.id}.count}
+    func updateCount(in source:SourceCatalog)->Int {
+        Set(updates.filter{$0.source.id==source.id}.map{$0.app.id}+sourceNotices.filter{$0.sourceID==source.id}.map(\.bundleID)).count
+    }
+    var sourceUpdateCount:Int {sources.reduce(0){$0+updateCount(in:$1)}}
+    func hasSourceNotice(_ app:CatalogApp,source:SourceCatalog)->Bool {sourceNotices.contains{$0.sourceID==source.id && $0.bundleID==app.id}}
+    func acknowledgeSourceVersion(_ app:CatalogApp,source:SourceCatalog) {
+        sourceNotices.removeAll{$0.sourceID==source.id && $0.bundleID==app.id};save(sourceNotices,"source-notices.json")
+    }
+    var reminderApps:[RenewalReminderApp] {
+        var apps=managed.compactMap{app in app.expiresAt.map{RenewalReminderApp(id:app.id,name:app.name,expiresAt:$0)}}
+        if let selfExpiration {apps.removeAll{$0.id=="com.directside.app"};apps.append(RenewalReminderApp(id:"com.directside.app",name:"DirectSide",expiresAt:selfExpiration))}
+        return apps.sorted{$0.id<$1.id}
+    }
     func update(for device:DeviceApp)->(app:CatalogApp,source:SourceCatalog)? {
         updates.first{installed($0.app)?.installedBundleID==device.id}
     }
@@ -239,6 +252,7 @@ import CryptoKit
         }
         sources = load("sources.json") ?? []
         managed = load("apps.json") ?? []
+        sourceNotices = load("source-notices.json") ?? []
         refreshBootstrap()
         guard ds_set_anisette_callback(ds_swift_anisette_generate,ds_swift_anisette_release) else {self.error="Could not connect the local authentication runtime.";return}
         guard ds_set_anisette_resync_callback(ds_swift_anisette_resync) else {self.error="Could not connect local authentication synchronization.";return}
@@ -414,6 +428,7 @@ import CryptoKit
                     if app.id=="com.directside.app" {selfExpiration=app.expiresAt}
                     let old=managed.filter{$0.id==app.id}.map(\.cachedIPA)
                     managed.removeAll { $0.id==app.id }; managed.append(app); save(managed,"apps.json")
+                    sourceNotices.removeAll{$0.bundleID==app.id && (app.sourceID==nil || $0.sourceID==app.sourceID)};save(sourceNotices,"source-notices.json")
                     for path in old where path != app.cachedIPA {removeUnusedIPA(path)}
                 }
                 pendingApp=nil
@@ -459,11 +474,12 @@ import CryptoKit
         }
     }
     private func refreshSourceSnapshot() async {
-        defer {save(sources,"sources.json")}
+        defer {save(sources,"sources.json");save(sourceNotices,"source-notices.json")}
         for old in sources {
             guard let url=old.sourceURL else { continue }
             do {
                 let refreshed=try await fetchSource(url)
+                sourceNotices=SourceVersionChanges.updating(previous:old,current:refreshed,pending:sourceNotices)
                 if let index=sources.firstIndex(where:{$0.id==old.id}) {sources[index]=refreshed}
                 sourceFailures.removeValue(forKey:old.id)
             } catch {
@@ -512,7 +528,7 @@ import CryptoKit
         sources.removeAll { $0.id==source.id }; sources.append(source); save(sources,"sources.json"); pendingSource=nil
     }
     func removeSources(at offsets: IndexSet) { sources.remove(atOffsets:offsets); save(sources,"sources.json") }
-    func removeSource(_ source:SourceCatalog) {sources.removeAll{$0.id==source.id};sourceFailures.removeValue(forKey:source.id);save(sources,"sources.json")}
+    func removeSource(_ source:SourceCatalog) {sources.removeAll{$0.id==source.id};sourceFailures.removeValue(forKey:source.id);sourceNotices.removeAll{$0.sourceID==source.id};save(sourceNotices,"source-notices.json");save(sources,"sources.json")}
     func install(_ app: CatalogApp, source: SourceCatalog? = nil, peer: String, port: Int) async {
         guard !busy else { return }
         refreshBootstrap()

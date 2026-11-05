@@ -54,7 +54,8 @@ struct CatalogRow: View {
                 HStack(spacing:13) {
                     Artwork(url:app.iconURL)
                     VStack(alignment:.leading,spacing:4) {
-                        Text(L(app.name)).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
+                        HStack {Text(L(app.name)).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
+                            if engine.hasUpdate(app) || engine.hasSourceNotice(app,source:source) {UpdateIndicator(title:engine.hasUpdate(app) ? "Update":"Neue Version")}}
                         Text(L(app.subtitle ?? app.developerName ?? source.name)).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                         if engine.hasUpdate(app),let latest=app.latest {Text(L("Version \(latest.displayVersion) verfügbar")).font(.caption.weight(.medium)).foregroundStyle(Style.accent)}
                     }
@@ -67,6 +68,11 @@ struct CatalogRow: View {
 
 }
 
+struct UpdateIndicator:View {
+    var title:String="Update"
+    var body:some View {Text(L(title)).font(.caption2.bold()).foregroundStyle(Style.accent).padding(.horizontal,9).padding(.vertical,5).background(Style.accent.opacity(0.16),in:Capsule())}
+}
+
 struct CatalogInstallAction:View {
     @EnvironmentObject var engine:Engine
     let app:CatalogApp
@@ -76,7 +82,7 @@ struct CatalogInstallAction:View {
     var body:some View {
         Menu {
             Button {if let installed=engine.installed(app),!installed.cachedIPA.isEmpty,!engine.hasUpdate(app) {engine.refresh(installed,peer:connection.peer,port:connection.port)}else{Task{await engine.install(app,source:source,peer:connection.peer,port:connection.port)}}} label:{Label(L("Auf diesem Gerät"),systemImage:"iphone")}
-            Button {if LiveContainerBridge.available {LiveContainerBridge.importApp(app,engine:engine)}else{showContainerSetup=true}} label:{Label(L("In LiveContainer"),systemImage:"square.stack.3d.up")}
+            Button {if LiveContainerBridge.available {LiveContainerBridge.importApp(app,source:source,engine:engine)}else{showContainerSetup=true}} label:{Label(L("In LiveContainer"),systemImage:"square.stack.3d.up")}
         }label:{
             if let installed=engine.installed(app),!installed.cachedIPA.isEmpty,!engine.hasUpdate(app) {SignatureLabel(expiresAt:installed.expiresAt)}
             else {Text(L(engine.hasUpdate(app) ? "Aktualisieren":"Laden")).font(.caption.bold()).padding(.horizontal,15).padding(.vertical,9).background(Style.accent.opacity(0.12),in:Capsule())}
@@ -156,6 +162,7 @@ struct AppDetailView: View {
                     Artwork(url:app.iconURL,size:88)
                     VStack(alignment:.leading,spacing:6) {Text(L(app.name)).font(.title2.bold());Text(L(app.developerName ?? source.name)).font(.subheadline).foregroundStyle(.secondary);CatalogInstallAction(app:app,source:source,connection:connection)}
                 }
+                if engine.hasUpdate(app) || engine.hasSourceNotice(app,source:source) {UpdateIndicator(title:engine.hasUpdate(app) ? "Update verfügbar":"Neue Version in dieser Quelle")}
                 HStack {metadata("VERSION",app.latest?.displayVersion ?? "–");Divider();metadata("GRÖSSE",app.latest?.size.map{ByteCountFormatter.string(fromByteCount:$0,countStyle:.file)} ?? "–");Divider();metadata("SYSTEM",app.latest?.minOSVersion.map{"iOS \($0)+"} ?? "iOS")}.frame(height:52).padding(.vertical,6)
                 if let shots=app.screenshots?.all,!shots.isEmpty {
                     ScrollView(.horizontal,showsIndicators:false) {HStack(spacing:12) {ForEach(shots) { shot in Button {selectedImage=shot} label: {AsyncImage(url:["http","https"].contains(shot.imageURL.scheme ?? "") ? shot.imageURL:nil) {image in image.resizable().scaledToFit()} placeholder:{RoundedRectangle(cornerRadius:17).fill(Style.surface).overlay(ProgressView())}.frame(width:max(140,min(310,240*shot.aspectRatio)),height:240).clipShape(RoundedRectangle(cornerRadius:17))}.buttonStyle(.plain).accessibilityLabel(L("Screenshot vergrößern"))}}}
@@ -195,11 +202,11 @@ struct SourcesView:View {
                         Image(systemName:"tray.2.fill").font(.title2).foregroundStyle(Style.accent).frame(width:56,height:56).background(Style.accent.opacity(0.1),in:RoundedRectangle(cornerRadius:14))
                         VStack(alignment:.leading,spacing:7) {
                             Text(source.name).font(.subheadline.bold()).foregroundStyle(.primary)
-                            Text(source.sourceURL?.host ?? source.identifier ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            if let subtitle=source.subtitle {Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)}
                             HStack(spacing:10) {
                                 Text(L(source.apps.count==1 ? "1 App":"\(source.apps.count) Apps"))
                                 if let _=engine.sourceFailures[source.id] {Label(L("Nicht erreichbar"),systemImage:"exclamationmark.circle")}
-                                else if engine.updateCount(in:source)>0 {Label(L(engine.updateCount(in:source)==1 ? "1 Update verfügbar":"\(engine.updateCount(in:source)) Updates verfügbar"),systemImage:"arrow.down.circle.fill").foregroundStyle(Style.accent)}
+                                else if engine.updateCount(in:source)>0 {UpdateIndicator(title:engine.updateCount(in:source)==1 ? "1 neue Version":"\(engine.updateCount(in:source)) neue Versionen")}
                                 else {Label(L(source.refreshedAt == nil ? "Nicht geprüft":"Quelle geladen"),systemImage:"checkmark.circle")}
                             }.font(.caption2).foregroundStyle(engine.sourceFailures[source.id] != nil ? Color.orange:Color.secondary)
                         }
@@ -225,10 +232,11 @@ struct SourceDetailView:View {
                     Image(systemName:"tray.2.fill").font(.largeTitle).foregroundStyle(Style.accent)
                     VStack(alignment:.leading,spacing:5) {
                         Text(L(source.name)).font(.title2.bold())
-                        Text(source.sourceURL?.host ?? source.subtitle ?? "").font(.subheadline).foregroundStyle(.secondary)
+                        if let subtitle=source.subtitle {Text(subtitle).font(.subheadline).foregroundStyle(.secondary)}
                     }
                 }
                 if let text=source.description {Text(L(text)).font(.subheadline).foregroundStyle(.secondary)}
+                if engine.updateCount(in:source)>0 {UpdateIndicator(title:engine.updateCount(in:source)==1 ? "1 neue Version":"\(engine.updateCount(in:source)) neue Versionen")}
                 if let failure=engine.sourceFailures[source.id] {Label(L(failure),systemImage:"exclamationmark.circle").font(.caption).foregroundStyle(.orange)}
                 SectionTitle(title:"Apps aus dieser Quelle")
                 ForEach(source.apps){CatalogRow(app:$0,source:source,connection:connection)}

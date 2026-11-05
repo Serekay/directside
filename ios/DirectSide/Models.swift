@@ -121,6 +121,12 @@ struct DeviceApp:Decodable,Identifiable {
 }
 
 enum CatalogUpdates {
+    static func matchesInstalledID(_ installed:String,bundle:String)->Bool {
+        if installed==bundle {return true}
+        guard installed.hasPrefix(bundle+".") else {return false}
+        let suffix=installed.dropFirst(bundle.count+1)
+        return suffix.utf8.count==10 && suffix.utf8.allSatisfy{(48...57).contains($0) || (65...90).contains($0)}
+    }
     private static func normalized(_ value:String?)->String? {
         guard var value=value?.trimmingCharacters(in:.whitespacesAndNewlines),!value.isEmpty,value != "?" else {return nil}
         if value.lowercased().hasPrefix("v") {value.removeFirst()}

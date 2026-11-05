@@ -19,6 +19,7 @@ struct LibraryView:View {
                 Button {Task{await engine.renewAll(peer:connection.peer,port:connection.port)}}label:{Label(L("Alle Signaturen erneuern"),systemImage:"arrow.clockwise").frame(maxWidth:.infinity)}.buttonStyle(.borderedProminent).disabled(engine.busy || !engine.canSign || !engine.pairingReady)
             }
             Section {
+                if !engine.updates.isEmpty {HStack {Label(L("Updates verfügbar"),systemImage:"arrow.down.circle.fill").foregroundStyle(Style.accent);Spacer();UpdateIndicator(title:String(engine.updates.count))}}
                 HStack(spacing:12) {
                     BrandIcon(size:50);Text("DirectSide").font(.subheadline.bold());Spacer()
                     if updater.available != nil {Button(L("Aktualisieren")){updater.showOffer=true}.font(.caption.bold()).buttonStyle(.borderedProminent).disabled(engine.busy || updater.downloading)}

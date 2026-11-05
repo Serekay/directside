@@ -624,5 +624,22 @@
   "Die ausgewählte LiveContainer-Installation wurde auf diesem Gerät nicht gefunden. App-Liste aktualisieren.": "The selected LiveContainer installation was not found on this device. Refresh the app list.",
   "Mehrere LiveContainer-Installationen gefunden. Die gewünschte App in der App-Übersicht zum Erneuern auswählen.": "Multiple LiveContainer installations found. Select the app you want to renew in the app list.",
   "Das ausgewählte Gerät ist nicht mehr verbunden. Erneut verbinden und LiveContainer erneuern.": "The selected device is no longer connected. Reconnect it and renew LiveContainer.",
-  "LiveContainer ist installiert. Bei Bedarf in DirectSide unter Einstellungen → LiveContainer das Zertifikat übertragen.": "LiveContainer is installed. If needed, transfer its certificate in DirectSide under Settings > LiveContainer."
+  "LiveContainer ist installiert. Bei Bedarf in DirectSide unter Einstellungen → LiveContainer das Zertifikat übertragen.": "LiveContainer is installed. If needed, transfer its certificate in DirectSide under Settings > LiveContainer.",
+  "WLAN nicht verfügbar": "Wi-Fi unavailable",
+  "Verbindung prüfen …": "Checking connection …",
+  "Mit einem WLAN verbinden und erneut versuchen.": "Connect to Wi-Fi and try again.",
+  "Lokale Verbindung prüfen": "Check local connection",
+  "WLAN und die Verbindung in LocalDevVPN prüfen.": "Check Wi-Fi and the connection in LocalDevVPN.",
+  "Ablauferinnerungen": "Expiry reminders",
+  "Mitteilungen in iOS erlauben": "Allow notifications in iOS",
+  "Erinnert 2 Tage und 1 Tag vor Ablauf der Signatur.": "Reminds you 2 days and 1 day before the signature expires.",
+  "Mitteilungen konnten nicht eingerichtet werden.": "Could not set up notifications.",
+  "Signatur läuft bald ab": "Signature expires soon",
+  "Die Signatur von %@ läuft in 2 Tagen ab. Jetzt in DirectSide erneuern.": "The signature for %@ expires in 2 days. Renew it in DirectSide.",
+  "Die Signatur von %@ läuft in einem Tag ab. Jetzt in DirectSide erneuern.": "The signature for %@ expires in 1 day. Renew it in DirectSide.",
+  "Neue Version": "New version",
+  "Neue Version in dieser Quelle": "New version in this source",
+  "1 neue Version": "1 new version",
+  "%@ neue Versionen": "%@ new versions",
+  "Updates verfügbar": "Updates available"
 }
