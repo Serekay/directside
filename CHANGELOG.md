@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.7 (22) - 2026-11-05
 
 - Distinguish unavailable Wi-Fi from an unreachable local installation connection.
 - Add optional local reminders two days and one day before signature expiry.
