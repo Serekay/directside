@@ -26,6 +26,19 @@ scanner = load('build_secret_scan', 'scan-build-secrets.py')
 
 
 class SecurityGateTests(unittest.TestCase):
+    def test_web_only_maintenance_exception_requires_both_shipped_graphs_to_exclude_it(self):
+        empty = subprocess.CompletedProcess([], 0, stdout='', stderr='nothing to print')
+        included = subprocess.CompletedProcess([], 0, stdout='pin-utils v0.1.1\n', stderr='')
+        failed = subprocess.CompletedProcess([], 1, stdout='', stderr='metadata unavailable')
+        with patch.object(audit.subprocess, 'run', side_effect=[empty, empty]) as run:
+            self.assertTrue(audit.pin_utils_is_unshipped())
+            self.assertEqual(run.call_count, 2)
+            self.assertIn('x86_64-pc-windows-gnullvm', run.call_args_list[0].args[0])
+            self.assertIn('aarch64-apple-ios', run.call_args_list[1].args[0])
+        for results in ([included], [empty, included], [failed]):
+            with patch.object(audit.subprocess, 'run', side_effect=results):
+                self.assertFalse(audit.pin_utils_is_unshipped())
+
     def test_an_advisory_other_than_the_exact_reviewed_rsa_warning_blocks(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
