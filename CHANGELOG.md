@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.6 (21) - 2026-11-05
+
+- Maintenance release for Windows and iPhone.
+
 ## 0.1.5 (20) - 2026-11-05
 
 - Install DirectSide from the current official release without a separate IPA download.
