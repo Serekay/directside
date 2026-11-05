@@ -428,7 +428,7 @@ import CryptoKit
                     if app.id=="com.directside.app" {selfExpiration=app.expiresAt}
                     let old=managed.filter{$0.id==app.id}.map(\.cachedIPA)
                     managed.removeAll { $0.id==app.id }; managed.append(app); save(managed,"apps.json")
-                    sourceNotices.removeAll{$0.bundleID==app.id && (app.sourceID==nil || $0.sourceID==app.sourceID)};save(sourceNotices,"source-notices.json")
+                    sourceNotices=SourceVersionChanges.acknowledging(installed:app,pending:sourceNotices);save(sourceNotices,"source-notices.json")
                     for path in old where path != app.cachedIPA {removeUnusedIPA(path)}
                 }
                 pendingApp=nil

@@ -143,10 +143,13 @@ enum CatalogUpdates {
         return (normalized(lhs.buildVersion) ?? "").compare(normalized(rhs.buildVersion) ?? "",options:[.numeric,.caseInsensitive])
     }
     static func isNewer(_ candidate:CatalogVersion,than installed:ManagedApp)->Bool {
-        guard let next=normalized(candidate.version),let current=normalized(installed.version) else {return false}
+        isNewer(version:candidate.version,buildVersion:candidate.buildVersion,than:installed)
+    }
+    static func isNewer(version:String,buildVersion:String?,than installed:ManagedApp)->Bool {
+        guard let next=normalized(version),let current=normalized(installed.version) else {return false}
         let order=next.compare(current,options:[.numeric,.caseInsensitive])
         if order != .orderedSame {return order == .orderedDescending}
-        guard let nextBuild=normalized(candidate.buildVersion) else {return false}
+        guard let nextBuild=normalized(buildVersion) else {return false}
         guard let currentBuild=normalized(installed.buildVersion) else {return true}
         return nextBuild.compare(currentBuild,options:[.numeric,.caseInsensitive]) == .orderedDescending
     }

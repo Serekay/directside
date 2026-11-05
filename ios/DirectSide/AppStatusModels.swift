@@ -53,6 +53,13 @@ struct SourceVersionNotice:Codable,Identifiable,Equatable {
     var id:String {String(sourceID.utf8.count)+":"+sourceID+bundleID}
 }
 enum SourceVersionChanges {
+    static func acknowledging(installed:ManagedApp,pending:[SourceVersionNotice])->[SourceVersionNotice] {
+        pending.filter {notice in
+            guard notice.bundleID==installed.id,installed.sourceID==nil || notice.sourceID==installed.sourceID else {return true}
+            guard let version=installed.version,!version.isEmpty,version != "?" else {return true}
+            return CatalogUpdates.isNewer(version:notice.version,buildVersion:notice.buildVersion,than:installed)
+        }
+    }
     static func updating(previous:SourceCatalog,current:SourceCatalog,pending:[SourceVersionNotice])->[SourceVersionNotice] {
         let old=Dictionary(grouping:previous.apps,by:{$0.id})
         var result=pending.filter{$0.sourceID != previous.id}

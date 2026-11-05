@@ -152,6 +152,10 @@ check(versionNotices.count==1,"Source versions are visible even without native i
 check(SourceVersionChanges.updating(previous:noticeNewSource,current:noticeNewSource,pending:versionNotices).count==1,"An unchanged refresh keeps the pending source notice")
 check(SourceVersionChanges.updating(previous:noticeNewSource,current:noticeOldSource,pending:versionNotices).isEmpty,"A rolled-back source version removes the outdated notice")
 check(SourceVersionChanges.updating(previous:noticeOldSource,current:noticeOldSource,pending:[]).isEmpty,"No fake update for an unchanged source")
+var installedNoticeApp=ManagedApp(id:"example.app",name:"Example",cachedIPA:"",installedAt:reminderNow,version:"1.0")
+check(SourceVersionChanges.acknowledging(installed:installedNoticeApp,pending:versionNotices).count==1,"Installing an older IPA must not clear the newer source version")
+installedNoticeApp.version="1.1"
+check(SourceVersionChanges.acknowledging(installed:installedNoticeApp,pending:versionNotices).isEmpty,"Installing the available version clears its source notice")
 check(CatalogUpdates.matchesInstalledID("example.app.TESTTEAM01",bundle:"example.app"),"Source matching works before opening certificate settings")
 check(!CatalogUpdates.matchesInstalledID("example.app.extension",bundle:"example.app"),"Do not match an arbitrary extension as the parent app")
 print("Connection states, expiry reminder plans and source version indicators: passed")
