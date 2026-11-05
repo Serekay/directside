@@ -26,7 +26,6 @@ Your account is transferred from Windows. After setup, keep LocalDevVPN connecte
 - Use LiveContainer for compatible apps that share one sideloaded app slot.
 - Use a free or paid Apple Developer account, or import your own certificate.
 - Check registered App IDs and switch between English and German.
-- Enable local expiry reminders in **Settings** for alerts two days and one day before a known signature expires.
 
 ## Setup
 
