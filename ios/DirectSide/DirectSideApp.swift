@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-private final class DirectSideAppDelegate:NSObject,UIApplicationDelegate {
+@MainActor private final class DirectSideAppDelegate:NSObject,UIApplicationDelegate {
     func application(_ application:UIApplication,didFinishLaunchingWithOptions launchOptions:[UIApplication.LaunchOptionsKey:Any]?=nil)->Bool {
         _ = RenewalNotifications.shared
         return true
