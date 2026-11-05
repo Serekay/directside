@@ -33,13 +33,15 @@ struct RenewalReminder:Identifiable,Equatable {
 enum RenewalReminderPlan {
     static func make(apps:[RenewalReminderApp],now:Date,limit:Int=60)->[RenewalReminder] {
         let unique=Dictionary(apps.map{($0.id,$0)},uniquingKeysWith:{_,new in new})
-        return unique.values.flatMap { app in
-            [2,1].compactMap {days->RenewalReminder? in
+        var reminders:[RenewalReminder]=[]
+        for app in unique.values {
+            for days in [2,1] {
                 let date=app.expiresAt.addingTimeInterval(-Double(days)*86400)
-                guard date>now else {return nil}
-                return RenewalReminder(app:app,days:days,date:date)
+                if date>now {reminders.append(RenewalReminder(app:app,days:days,date:date))}
             }
-        }.sorted { $0.date == $1.date ? $0.id<$1.id:$0.date<$1.date }.prefix(max(0,limit)).map{$0}
+        }
+        reminders.sort { $0.date == $1.date ? $0.id<$1.id:$0.date<$1.date }
+        return Array(reminders.prefix(max(0,limit)))
     }
 }
 

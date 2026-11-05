@@ -26,6 +26,12 @@ jobs:
           fetch-depth: 0
       - name: Scan build history for secrets
         run: python3 scripts/scan-build-secrets.py
+      - name: Source format tests
+        run: |
+          swiftc ios/DirectSide/Models.swift ios/DirectSide/AppStatusModels.swift ios/DirectSide/Localization.swift ios/DirectSide/UpdateModel.swift ios/Tests/main.swift -o /tmp/directside-source-tests
+          /tmp/directside-source-tests
+          swiftc ios/DirectSide/Models.swift ios/DirectSide/SourceRefreshCoordinator.swift ios/Tests/SourceRefreshTests.swift -o /tmp/directside-refresh-tests
+          /tmp/directside-refresh-tests
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
@@ -46,12 +52,6 @@ jobs:
         run: python3 scripts/audit-rust-dependencies.py
       - name: Local Mac authentication interpreter (no JIT)
         run: python3 scripts/build-ios-mac-auth.py
-      - name: Source format tests
-        run: |
-          swiftc ios/DirectSide/Models.swift ios/DirectSide/AppStatusModels.swift ios/DirectSide/Localization.swift ios/DirectSide/UpdateModel.swift ios/Tests/main.swift -o /tmp/directside-source-tests
-          /tmp/directside-source-tests
-          swiftc ios/DirectSide/Models.swift ios/DirectSide/SourceRefreshCoordinator.swift ios/Tests/SourceRefreshTests.swift -o /tmp/directside-refresh-tests
-          /tmp/directside-refresh-tests
       - name: Xcode project
         run: |
           cd ios
