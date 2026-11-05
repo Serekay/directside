@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.8 (23) - 2026-11-05
 
 - Read LiveContainer guest version metadata through the paired local connection and compare it with source versions.
 - Show guest apps and update actions under My Apps; keep update indicators until a new installed version is read.
