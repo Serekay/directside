@@ -301,7 +301,7 @@ ApplicationWindow {
                             ColumnLayout {spacing:6
                                 RowLayout {spacing:8
                                     Label {text:win.t("DirectSide für iPhone");font.pixelSize:21;font.weight:Font.DemiBold;font.letterSpacing:-0.4}
-                                    Badge {objectName:"ipaVersionBadge";visible:s.bundledIPAReady || s.releaseVersion.length>0;text:s.bundledIPAReady?s.bundledIPAVersion:s.releaseVersion}
+                                    Badge {objectName:"ipaVersionBadge";visible:s.directsideIPAVersion.length>0 || s.releaseVersion.length>0;text:s.directsideIPAVersion || s.releaseVersion}
                                 }
                                 Label {text:"iOS 17+ · "+win.t("Pairing inklusive");font.pixelSize:12;color:win.muted}
                             }
@@ -310,7 +310,7 @@ ApplicationWindow {
                             BusyIndicator {running:parent.visible;implicitWidth:30;implicitHeight:30}
                             Text {objectName:"deviceSetupProgressText";text:win.t(s.setupPhase);color:win.accent;wrapMode:Text.WordWrap;Layout.fillWidth:true;font.pixelSize:13}
                         }
-                        Action {objectName:"installDirectSideButton";text:s.directsideInstalling?win.t("Bitte warten …"):win.t("DirectSide installieren");primary:true;Layout.fillWidth:true;implicitHeight:48;enabled:s.canSign && s.devices.length>0 && (!s.foregroundBusy || s.scanning) && !s.updateBusy && !s.directsideInstalling && (s.bundledIPAReady || s.releaseIPA);onClicked:backend.installDirectSide()}
+                        Action {objectName:"installDirectSideButton";text:s.directsideInstalling?win.t("Bitte warten …"):win.t("DirectSide installieren");primary:true;Layout.fillWidth:true;implicitHeight:48;enabled:s.canSign && s.devices.length>0 && (!s.foregroundBusy || s.scanning) && !s.updateBusy && !s.directsideInstalling;onClicked:backend.installDirectSide()}
                         Item {Layout.fillHeight:true}
                     }
                 }
@@ -384,7 +384,7 @@ ApplicationWindow {
                         Text {objectName:"helpNextInstruction";text:win.t(win.helpStep==="apple"?"Windows benötigt die Apple-Unterstützung, um dein iPhone zu erkennen.":win.helpStep==="connect"?"Verbinde dein iPhone per USB und entsperre es. Bestätige „Vertrauen“, falls das iPhone danach fragt.":win.helpStep==="certificate"?"Wähle dein Zertifikat und die zugehörigen Profile aus.":win.helpStep==="account"?"Melde dich links mit deinem Apple Account an.":win.helpStep==="install"?"Installiere DirectSide. Danach führt Windows dich durch die nötigen Freigaben am iPhone.":win.helpStep==="developer"?(win.developerDisabled?"Aktiviere den Entwicklermodus am iPhone. Die Anleitung zeigt dir die Schritte.":"Lass dein iPhone entsperrt und per USB angeschlossen."):"Öffne DirectSide auf deinem iPhone und folge dort der Einführung.");font.pixelSize:16;color:win.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
                         Action {objectName:"helpAppleSetup";visible:win.helpStep==="apple" && !s.foregroundBusy && !s.setupBusy;text:win.t("Apple-Unterstützung einrichten");primary:true;onClicked:backend.setupComponents()}
                         Action {visible:win.helpStep==="certificate" && !s.foregroundBusy;text:win.t("Zertifikat einrichten");onClicked:win.page="identity"}
-                        Action {objectName:"helpInstall";visible:win.helpStep==="install" && !s.foregroundBusy && !s.updateBusy && !s.directsideInstalling && (s.bundledIPAReady || s.releaseIPA);text:win.t("DirectSide installieren");primary:true;onClicked:backend.installDirectSide()}
+                        Action {objectName:"helpInstall";visible:win.helpStep==="install" && !s.foregroundBusy && !s.updateBusy && !s.directsideInstalling;text:win.t("DirectSide installieren");primary:true;onClicked:backend.installDirectSide()}
                         Action {objectName:"helpDeveloper";visible:win.helpStep==="developer" && win.developerDisabled;text:win.t("Anleitung öffnen");primary:true;onClicked:win.page="developer"}
                         Action {visible:win.helpStep==="iphone" && s.canSign && s.bundledIPAReady && !s.foregroundBusy && !s.updateBusy && !s.setupPending;text:win.t("App startet nicht?");quiet:true;onClicked:win.helpTrouble=!win.helpTrouble}
                         Text {visible:win.helpTrouble && win.helpStep==="iphone";text:win.t("Falls iOS danach fragt: Einstellungen → Allgemein → VPN & Geräteverwaltung → Entwicklungsteam → Vertrauen.");color:win.ink;wrapMode:Text.WordWrap;Layout.fillWidth:true}
@@ -521,7 +521,7 @@ ApplicationWindow {
             ColumnLayout {anchors.fill:parent;anchors.leftMargin:24;anchors.rightMargin:24;anchors.topMargin:8;anchors.bottomMargin:12;spacing:4
             RowLayout {Layout.fillWidth:true;spacing:8
                 Item {Layout.fillWidth:true}
-                Label {visible:s.updateBusy || s.updateMessage.length>0;text:s.updateBusy?win.t("Update prüfen …")+(s.updateProgress>0?" "+s.updateProgress+"%":""):win.t(s.updateMessage);font.pixelSize:12;color:s.updateState==="error"?"#ffb49a":win.muted;Layout.maximumWidth:parent.width*0.55;horizontalAlignment:Text.AlignRight}
+                Label {visible:s.updateBusy || s.updateMessage.length>0;text:s.updateBusy?win.t(s.directsideInstalling?"DirectSide herunterladen …":"Update prüfen …")+(s.updateProgress>0?" "+s.updateProgress+"%":""):win.t(s.updateMessage);font.pixelSize:12;color:s.updateState==="error"?"#ffb49a":win.muted;Layout.maximumWidth:parent.width*0.55;horizontalAlignment:Text.AlignRight}
                 Label {visible:!!s.error || (s.busy && !s.scanning && !s.settingUp) || s.lcPrepared || s.success;text:(s.error || (s.busy && !s.scanning?s.status:s.lcPrepared?win.t("Zertifikat übertragen · auf dem iPhone fortfahren"):s.success?s.status:"")).split("\n")[0];font.pixelSize:12;color:s.error?"#ffb49a":win.muted;Layout.maximumWidth:parent.width-150;horizontalAlignment:Text.AlignRight}
                 IconButton {visible:s.error.length>0;text:"≡";hint:win.t("Protokoll");onClicked:win.page="activity"}
                 ProgressBar {visible:s.busy && !s.scanning;Layout.preferredWidth:100;from:0;to:100;value:s.progress;indeterminate:s.progress<=0

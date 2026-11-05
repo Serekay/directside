@@ -2,6 +2,8 @@
 
 Install iPhone apps with your own Apple account. Set up once from Windows, then install apps and renew signatures directly on your iPhone.
 
+**Version 0.1.5 (20)** - install DirectSide from Windows with one click. The current IPA downloads automatically; no separate IPA download is needed. Includes the Windows taskbar icon fix and package privacy checks.
+
 [Download for Windows](https://github.com/Serekay/directside/releases/latest/download/DirectSide.exe) | [Download IPA](https://github.com/Serekay/directside/releases/latest/download/DirectSide.ipa) | [Releases](https://github.com/Serekay/directside/releases)
 
 [Quick start](#quick-start) | [Setup](#setup) | [Screenshots](#screenshots) | [Troubleshooting](#troubleshooting)
@@ -11,7 +13,7 @@ Install iPhone apps with your own Apple account. Set up once from Windows, then 
 You need a Windows PC, an unlocked iPhone or iPad running **iOS 17 or later**, a USB cable and an Apple account.
 
 1. Open **DirectSide.exe**, connect your iPhone and confirm **Trust** on the phone if asked.
-2. Sign in with your Apple account and select **Install DirectSide**.
+2. Sign in with your Apple account and select **Install DirectSide**. The app downloads and verifies the current IPA automatically.
 3. Follow the Windows guide to enable **Developer Mode** and trust your developer team if required. Then open DirectSide on the iPhone.
 4. Follow the iPhone introduction to install and connect **LocalDevVPN**. You can also set up **LiveContainer** or choose **Set up later**.
 5. Open **Sources**, select **+** and add a source by address or QR code. Choose an app to install.
@@ -100,7 +102,7 @@ The P12 must include the private key. The profiles must cover the app, any exten
 
 **Update DirectSide:** check **Settings** on the iPhone for a new version. The app also checks automatically at startup.
 
-**Update from Windows:** keep the new `DirectSide.ipa` beside `DirectSide.exe` and select **Install DirectSide**. Use the same account and signing team to keep the existing installation and app data.
+**Update from Windows:** select **Install DirectSide**. Windows downloads and verifies the IPA from the current official release, then signs and installs it on the selected device. Use the same account and signing team to keep the existing installation and app data. A separate IPA download is not required. To install a local IPA, use **+**.
 
 **Renew signatures:** open **My Apps** and renew before the remaining days run out. This extends the signature of the installed version.
 

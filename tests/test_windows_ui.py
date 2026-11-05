@@ -459,19 +459,54 @@ class WindowsUIStateTests(unittest.TestCase):
   self.assertFalse(install.property('visible'));self.assertTrue(check.property('visible'))
   root.close();engine.deleteLater();APP.processEvents()
 
- def test_primary_install_uses_current_adjacent_ipa_without_a_release(self):
+ def test_primary_install_downloads_latest_without_adjacent_ipa_or_prior_release_check(self):
   import plistlib,zipfile
-  from unittest.mock import patch
+  from unittest.mock import patch,Mock
   folder=Path(self.folder.name);ipa=folder/'DirectSide.ipa'
-  with zipfile.ZipFile(ipa,'w') as archive:archive.writestr('Payload/DirectSide.app/Info.plist',plistlib.dumps({'CFBundleIdentifier':'com.directside.app','CFBundleShortVersionString':'0.1.0','CFBundleVersion':'14'}))
-  with patch('desktop.HOME',folder),patch('desktop.ROOT',folder):
-   self.bridge.update(busy=False,loggedIn=True,devices=[{'id':'phone'}],releaseIPA=False,releaseVersion='',customIPA='other.ipa')
+  download=folder/'downloaded.ipa'
+  with zipfile.ZipFile(download,'w') as archive:archive.writestr('Payload/DirectSide.app/Info.plist',plistlib.dumps({'CFBundleIdentifier':'com.directside.app','CFBundleShortVersionString':'0.2.0','CFBundleVersion':'25'}))
+  release={'tag_name':'v0.2.0','assets':[{'name':'DirectSide.ipa'}]}
+  self.bridge.releaseClient.latest=Mock(return_value=release)
+  self.bridge.releaseClient.download=Mock(return_value=download)
+  class InlineThread:
+   def __init__(self,**kwargs):self.target=kwargs['target']
+   def start(self):self.target()
+  with patch('desktop.HOME',folder),patch('desktop.ROOT',folder),patch('desktop.threading.Thread',side_effect=InlineThread):
+   for adjacent in (False,True):
+    if adjacent:
+     with zipfile.ZipFile(ipa,'w') as archive:archive.writestr('Payload/DirectSide.app/Info.plist',plistlib.dumps({'CFBundleIdentifier':'com.directside.app','CFBundleShortVersionString':'0.1.0','CFBundleVersion':'14'}))
+    self.bridge.release=None
+    self.bridge.update(busy=False,directsideInstalling=False,loggedIn=True,devices=[{'id':'phone'}],releaseIPA=False,releaseVersion='',customIPA='other.ipa')
+    self.bridge.installDirectSide()
+    self.bridge.startPendingReleaseInstall()
+    self.assertEqual(self.sent[-1]['command'],'install');self.assertEqual(self.sent[-1]['path'],str(download))
+    self.assertEqual(self.sent[-1]['bundle_id'],'com.directside.app')
+    self.assertTrue(self.sent[-1]['bootstrap'])
+    self.assertEqual(self.bridge.data['customIPA'],'other.ipa')
+    self.assertEqual(self.bridge.data['directsideIPAVersion'],'0.2.0 (25)')
+  self.assertEqual(self.bridge.releaseClient.latest.call_count,2)
+  self.assertEqual(self.bridge.releaseClient.download.call_count,2)
+
+ def test_failed_primary_download_never_silently_installs_adjacent_ipa_and_can_retry(self):
+  from unittest.mock import patch,Mock
+  from updates import UpdateError
+  self.bridge.update(busy=False,loggedIn=True,devices=[{'id':'phone'}],bundledIPAReady=True,bundledIPA='old.ipa')
+  self.bridge.releaseClient.latest=Mock(side_effect=UpdateError('GitHub momentan nicht erreichbar.'))
+  class InlineThread:
+   def __init__(self,**kwargs):self.target=kwargs['target']
+   def start(self):self.target()
+  with patch('desktop.threading.Thread',side_effect=InlineThread):
    self.bridge.installDirectSide()
-  self.assertTrue(self.bridge.data['bundledIPAReady'])
-  self.assertEqual(self.bridge.data['bundledIPAVersion'],'0.1.0 (14)')
-  self.assertEqual(self.sent[-1]['command'],'install');self.assertEqual(self.sent[-1]['path'],str(ipa))
-  self.assertEqual(self.sent[-1]['bundle_id'],'com.directside.app')
-  self.assertEqual(self.bridge.data['customIPA'],'other.ipa')
+   self.assertFalse(self.bridge.data['directsideInstalling'])
+   self.assertFalse(self.bridge.data['updateBusy'])
+   self.assertEqual(self.bridge.data['updateState'],'error')
+   self.assertIsNone(self.bridge.pendingReleaseInstall)
+   self.assertEqual(self.sent,[])
+   self.bridge.releaseClient.latest=Mock(return_value=None)
+   self.bridge.installDirectSide()
+   self.assertFalse(self.bridge.data['directsideInstalling'])
+   self.assertIn('+',self.bridge.data['updateMessage'])
+   self.assertEqual(self.sent,[])
 
  def test_adjacent_ipa_rejects_other_apps_corruption_and_older_versions(self):
   import plistlib,zipfile
@@ -515,7 +550,7 @@ class WindowsUIStateTests(unittest.TestCase):
   from PySide6.QtCore import QPointF
   from PySide6.QtGui import QFont,QFontDatabase
   QFontDatabase.addApplicationFont('C:/Windows/Fonts/segoeui.ttf')
-  self.bridge.update(busy=False,loggedIn=True,devices=[{'id':'phone','label':'iPhone'}],releaseIPA=True,releaseVersion='v0.2.0')
+  self.bridge.update(busy=False,loggedIn=True,devices=[{'id':'phone','label':'iPhone'}],releaseIPA=False,releaseVersion='',bundledIPAReady=False)
   engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('backend',self.bridge)
   engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')))
   root=engine.rootObjects()[0];root.setProperty('font',QFont('Segoe UI',10));root.setWidth(960);root.setHeight(680)

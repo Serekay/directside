@@ -74,7 +74,7 @@ class DesktopBridge(QObject):
         for path in [HOME/'DirectSide.ipa',ROOT/'dist'/'DirectSide.ipa']:
             if path.is_file(): self.data.update(ipa=str(path),ipaName=path.name);break
         self.data.update(language=language,savedEmail=saved.get('email',''),translations=ENGLISH,status=translate(self.data['status'],language))
-        self.data.update(version=VERSION,build=BUILD,updateBusy=False,updateProgress=0,updateState='unchecked',updateMessage='',releaseVersion='',windowsUpdate=False,releaseIPA=False,directsideInstalling=False,customIPA='',customIPAName='',ipaSource='file',githubSaved=(CACHE/'github.dpapi').is_file())
+        self.data.update(version=VERSION,build=BUILD,updateBusy=False,updateProgress=0,updateState='unchecked',updateMessage='',releaseVersion='',windowsUpdate=False,releaseIPA=False,directsideInstalling=False,directsideIPAVersion='',customIPA='',customIPAName='',ipaSource='file',githubSaved=(CACHE/'github.dpapi').is_file())
         self.refreshBundledIPA()
         self.data.update(certificates=[],certificatesLoaded=False,certificateTeam='',certificateLimit=False,removal={},developerMode='unknown',settingUp=False,setupPhase='')
         self.data.update(signingMode=saved.get('signing_mode','account'),importedIdentity={},identityP12='',identityProfiles=[],canSign=False)
@@ -652,14 +652,7 @@ class DesktopBridge(QObject):
 
     @Slot()
     def installDirectSide(self):
-        if self.data['updateBusy'] or (self.data['busy'] and not self.data['scanning']) or self.data['directsideInstalling'] or not self.data['canSign'] or not self.data['devices']:return
-        self.refreshBundledIPA()
-        if self.data['bundledIPAReady']:
-            device=self.data['devices'][self.data['deviceIndex']]['id']
-            self.pendingReleaseInstall=(self.data['bundledIPA'],device)
-            self.update(directsideInstalling=True)
-            self.startPendingReleaseInstall()
-        else:self.downloadDirectSide()
+        self.downloadDirectSide()
 
     def refreshBundledIPA(self):
         self.data.update(bundledIPAReady=False,bundledIPA='',bundledIPAVersion='')
@@ -677,16 +670,20 @@ class DesktopBridge(QObject):
 
     @Slot()
     def downloadDirectSide(self):
-        if self.data['updateBusy'] or (self.data['busy'] and not self.data['scanning']) or self.data['directsideInstalling'] or not self.data['canSign'] or not self.data['devices'] or not self.release or not self.data['releaseIPA']:return
+        if self.data['updateBusy'] or (self.data['busy'] and not self.data['scanning']) or self.data['directsideInstalling'] or not self.data['canSign'] or not self.data['devices']:return
         device=self.data['devices'][self.data['deviceIndex']]['id']
-        self.update(directsideInstalling=True)
+        self.update(directsideInstalling=True,error='',success=False,directsideIPAVersion='')
         def work():
             release=self.releaseClient.latest()
             if release is None:
-                self.releaseEvent.emit({'type':'release','release':None});return
+                raise UpdateError('Keine DirectSide-IPA freigegeben. Erneut versuchen oder eine eigene IPA über + auswählen.')
             path=self.releaseClient.download(release,'DirectSide.ipa',lambda value:self.releaseEvent.emit({'type':'progress','value':value}))
+            info=ipa_info(path)
+            package_version=info.get('CFBundleShortVersionString','')
+            build=info.get('CFBundleVersion','')
+            package_version=package_version+(' ('+str(build)+')' if build else '')
             self.releaseEvent.emit({'type':'release','release':release,'downloading':True})
-            self.releaseEvent.emit({'type':'ipa','path':str(path),'version':release['tag_name'],'install_device':device})
+            self.releaseEvent.emit({'type':'ipa','path':str(path),'version':release['tag_name'],'package_version':package_version,'install_device':device})
         self.releaseWorker(work)
 
     def startPendingReleaseInstall(self):
@@ -694,7 +691,7 @@ class DesktopBridge(QObject):
         path,device=self.pendingReleaseInstall;self.pendingReleaseInstall=None
         if not self.data['canSign'] or not self.data['devices'] or self.data['devices'][self.data['deviceIndex']]['id']!=device:
             self.fail('Zielgerät oder Anmeldung hat sich geändert. Installation erneut starten.');return
-        self.data.update(ipa=path,ipaSource='file' if path==self.data.get('bundledIPA') else 'github')
+        self.data.update(ipa=path,ipaSource='github')
         self.install()
 
     @Slot()
@@ -725,7 +722,8 @@ class DesktopBridge(QObject):
             self.update(updateBusy=event.get('downloading',False),updateState='available' if newer else 'current',updateMessage='',releaseVersion=self.release['tag_name'],windowsUpdate=newer and 'DirectSide.exe' in assets,releaseIPA='DirectSide.ipa' in assets)
         elif kind=='ipa':
             if event.get('install_device'):self.pendingReleaseInstall=(event['path'],event['install_device'])
-            self.update(updateBusy=False,ipa=event['path'],ipaName='DirectSide · '+event['version'],ipaSource='github',success=False,error='',updateMessage='' if event.get('install_device') else 'DirectSide-IPA bereit.')
+            package_version=event.get('package_version','')
+            self.update(updateBusy=False,ipa=event['path'],ipaName='DirectSide'+(' · '+package_version if package_version else ''),directsideIPAVersion=package_version,ipaSource='github',success=False,error='',updateMessage='' if event.get('install_device') else 'DirectSide-IPA bereit.')
         elif kind=='error':self.update(updateBusy=False,directsideInstalling=False,updateState='error',updateMessage=event['message'])
         elif kind=='windows':
             # A login or installation may have started during the download. Defer restart.

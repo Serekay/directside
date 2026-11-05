@@ -176,6 +176,8 @@
   "GitHub momentan nicht erreichbar.": "GitHub is currently unavailable.",
   "GitHub-Anfrage fehlgeschlagen. Erneut versuchen.": "GitHub request failed. Please try again.",
   "DirectSide-IPA bereit.": "DirectSide IPA ready.",
+  "DirectSide herunterladen …": "Downloading DirectSide …",
+  "Keine DirectSide-IPA freigegeben. Erneut versuchen oder eine eigene IPA über + auswählen.": "No DirectSide IPA released. Try again or select your own IPA using +.",
   "Windows-Update installiert.": "Windows update installed.",
   "Windows-Update fehlgeschlagen. Vorherige Version bleibt erhalten.": "Windows update failed. Previous version retained.",
   "Windows-Updater konnte nicht gestartet werden.": "Could not start the Windows updater.",
