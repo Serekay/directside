@@ -2,8 +2,6 @@
 
 Install iPhone apps with your own Apple account. Set up once from Windows, then install apps and renew signatures directly on your iPhone.
 
-**Version 0.1.5 (20)** - install DirectSide from Windows with one click. The current IPA downloads automatically; no separate IPA download is needed. Includes the Windows taskbar icon fix and package privacy checks.
-
 [Download for Windows](https://github.com/Serekay/directside/releases/latest/download/DirectSide.exe) | [Download IPA](https://github.com/Serekay/directside/releases/latest/download/DirectSide.ipa) | [Releases](https://github.com/Serekay/directside/releases)
 
 [Quick start](#quick-start) | [Setup](#setup) | [Screenshots](#screenshots) | [Troubleshooting](#troubleshooting)

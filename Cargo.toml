@@ -19,10 +19,6 @@ required-features = ["iphone-screenshots"]
 name = "iphone-control"
 required-features = ["iphone-control"]
 
-[[example]]
-name = "iphone-reset-setup"
-required-features = ["iphone-screenshots"]
-
 [dependencies]
 ns-keyed-archive = { version = "0.1.5", optional = true }
 isideload = { path = "vendor/isideload" }

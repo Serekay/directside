@@ -41,3 +41,8 @@ credentials*.json
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Local workspace instructions and internal documentation
+/AGENTS.md
+/CLAUDE.md
+/docs/internal/

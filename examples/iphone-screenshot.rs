@@ -1,5 +1,5 @@
 //! Explicit, one-shot README capture. Does not install developer images or
-//! publish screenshots. Probe is safe to run before the owner opens DirectSide.
+//! publish screenshots. Open the intended app view before capturing.
 use idevice::{IdeviceService,lockdown::LockdownClient,provider::IdeviceProvider,usbmuxd::{UsbmuxdConnection,UsbmuxdAddr},dvt::{remote_server::RemoteServerClient,screenshot::ScreenshotClient}};
 use rootcause::prelude::*;
 use std::{path::PathBuf,time::Duration};

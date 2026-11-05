@@ -32,6 +32,9 @@ class GitContentGuardTests(unittest.TestCase):
     def test_environment_file_is_rejected_before_secret_scan(self):
         self.stage('.env','LOCAL_SETTING=value\n')
         self.assertEqual(self.check(),1)
+    def test_local_workspace_instructions_are_rejected(self):
+        self.stage('AGENTS.md','Local workspace instructions\n')
+        self.assertEqual(self.check(),1)
     def test_safe_change_is_accepted(self):
         if not (ROOT/'.tools/gitleaks/gitleaks.exe').is_file() and not shutil.which('gitleaks'):self.skipTest('Gitleaks not installed')
         self.stage('README.md','Project documentation\n')

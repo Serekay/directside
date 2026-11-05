@@ -11,7 +11,9 @@ def main():
     suffixes={'.p12','.pfx','.p8','.pem','.key','.mobileprovision','.mobiledevicepairing','.dpapi','.ipa','.exe','.dll','.log','.sqlite','.sqlite3'}
     for name in filter(None,paths):
         path=Path(name)
-        if path.suffix.lower() in suffixes or any(p in {'.tools','build','dist','target','.claude','.codex'} for p in path.parts) or path.name=='.env' or (path.name.startswith('.env.') and path.name!='.env.example'):
+        internal=(path.name in {'AGENTS.md','CLAUDE.md'} or path.name.endswith('-prompt.md')
+                  or path.parts[:2]==('docs','internal'))
+        if internal or path.suffix.lower() in suffixes or any(p in {'.tools','build','dist','target','.claude','.codex'} for p in path.parts) or path.name=='.env' or (path.name.startswith('.env.') and path.name!='.env.example'):
             print('Commit blocked: a local credential, binary or diagnostic file is staged.',file=sys.stderr)
             return 1
     email=subprocess.check_output(['git','var','GIT_AUTHOR_IDENT'],cwd=ROOT,text=True).split('<',1)[1].split('>',1)[0]
