@@ -28,7 +28,7 @@ jobs:
         run: python3 scripts/scan-build-secrets.py
       - name: Source format tests
         run: |
-          swiftc ios/DirectSide/Models.swift ios/DirectSide/AppStatusModels.swift ios/DirectSide/Localization.swift ios/DirectSide/UpdateModel.swift ios/Tests/main.swift -o /tmp/directside-source-tests
+          swiftc ios/DirectSide/Models.swift ios/DirectSide/AppStatusModels.swift ios/DirectSide/LiveContainerInventory.swift ios/DirectSide/Localization.swift ios/DirectSide/UpdateModel.swift ios/Tests/main.swift -o /tmp/directside-source-tests
           /tmp/directside-source-tests
           swiftc ios/DirectSide/Models.swift ios/DirectSide/SourceRefreshCoordinator.swift ios/Tests/SourceRefreshTests.swift -o /tmp/directside-refresh-tests
           /tmp/directside-refresh-tests

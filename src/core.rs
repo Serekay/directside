@@ -692,6 +692,37 @@ fn check_slots(installed:&std::collections::HashMap<String,plist::Value>,target:
     Ok(())
 }
 
+async fn inspect_livecontainer_usb(request:&Value)->Result<(),Report> {
+    let id=text(request,"device_id")?;
+    let mut mux=UsbmuxdConnection::default().await?;
+    let device=mux.get_devices().await?.into_iter().find(|d|d.udid==id).ok_or_else(||report!("Gerät nicht verbunden."))?;
+    let provider=device.to_provider(UsbmuxdAddr::from_env_var()?,"DirectSide");
+    let apps=idevice::installation_proxy::InstallationProxyClient::connect(&provider).await?.get_apps(Some("User"),None).await?;
+    let mut hosts=Vec::new();
+    for host in apps.keys().filter(|id|livecontainer_id(id)).take(8) {
+        let result=async {
+            let mut afc=idevice::house_arrest::HouseArrestClient::connect(&provider).await?.vend_documents(host.clone()).await?;
+            crate::livecontainer_inventory::read(&mut afc,host).await
+        }.await;
+        hosts.push(result.unwrap_or_else(|_|json!({"hostID":host,"state":"unavailable","apps":[]})));
+    }
+    emit(json!({"event":"livecontainer_apps","device_id":id,"hosts":hosts}));Ok(())
+}
+async fn inspect_livecontainer_local(request:&Value)->Result<(),Report> {
+    use idevice::RsdService;
+    let(mut handle,mut rsd)=connect_local(request).await?;
+    let apps=idevice::installation_proxy::InstallationProxyClient::connect_rsd(&mut handle,&mut rsd).await?.get_apps(Some("User"),None).await?;
+    let mut hosts=Vec::new();
+    for host in apps.keys().filter(|id|livecontainer_id(id)).take(8) {
+        let result=async {
+            let mut afc=idevice::house_arrest::HouseArrestClient::connect_rsd(&mut handle,&mut rsd).await?.vend_documents(host.clone()).await?;
+            crate::livecontainer_inventory::read(&mut afc,host).await
+        }.await;
+        hosts.push(result.unwrap_or_else(|_|json!({"hostID":host,"state":"unavailable","apps":[]})));
+    }
+    emit(json!({"event":"livecontainer_apps","generation":request["generation"],"hosts":hosts}));Ok(())
+}
+
 async fn inspect_local(request:&Value)->Result<(),Report> {
     use idevice::RsdService;
     let(mut handle,mut rsd)=connect_local(request).await?;
@@ -847,6 +878,8 @@ pub async fn run() {
             },
             "import_session"=>{let result=import_session(&request);if result.is_ok(){engine=None;session_diagnostic("imported","");}else if let Err(error)=&result{session_diagnostic("import_failed",&error.to_string());}result},
             "inspect_local"=>match tokio::time::timeout(Duration::from_secs(25),inspect_local(&request)).await {Ok(r)=>r,Err(_)=>Err(report!("Verbindung zum lokalen Gerät hat zu lange gedauert. LocalDevVPN prüfen."))},
+            "inspect_livecontainer"=>match tokio::time::timeout(Duration::from_secs(45),inspect_livecontainer_usb(&request)).await {Ok(r)=>r,Err(_)=>Err(report!("LiveContainer-Versionen konnten nicht rechtzeitig gelesen werden."))},
+            "inspect_livecontainer_local"=>match tokio::time::timeout(Duration::from_secs(45),inspect_livecontainer_local(&request)).await {Ok(r)=>r,Err(_)=>Err(report!("LiveContainer-Versionen konnten nicht rechtzeitig gelesen werden."))},
             "login" => {
                 engine = None;
                 let result = tokio::time::timeout(Duration::from_secs(300),login(&request)).await;
@@ -872,7 +905,11 @@ pub async fn run() {
             "quit" => break,
             _ => Err(report!("Unbekannter Befehl.")),
         };
-        if let Err(e) = result { emit(json!({"event":"error","command":command,"message":format!("{e}")})); }
+        if let Err(e) = result {
+            let mut event=json!({"event":"error","command":command,"message":format!("{e}")});
+            if command=="inspect_livecontainer_local" {event["generation"]=request["generation"].clone();}
+            emit(event);
+        }
     }
 }
 

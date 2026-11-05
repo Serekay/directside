@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Read LiveContainer guest version metadata through the paired local connection and compare it with source versions.
+- Show guest apps and update actions under My Apps; keep update indicators until a new installed version is read.
+- Mark unavailable or partial guest inventories as unverified and retain the last known versions.
+
 ## 0.1.7 (22) - 2026-11-05
 
 - Distinguish unavailable Wi-Fi from an unreachable local installation connection.

@@ -1,4 +1,5 @@
 pub mod core;
+mod livecontainer_inventory;
 #[cfg(windows)]
 mod iphone_setup;
 use std::{collections::VecDeque, ffi::{CStr,CString,c_char}, sync::{Mutex,OnceLock,mpsc}};

@@ -61,6 +61,15 @@ import CryptoKit
     @Published var sourceFailures: [String:String] = [:]
     @Published var refreshingSources = false
     @Published var sourceNotices:[SourceVersionNotice]=[]
+    @Published var containerGuests:[LiveContainerGuest]=[]
+    @Published var containerReadStates:[String:String]=[:]
+    @Published var readingContainer=false
+    @Published var containerReadError:String?
+    private var containerGeneration=UUID().uuidString
+    func invalidateContainerInventory() {
+        containerGeneration=UUID().uuidString;readingContainer=false;lastInspection=nil
+        containerReadStates=containerReadStates.mapValues{_ in "unverified"}
+    }
     private let sourceRefresh=SourceRefreshCoordinator()
     @Published var selfExpiration:Date?
     @Published var slotsUsed:Int?
@@ -224,13 +233,20 @@ import CryptoKit
     }
     func installed(_ app:CatalogApp) -> ManagedApp? {updateRecords.first{$0.id==app.id}}
     func updateCount(in source:SourceCatalog)->Int {
-        Set(updates.filter{$0.source.id==source.id}.map{$0.app.id}+sourceNotices.filter{$0.sourceID==source.id}.map(\.bundleID)).count
+        let guestIDs=containerGuests.filter {guest in
+            guard let app=source.apps.first(where:{$0.id==guest.bundleID}),let latest=app.latest else {return false}
+            return CatalogUpdates.isNewer(latest,than:guest.comparisonRecord)
+        }.map(\.bundleID)
+        return Set(updates.filter{$0.source.id==source.id}.map{$0.app.id}+guestIDs+sourceNotices.filter{$0.sourceID==source.id}.map(\.bundleID)).count
+    }
+    func containerUpdateCandidates(for guest:LiveContainerGuest)->[LiveContainerGuestUpdate] {LiveContainerInventory.candidates(for:guest,sources:sources)}
+    var containerUpdateCount:Int {containerGuests.filter{!containerUpdateCandidates(for:$0).isEmpty}.count}
+    func hasContainerUpdate(_ app:CatalogApp)->Bool {
+        guard let latest=app.latest else {return false}
+        return containerGuests.contains{$0.bundleID==app.id && CatalogUpdates.isNewer(latest,than:$0.comparisonRecord)}
     }
     var sourceUpdateCount:Int {sources.reduce(0){$0+updateCount(in:$1)}}
     func hasSourceNotice(_ app:CatalogApp,source:SourceCatalog)->Bool {sourceNotices.contains{$0.sourceID==source.id && $0.bundleID==app.id}}
-    func acknowledgeSourceVersion(_ app:CatalogApp,source:SourceCatalog) {
-        sourceNotices.removeAll{$0.sourceID==source.id && $0.bundleID==app.id};save(sourceNotices,"source-notices.json")
-    }
     var reminderApps:[RenewalReminderApp] {
         var apps=managed.compactMap{app in app.expiresAt.map{RenewalReminderApp(id:app.id,name:app.name,expiresAt:$0)}}
         if let selfExpiration {apps.removeAll{$0.id=="com.directside.app"};apps.append(RenewalReminderApp(id:"com.directside.app",name:"DirectSide",expiresAt:selfExpiration))}
@@ -253,6 +269,7 @@ import CryptoKit
         sources = load("sources.json") ?? []
         managed = load("apps.json") ?? []
         sourceNotices = load("source-notices.json") ?? []
+        containerGuests = load("livecontainer-apps.json") ?? []
         refreshBootstrap()
         guard ds_set_anisette_callback(ds_swift_anisette_generate,ds_swift_anisette_release) else {self.error="Could not connect the local authentication runtime.";return}
         guard ds_set_anisette_resync_callback(ds_swift_anisette_resync) else {self.error="Could not connect local authentication synchronization.";return}
@@ -390,9 +407,22 @@ import CryptoKit
                 }
                 save(managed,"apps.json")
                 if let (peer,port)=inspectionConnection {
+                    if !readingContainer {readingContainer=true;containerReadError=nil;send(["command":"inspect_livecontainer_local","peer":peer,"port":port,"pairing_path":Paths.pairing.path,"generation":containerGeneration])}
                     let ids=deviceApps.map(\.id).filter{deviceIcons[$0]==nil}
                     for index in stride(from:0,to:ids.count,by:12) {send(["command":"local_app_icons","peer":peer,"port":port,"pairing_path":Paths.pairing.path,"bundles":Array(ids[index..<min(index+12,ids.count)])])}
                 }
+            case "livecontainer_apps":
+                guard event["generation"] as? String==containerGeneration else {continue}
+                readingContainer=false
+                if let data=try? JSONSerialization.data(withJSONObject:event["hosts"] ?? []),let hosts=try? JSONDecoder().decode([LiveContainerHostInventory].self,from:data) {
+                    containerGuests=LiveContainerInventory.reconcile(previous:containerGuests,hosts:hosts,now:Date())
+                    containerReadStates=Dictionary(hosts.map{($0.hostID,$0.state)},uniquingKeysWith:{_,last in last})
+                    containerReadError=hosts.contains{$0.state != "ready"} ? "LiveContainer konnte nicht vollständig gelesen werden.":nil
+                    for guest in containerGuests where containerReadStates[guest.hostID]=="ready" {
+                        sourceNotices=SourceVersionChanges.acknowledging(installed:guest.comparisonRecord,pending:sourceNotices)
+                    }
+                    save(containerGuests,"livecontainer-apps.json");save(sourceNotices,"source-notices.json")
+                } else {containerReadError="LiveContainer konnte nicht vollständig gelesen werden."}
             case "ipa_inspected":
                 if let path=event["path"] as? String,let file=importingPath,path==file.path,let bundle=event["bundle_id"] as? String {
                     importedIPA=ImportedIPA(file:file,bundleID:bundle,name:event["name"] as? String ?? "Imported app",version:event["version"] as? String)
@@ -434,6 +464,7 @@ import CryptoKit
                 pendingApp=nil
                 let continuation=installContinuation; installContinuation=nil; continuation?.resume()
             case "error":
+                if event["command"] as? String == "inspect_livecontainer_local" {if event["generation"] as? String==containerGeneration {readingContainer=false;containerReadError="LiveContainer konnte nicht gelesen werden. Verbindung prüfen und erneut versuchen.";containerReadStates=containerReadStates.mapValues{_ in "unverified"}};continue}
                 if event["command"] as? String == "import_session" {pendingLocalIdentity=nil;sessionImportPending=false;restoring=false;busy=false;message="Bitte anmelden";continue}
                 if event["command"] as? String == "app_ids" {loadingAppIDs=false;appIDsError="App-Kennungen konnten nicht geladen werden. Bitte erneut versuchen.";continue}
                 if event["command"] as? String == "local_app_icons" {continue}

@@ -51,7 +51,7 @@ enum LiveContainerBridge {
         var url=URLComponents();url.scheme="livecontainer";url.host="install";url.queryItems=[URLQueryItem(name:"url",value:latest.downloadURL.absoluteString)]
         guard let destination=url.url else {return}
         UIApplication.shared.open(destination,options:[:]){success in Task{@MainActor in
-            if success {engine.message="An LiveContainer übergeben. Installation dort bestätigen.";if let source {engine.acknowledgeSourceVersion(app,source:source)}}
+            if success {engine.message="An LiveContainer übergeben. Installation dort bestätigen."}
             else {engine.error="LiveContainer konnte nicht geöffnet werden."}
         }}
     }

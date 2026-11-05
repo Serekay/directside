@@ -641,5 +641,16 @@
   "Neue Version in dieser Quelle": "New version in this source",
   "1 neue Version": "1 new version",
   "%@ neue Versionen": "%@ new versions",
-  "Updates verfügbar": "Updates available"
+  "Updates verfügbar": "Updates available",
+  "LiveContainer-Update": "LiveContainer update",
+  "In LiveContainer aktualisieren": "Update in LiveContainer",
+  "LiveContainer-Versionen lesen …": "Reading LiveContainer versions …",
+  "Noch keine LiveContainer-Versionen gelesen.": "No LiveContainer versions read yet.",
+  "LiveContainer prüfen": "Check LiveContainer",
+  "Für die Versionsprüfung die lokale Verbindung herstellen.": "Connect the local installation connection to check versions.",
+  "LiveContainer konnte nicht vollständig gelesen werden.": "LiveContainer could not be read completely.",
+  "LiveContainer konnte nicht gelesen werden. Verbindung prüfen und erneut versuchen.": "Could not read LiveContainer. Check the connection and try again.",
+  "Installiert: %@": "Installed: %@",
+  "Zuletzt gelesen: %@": "Last read: %@",
+  "Version unbekannt": "Version unknown"
 }

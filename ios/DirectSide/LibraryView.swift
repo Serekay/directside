@@ -53,6 +53,21 @@ struct LibraryView:View {
                     .swipeActions(edge:.trailing,allowsFullSwipe:false){deleteButton(app)}.contextMenu{deleteButton(app)}
                 }
             } header:{HStack{Text(L("Installiert"));Spacer();if let slots=engine.slotsUsed {Text(L("\(slots) Entwickler-Apps"))}}}
+            if LiveContainerBridge.available || !engine.containerGuests.isEmpty || engine.readingContainer {Section {
+                ForEach(engine.containerGuests) {guest in LiveContainerGuestRow(guest:guest)}
+                if engine.containerGuests.isEmpty {
+                    Text(L(engine.readingContainer ? "LiveContainer-Versionen lesen …":"Noch keine LiveContainer-Versionen gelesen.")).font(.subheadline).foregroundStyle(.secondary)
+                }
+            } header:{
+                HStack {
+                    Text(L("In LiveContainer"));Spacer()
+                    if engine.readingContainer {ProgressView().controlSize(.small)}
+                    else {Button {connection.checkVPN();engine.inspectConnection(peer:connection.peer,port:connection.port,force:true)} label:{Image(systemName:"arrow.clockwise")}.accessibilityLabel(L("LiveContainer prüfen"))}
+                }
+            } footer:{
+                if let error=engine.containerReadError {Text(L(error)).foregroundStyle(.orange)}
+                else if !connection.vpnReachable {Text(L("Für die Versionsprüfung die lokale Verbindung herstellen."))}
+            }}
         }.listStyle(.insetGrouped).scrollContentBackground(.hidden).background(Style.background).toolbar(.hidden,for:.navigationBar)
         .scrollDismissesKeyboard(.interactively)
         .task{engine.inspectConnection(peer:connection.peer,port:connection.port)}
@@ -70,6 +85,33 @@ struct LibraryView:View {
     }
     @ViewBuilder private func deleteButton(_ app:DeviceApp?)->some View {
         if let app {Button(role:.destructive){selected=app}label:{Label(L("App löschen"),systemImage:"trash")}.disabled(engine.busy)}
+    }
+}
+
+private struct LiveContainerGuestRow:View {
+    @EnvironmentObject var engine:Engine
+    let guest:LiveContainerGuest
+    var body:some View {
+        let candidates=engine.containerUpdateCandidates(for:guest)
+        let icon=engine.sources.flatMap(\.apps).first{$0.id==guest.bundleID}?.iconURL
+        let verified=engine.containerReadStates[guest.hostID]=="ready"
+        HStack(spacing:12) {
+            Artwork(url:icon,size:50)
+            VStack(alignment:.leading,spacing:4) {
+                HStack {Text(guest.name).font(.subheadline.bold());if !candidates.isEmpty {UpdateIndicator()}}
+                Text(guest.version.map{L(verified ? "Installiert: \($0)":"Zuletzt gelesen: \($0)")} ?? L("Version unbekannt")).font(.caption).foregroundStyle(.secondary)
+                if let latest=candidates.first?.app.latest {Text(L("Version \(latest.displayVersion) verfügbar")).font(.caption.weight(.medium)).foregroundStyle(Style.accent)}
+                if !verified {Text(L("Nicht geprüft")).font(.caption2).foregroundStyle(.orange)}
+            }
+            Spacer(minLength:4)
+            if candidates.count==1,let update=candidates.first {
+                Button(L("Aktualisieren")){LiveContainerBridge.importApp(update.app,source:update.source,engine:engine)}.font(.caption.bold()).buttonStyle(.borderedProminent).disabled(engine.busy || engine.readingContainer)
+            }else if !candidates.isEmpty {
+                Menu {
+                    ForEach(candidates) {update in Button(update.source.name+" · "+(update.app.latest?.displayVersion ?? "")){LiveContainerBridge.importApp(update.app,source:update.source,engine:engine)}}
+                }label:{Text(L("Aktualisieren")).font(.caption.bold())}.disabled(engine.busy || engine.readingContainer)
+            }
+        }.padding(.vertical,8)
     }
 }
 

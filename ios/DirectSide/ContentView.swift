@@ -32,7 +32,7 @@ struct ContentView:View {
         else {
         TabView(selection:$tab) {
             NavigationStack{DiscoverView(connection:connection,addSource:{sheet = .add})}.tabItem{Label(L("Entdecken"),systemImage:"safari")}.tag(0)
-            NavigationStack{LibraryView(connection:connection)}.tabItem{Label(L("Meine Apps"),systemImage:"square.stack")}.badge(engine.updates.count+(updater.available == nil ? 0:1)).tag(1)
+            NavigationStack{LibraryView(connection:connection)}.tabItem{Label(L("Meine Apps"),systemImage:"square.stack")}.badge(engine.updates.count+engine.containerUpdateCount+(updater.available == nil ? 0:1)).tag(1)
             NavigationStack{SourcesView(connection:connection,addSource:{sheet = .add})}.tabItem{Label(L("Quellen"),systemImage:"square.stack.3d.up")}.badge(engine.sourceUpdateCount).tag(2)
             NavigationStack{SettingsView(connection:connection)}.tabItem{Label(L("Einstellungen"),systemImage:"gearshape")}.tag(3)
         }.tint(Style.accent)
@@ -47,7 +47,7 @@ struct ContentView:View {
         .task(id:engine.reminderApps) {reminders.update(apps:engine.reminderApps,language:language)}
         .onChange(of:reminders.showLibrary,initial:true){_,show in if show {tab=1;reminders.showLibrary=false}}
         .onChange(of:phase){_,value in
-            if value == .active {engine.refreshBootstrap();startConnectionIfNeeded();reminders.update(apps:engine.reminderApps,language:language);Task{await updater.check()};Task{await engine.refreshSources()}}
+            if value == .active {engine.refreshBootstrap();engine.invalidateContainerInventory();startConnectionIfNeeded();engine.inspectConnection(peer:connection.peer,port:connection.port,force:true);reminders.update(apps:engine.reminderApps,language:language);Task{await updater.check()};Task{await engine.refreshSources()}}
             else if value == .background {connection.stopMonitoring()}
         }
         .onChange(of:onboardingStep){_,_ in startConnectionIfNeeded()}
@@ -60,7 +60,7 @@ struct ContentView:View {
         .onChange(of:updater.showOffer){_,_ in presentUpdateIfReady()}
         .onChange(of:engine.busy){_,value in if !value {engine.inspectConnection(peer:connection.peer,port:connection.port);presentUpdateIfReady()}}
         .onChange(of:connection.port){_,value in if value>0 {engine.inspectConnection(peer:connection.peer,port:value)}}
-        .onChange(of:connection.vpnReachable){_,value in if value {engine.inspectConnection(peer:connection.peer,port:connection.port)}}
+        .onChange(of:connection.vpnReachable){_,value in if value {engine.inspectConnection(peer:connection.peer,port:connection.port)} else {engine.invalidateContainerInventory()}}
     }
     private var presentedContent:some View {
         observedTabs.sheet(item:$sheet,onDismiss:dismissSheet){item in sheetNavigation(item)}

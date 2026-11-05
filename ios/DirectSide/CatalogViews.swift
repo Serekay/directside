@@ -55,9 +55,9 @@ struct CatalogRow: View {
                     Artwork(url:app.iconURL)
                     VStack(alignment:.leading,spacing:4) {
                         HStack {Text(L(app.name)).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
-                            if engine.hasUpdate(app) || engine.hasSourceNotice(app,source:source) {UpdateIndicator(title:engine.hasUpdate(app) ? "Update":"Neue Version")}}
+                            if engine.hasUpdate(app) || engine.hasContainerUpdate(app) || engine.hasSourceNotice(app,source:source) {UpdateIndicator(title:engine.hasUpdate(app) || engine.hasContainerUpdate(app) ? "Update verfügbar":"Neue Version")}}
                         Text(L(app.subtitle ?? app.developerName ?? source.name)).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                        if engine.hasUpdate(app),let latest=app.latest {Text(L("Version \(latest.displayVersion) verfügbar")).font(.caption.weight(.medium)).foregroundStyle(Style.accent)}
+                        if engine.hasUpdate(app) || engine.hasContainerUpdate(app),let latest=app.latest {Text(L("Version \(latest.displayVersion) verfügbar")).font(.caption.weight(.medium)).foregroundStyle(Style.accent)}
                     }
                 }
             }.buttonStyle(.plain)
@@ -82,10 +82,10 @@ struct CatalogInstallAction:View {
     var body:some View {
         Menu {
             Button {if let installed=engine.installed(app),!installed.cachedIPA.isEmpty,!engine.hasUpdate(app) {engine.refresh(installed,peer:connection.peer,port:connection.port)}else{Task{await engine.install(app,source:source,peer:connection.peer,port:connection.port)}}} label:{Label(L("Auf diesem Gerät"),systemImage:"iphone")}
-            Button {if LiveContainerBridge.available {LiveContainerBridge.importApp(app,source:source,engine:engine)}else{showContainerSetup=true}} label:{Label(L("In LiveContainer"),systemImage:"square.stack.3d.up")}
+            Button {if LiveContainerBridge.available {LiveContainerBridge.importApp(app,source:source,engine:engine)}else{showContainerSetup=true}} label:{Label(L(engine.hasContainerUpdate(app) ? "In LiveContainer aktualisieren":"In LiveContainer"),systemImage:"square.stack.3d.up")}
         }label:{
-            if let installed=engine.installed(app),!installed.cachedIPA.isEmpty,!engine.hasUpdate(app) {SignatureLabel(expiresAt:installed.expiresAt)}
-            else {Text(L(engine.hasUpdate(app) ? "Aktualisieren":"Laden")).font(.caption.bold()).padding(.horizontal,15).padding(.vertical,9).background(Style.accent.opacity(0.12),in:Capsule())}
+            if let installed=engine.installed(app),!installed.cachedIPA.isEmpty,!engine.hasUpdate(app),!engine.hasContainerUpdate(app) {SignatureLabel(expiresAt:installed.expiresAt)}
+            else {Text(L(engine.hasUpdate(app) || engine.hasContainerUpdate(app) ? "Aktualisieren":"Laden")).font(.caption.bold()).padding(.horizontal,15).padding(.vertical,9).background(Style.accent.opacity(0.12),in:Capsule())}
         }
         .foregroundStyle(Style.accent).disabled(engine.busy || app.latest==nil)
         .sheet(isPresented:$showContainerSetup){NavigationStack{LiveContainerSettings(connection:connection).toolbar{Button(L("Fertig")){showContainerSetup=false}}}}
@@ -162,7 +162,7 @@ struct AppDetailView: View {
                     Artwork(url:app.iconURL,size:88)
                     VStack(alignment:.leading,spacing:6) {Text(L(app.name)).font(.title2.bold());Text(L(app.developerName ?? source.name)).font(.subheadline).foregroundStyle(.secondary);CatalogInstallAction(app:app,source:source,connection:connection)}
                 }
-                if engine.hasUpdate(app) || engine.hasSourceNotice(app,source:source) {UpdateIndicator(title:engine.hasUpdate(app) ? "Update verfügbar":"Neue Version in dieser Quelle")}
+                if engine.hasUpdate(app) || engine.hasContainerUpdate(app) || engine.hasSourceNotice(app,source:source) {UpdateIndicator(title:engine.hasUpdate(app) || engine.hasContainerUpdate(app) ? "Update verfügbar":"Neue Version in dieser Quelle")}
                 HStack {metadata("VERSION",app.latest?.displayVersion ?? "–");Divider();metadata("GRÖSSE",app.latest?.size.map{ByteCountFormatter.string(fromByteCount:$0,countStyle:.file)} ?? "–");Divider();metadata("SYSTEM",app.latest?.minOSVersion.map{"iOS \($0)+"} ?? "iOS")}.frame(height:52).padding(.vertical,6)
                 if let shots=app.screenshots?.all,!shots.isEmpty {
                     ScrollView(.horizontal,showsIndicators:false) {HStack(spacing:12) {ForEach(shots) { shot in Button {selectedImage=shot} label: {AsyncImage(url:["http","https"].contains(shot.imageURL.scheme ?? "") ? shot.imageURL:nil) {image in image.resizable().scaledToFit()} placeholder:{RoundedRectangle(cornerRadius:17).fill(Style.surface).overlay(ProgressView())}.frame(width:max(140,min(310,240*shot.aspectRatio)),height:240).clipShape(RoundedRectangle(cornerRadius:17))}.buttonStyle(.plain).accessibilityLabel(L("Screenshot vergrößern"))}}}
