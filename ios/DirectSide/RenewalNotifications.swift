@@ -3,6 +3,7 @@ import Combine
 import UserNotifications
 
 @MainActor final class RenewalNotifications:NSObject,ObservableObject,UNUserNotificationCenterDelegate {
+    static let shared=RenewalNotifications()
     @Published private(set) var enabled=UserDefaults.standard.bool(forKey:"renewalReminders")
     @Published private(set) var allowed=false
     @Published private(set) var error:String?

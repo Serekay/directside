@@ -1,9 +1,18 @@
 import SwiftUI
+import UIKit
+
+private final class DirectSideAppDelegate:NSObject,UIApplicationDelegate {
+    func application(_ application:UIApplication,didFinishLaunchingWithOptions launchOptions:[UIApplication.LaunchOptionsKey:Any]?=nil)->Bool {
+        _ = RenewalNotifications.shared
+        return true
+    }
+}
 
 @main struct DirectSideApp: App {
+    @UIApplicationDelegateAdaptor(DirectSideAppDelegate.self) private var appDelegate
     @StateObject private var engine = Engine()
     @StateObject private var updater = AppUpdater()
-    @StateObject private var reminders = RenewalNotifications()
+    @StateObject private var reminders = RenewalNotifications.shared
     @AppStorage("language") private var language="en"
     var body: some Scene {
         WindowGroup {
