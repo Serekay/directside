@@ -39,6 +39,8 @@ try {
         $env:PATH = "$pythonDirectory;$env:SystemRoot\System32;$env:SystemRoot"
         & $python -m PyInstaller --noconfirm --clean --distpath $OutputDirectory --workpath build\pyinstaller packaging\DirectSide.spec
         if ($LASTEXITCODE) { throw 'Windows packaging failed.' }
+        & $python scripts/verify-windows-package.py (Join-Path $OutputDirectory 'DirectSide.exe') --preferences (Join-Path $env:LOCALAPPDATA 'DirectSide\preferences.json')
+        if ($LASTEXITCODE) { throw 'Windows package privacy verification failed.' }
         $report = Join-Path $project 'build\smoke-test.json'
         if (Test-Path $report) { Remove-Item -LiteralPath $report }
         $application = Start-Process -FilePath (Join-Path (Join-Path $project $OutputDirectory) 'DirectSide.exe') -ArgumentList ('--smoke-test "{0}"' -f $report) -WindowStyle Hidden -PassThru

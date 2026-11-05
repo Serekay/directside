@@ -847,6 +847,10 @@ def main():
     engine.load(QUrl.fromLocalFile(str(ROOT/'ui'/'Main.qml')))
     if not engine.rootObjects():return 1
     engine.rootObjects()[0].setIcon(app.windowIcon())
+    native_icon=None
+    if sys.platform=='win32':
+        from window_icon import WindowsWindowIcon
+        native_icon=WindowsWindowIcon(engine.rootObjects()[0],ROOT/'assets'/'DirectSide.ico')
     app.aboutToQuit.connect(bridge.close)
     if smoke:
         output=Path(sys.argv[sys.argv.index('--smoke-test')+1])
@@ -861,9 +865,10 @@ def main():
             from PySide6.QtCore import Qt
             result={'qt_loaded':True,'qml_loaded':bool(engine.rootObjects()),
                 'window_icon':not window.icon().isNull(),'custom_frame':bool(window.flags() & Qt.FramelessWindowHint),
+                'native_window_icon':native_icon.verified() if native_icon else True,
                 'engine_ready':any(b'"event":"ready"' in line for line in captured.splitlines()),'engine_exit':code}
             result['local_authentication']=any(b'"event":"local_auth_ready"' in line for line in captured.splitlines())
-            result['passed']=all(result[k] for k in ['qt_loaded','qml_loaded','window_icon','custom_frame','engine_ready','local_authentication']) and code==0
+            result['passed']=all(result[k] for k in ['qt_loaded','qml_loaded','window_icon','native_window_icon','custom_frame','engine_ready','local_authentication']) and code==0
             output.parent.mkdir(parents=True,exist_ok=True)
             output.write_text(json.dumps(result,indent=2),encoding='utf-8')
             if probe.state()!=QProcess.NotRunning:probe.kill();probe.waitForFinished(1000)
@@ -874,6 +879,8 @@ def main():
         probe.started.connect(lambda:probe.write(b'{"command":"local_auth_probe"}\n{"command":"quit"}\n'))
         probe.start(str(ROOT/'bin'/'directside-engine.exe'),[])
         QTimer.singleShot(15000,lambda:finish(-1))
-    return app.exec()
+    result=app.exec()
+    if native_icon:native_icon.close()
+    return result
 
 if __name__=='__main__':sys.exit(main())
