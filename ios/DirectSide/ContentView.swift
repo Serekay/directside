@@ -45,7 +45,7 @@ struct ContentView:View {
         .task {startConnectionIfNeeded();await engine.refreshSources()}
         .task {await updater.check()}
         .task(id:engine.reminderApps) {reminders.update(apps:engine.reminderApps,language:language)}
-        .onChange(of:reminders.showLibrary){_,show in if show {tab=1;reminders.showLibrary=false}}
+        .onChange(of:reminders.showLibrary,initial:true){_,show in if show {tab=1;reminders.showLibrary=false}}
         .onChange(of:phase){_,value in
             if value == .active {engine.refreshBootstrap();startConnectionIfNeeded();reminders.update(apps:engine.reminderApps,language:language);Task{await updater.check()};Task{await engine.refreshSources()}}
             else if value == .background {connection.stopMonitoring()}
