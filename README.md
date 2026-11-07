@@ -7,7 +7,7 @@ Install iPhone apps with your own Apple account. Set up once from Windows, then 
 [Quick start](#quick-start) | [Setup](#setup) | [Screenshots](#screenshots) | [Troubleshooting](#troubleshooting)
 
 > [!WARNING]
-> **Banking and authentication apps:** Some banking apps [restrict access when Developer Mode is enabled](https://help.gxbank.my/Personal%2F%2Fsecurity-and-privacy/Fraud_Prevention_and_Security/Why_can%27t_I_access_the_GX_Bank_app%3F_I_see_a_%22Your_device_may_have_been_modified%22_screen.). [Microsoft Authenticator also performs device-integrity checks](https://support.microsoft.com/en-us/authenticator/jailbreak-root-detection-in-microsoft-authenticator); its documented restriction concerns devices detected as jailbroken or rooted, not a general ban on Developer Mode. Check your essential banking and sign-in apps before using this setup, and keep an alternative sign-in method available. Turning Developer Mode off prevents development-signed apps from opening.
+> **Developer Mode and app compatibility:** Some banking apps [restrict access when Developer Mode is enabled](https://help.gxbank.my/Personal%2F%2Fsecurity-and-privacy/Fraud_Prevention_and_Security/Why_can%27t_I_access_the_GX_Bank_app%3F_I_see_a_%22Your_device_may_have_been_modified%22_screen.). Before enabling it, check compatibility with your essential banking and authentication apps, and keep an alternative sign-in method available. If an app stops working, follow its provider’s guidance. Turning Developer Mode off prevents development-signed apps from opening.
 
 ## Quick start
 
