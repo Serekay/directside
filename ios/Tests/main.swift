@@ -172,6 +172,22 @@ check(LiveContainerInventory.candidates(for:guestRenewed[0],sources:[noticeNewSo
 let guestUnavailable=LiveContainerHostInventory(hostID:guestOld.hostID,state:"unavailable",apps:[])
 check(LiveContainerInventory.reconcile(previous:guestsRead,hosts:[guestUnavailable],now:reminderNow)==guestsRead,"Failed inventory reads preserve last known data instead of claiming no outdated apps")
 check(LiveContainerInventory.reconcile(previous:guestsRead,hosts:[],now:reminderNow).isEmpty,"A verified absent LiveContainer removes its cached inventory")
-let twoVersions=LiveContainerHostInventory(hostID:guestOld.hostID,state:"ready",apps:[guestOld,guestNew])
+var guestCopyOld=guestOld;guestCopyOld.installationID="example.app"
+var guestCopyNew=guestNew;guestCopyNew.installationID="example-copy.app"
+let twoVersions=LiveContainerHostInventory(hostID:guestOld.hostID,state:"ready",apps:[guestCopyOld,guestCopyNew])
 check(LiveContainerInventory.reconcile(previous:[],hosts:[twoVersions],now:reminderNow).count==2,"Keep different installed guest versions separate")
 print("LiveContainer installed-version comparison, successful update and failed-read regressions: passed")
+
+let partialUpdate=LiveContainerHostInventory(hostID:guestOld.hostID,state:"partial",apps:[guestNew])
+let partialReconciled=LiveContainerInventory.reconcile(previous:guestsRead,hosts:[partialUpdate],now:reminderNow)
+check(partialReconciled.count==1 && partialReconciled[0].version=="1.1","A successful guest read replaces its stale version even when another guest cannot be read")
+check(LiveContainerInventory.candidates(for:partialReconciled[0],sources:[noticeNewSource]).isEmpty,"Partial inventory must not leave a phantom update after installation")
+var updatedCopy=guestCopyOld;updatedCopy.version="1.1";updatedCopy.buildVersion="11"
+let copyRead=LiveContainerHostInventory(hostID:guestOld.hostID,state:"partial",apps:[updatedCopy])
+let copyResult=LiveContainerInventory.reconcile(previous:[guestCopyOld,guestCopyNew],hosts:[copyRead],now:reminderNow)
+check(copyResult.count==2 && copyResult.allSatisfy{$0.version=="1.1"},"Replace the updated installation without discarding a separately installed copy")
+check(LiveContainerInventory.verifiedIDs(in:[guestUnavailable]).isEmpty,"Failed reads must not turn cached versions into confirmed updates")
+check(LiveContainerInventory.verifiedIDs(in:[copyRead])==Set([updatedCopy.id]),"Only successfully read guest installations are verified in a partial snapshot")
+var buildUnknown=installed;buildUnknown.version="1.0";buildUnknown.buildVersion=nil
+check(!CatalogUpdates.isNewer(candidate,than:buildUnknown),"An unknown installed build is not evidence of an available update")
+print("Partial update replacement, duplicate installations and unknown build regressions: passed")

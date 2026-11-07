@@ -7,7 +7,8 @@ struct LiveContainerGuest:Codable,Identifiable,Equatable {
     var version:String?
     var buildVersion:String?
     var readAt:Date?
-    var id:String {[hostID,bundleID,version ?? "",buildVersion ?? ""].map{String($0.utf8.count)+":"+$0}.joined()}
+    var installationID:String?
+    var id:String {[hostID,installationID ?? bundleID].map{String($0.utf8.count)+":"+$0}.joined()}
     var comparisonRecord:ManagedApp {ManagedApp(id:bundleID,name:name,cachedIPA:"",installedAt:readAt ?? .distantPast,version:version,buildVersion:buildVersion)}
 }
 struct LiveContainerHostInventory:Decodable {
@@ -21,13 +22,20 @@ struct LiveContainerGuestUpdate:Identifiable {
     var id:String {source.id+"|"+app.id}
 }
 enum LiveContainerInventory {
+    static func verifiedIDs(in hosts:[LiveContainerHostInventory])->Set<String> {
+        Set(hosts.filter{["ready","partial"].contains($0.state)}.flatMap {host in host.apps.filter{$0.hostID==host.hostID}}.map(\.id))
+    }
     static func reconcile(previous:[LiveContainerGuest],hosts:[LiveContainerHostInventory],now:Date)->[LiveContainerGuest] {
         var result:[LiveContainerGuest]=[]
         for host in hosts {
             var saved:[LiveContainerGuest]=host.state=="ready" ? []:previous.filter{$0.hostID==host.hostID}
             if ["ready","partial"].contains(host.state) {
                 for var app in host.apps where app.hostID==host.hostID {
-                    app.readAt=now;saved.removeAll{$0.id==app.id};saved.append(app)
+                    app.readAt=now
+                    saved.removeAll {old in
+                        old.id==app.id || (old.hostID==app.hostID && old.bundleID==app.bundleID && (old.installationID==nil || app.installationID==nil))
+                    }
+                    saved.append(app)
                 }
             }
             result.append(contentsOf:saved)

@@ -19,21 +19,23 @@ struct LibraryView:View {
                 Button {Task{await engine.renewAll(peer:connection.peer,port:connection.port)}}label:{Label(L("Alle Signaturen erneuern"),systemImage:"arrow.clockwise").frame(maxWidth:.infinity)}.buttonStyle(.borderedProminent).disabled(engine.busy || !engine.canSign || !engine.pairingReady)
             }
             Section {
-                if !engine.updates.isEmpty {HStack {Label(L("Updates verfügbar"),systemImage:"arrow.down.circle.fill").foregroundStyle(Style.accent);Spacer();UpdateIndicator(title:String(engine.updates.count))}}
                 HStack(spacing:12) {
                     BrandIcon(size:50);Text("DirectSide").font(.subheadline.bold());Spacer()
-                    if updater.available != nil {Button(L("Aktualisieren")){updater.showOffer=true}.font(.caption.bold()).buttonStyle(.borderedProminent).disabled(engine.busy || updater.downloading)}
+                    VStack(alignment:.trailing,spacing:8) {
+                    if updater.available != nil {Button(L("Update")){updater.showOffer=true}.font(.caption.bold()).buttonStyle(.borderedProminent).disabled(engine.busy || updater.downloading)}
                     SignatureBadge(expiresAt:engine.selfExpiration){engine.refreshSelf(peer:connection.peer,port:connection.port)}.disabled(engine.busy || !engine.canSign || !engine.pairingReady)
+                    }.fixedSize(horizontal:true,vertical:false)
                 }.padding(.vertical,8)
                 ForEach(engine.managed.filter{$0.id != "com.directside.app"}) {app in
                     let deviceApp=engine.deviceApp(for:app)
                     HStack(spacing:12) {
                         if let icon=engine.deviceIcons[deviceApp?.id ?? ""] {DeviceArtwork(data:icon,name:app.name)} else {Artwork(url:app.iconURL,size:50)}
-                        VStack(alignment:.leading,spacing:4) {Text(app.name).font(.subheadline.bold());if let update=engine.updates.first(where:{$0.app.id==app.id}),let latest=update.app.latest {Text(L("Version \(latest.displayVersion) verfügbar")).font(.caption.weight(.medium)).foregroundStyle(Style.accent)}
-                            else {Text(app.version ?? L("Sideload-App")).font(.caption).foregroundStyle(.secondary)}}
+                        VStack(alignment:.leading,spacing:4) {Text(app.name).font(.subheadline.bold());Text(app.version ?? L("Sideload-App")).font(.caption).foregroundStyle(.secondary)}
                         Spacer()
-                        if let update=engine.updates.first(where:{$0.app.id==app.id}) {Button(L("Aktualisieren")){Task{await engine.install(update.app,source:update.source,peer:connection.peer,port:connection.port)}}.font(.caption.bold()).buttonStyle(.borderedProminent).disabled(engine.busy)}
+                        VStack(alignment:.trailing,spacing:8) {
+                        if let update=engine.updates.first(where:{$0.app.id==app.id}) {Button(L("Update")){Task{await engine.install(update.app,source:update.source,peer:connection.peer,port:connection.port)}}.font(.caption.bold()).buttonStyle(.borderedProminent).disabled(engine.busy)}
                         SignatureBadge(expiresAt:app.expiresAt){engine.refresh(app,peer:connection.peer,port:connection.port)}.disabled(engine.busy || !engine.canSign || !engine.pairingReady)
+                        }.fixedSize(horizontal:true,vertical:false)
                     }.padding(.vertical,8)
                     .swipeActions(edge:.trailing,allowsFullSwipe:false){deleteButton(deviceApp)}
                     .contextMenu{deleteButton(deviceApp)}
@@ -43,12 +45,13 @@ struct LibraryView:View {
                         DeviceArtwork(data:engine.deviceIcons[app.id],name:app.name)
                         VStack(alignment:.leading,spacing:4) {
                             Text(app.name).font(.subheadline.bold())
-                            if let update=engine.update(for:app),let latest=update.app.latest {Text(L("Version \(latest.displayVersion) verfügbar")).font(.caption.weight(.medium)).foregroundStyle(Style.accent)}
-                            else {Text(app.version ?? L("Entwickler-App · auf diesem Gerät")).font(.caption).foregroundStyle(.secondary)}
+                            Text(app.version ?? L("Entwickler-App · auf diesem Gerät")).font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
-                        if RenewalPackage.isLiveContainer(app.id) {Button(L("Erneuern")){Task{await engine.installLiveContainer(peer:connection.peer,port:connection.port,targetBundleID:app.id)}}.font(.caption.bold()).buttonStyle(.borderedProminent).disabled(engine.busy || !engine.canSign || !engine.pairingReady)}
-                        if let update=engine.update(for:app) {Button(L("Aktualisieren")){Task{await engine.install(update.app,source:update.source,peer:connection.peer,port:connection.port)}}.font(.caption.bold()).buttonStyle(.borderedProminent).disabled(engine.busy)}
+                        VStack(alignment:.trailing,spacing:8) {
+                        if RenewalPackage.isLiveContainer(app.id),engine.update(for:app)==nil {Button(L("Erneuern")){Task{await engine.installLiveContainer(peer:connection.peer,port:connection.port,targetBundleID:app.id)}}.font(.caption.bold()).buttonStyle(.borderedProminent).disabled(engine.busy || !engine.canSign || !engine.pairingReady)}
+                        if let update=engine.update(for:app) {Button(L("Update")){Task{await engine.install(update.app,source:update.source,peer:connection.peer,port:connection.port)}}.font(.caption.bold()).buttonStyle(.borderedProminent).disabled(engine.busy)}
+                        }.fixedSize(horizontal:true,vertical:false)
                     }.padding(.vertical,8)
                     .swipeActions(edge:.trailing,allowsFullSwipe:false){deleteButton(app)}.contextMenu{deleteButton(app)}
                 }
@@ -65,7 +68,7 @@ struct LibraryView:View {
                     else {Button {connection.checkVPN();engine.inspectConnection(peer:connection.peer,port:connection.port,force:true)} label:{Image(systemName:"arrow.clockwise")}.accessibilityLabel(L("LiveContainer prüfen"))}
                 }
             } footer:{
-                if let error=engine.containerReadError {Text(L(error)).foregroundStyle(.orange)}
+                if engine.containerReadError != nil {Text(L("Versionsprüfung derzeit nicht verfügbar.")).foregroundStyle(.secondary)}
                 else if !connection.vpnReachable {Text(L("Für die Versionsprüfung die lokale Verbindung herstellen."))}
             }}
         }.listStyle(.insetGrouped).scrollContentBackground(.hidden).background(Style.background).toolbar(.hidden,for:.navigationBar)
@@ -94,22 +97,19 @@ private struct LiveContainerGuestRow:View {
     var body:some View {
         let candidates=engine.containerUpdateCandidates(for:guest)
         let icon=engine.sources.flatMap(\.apps).first{$0.id==guest.bundleID}?.iconURL
-        let verified=engine.containerReadStates[guest.hostID]=="ready"
         HStack(spacing:12) {
             Artwork(url:icon,size:50)
             VStack(alignment:.leading,spacing:4) {
-                HStack {Text(guest.name).font(.subheadline.bold());if !candidates.isEmpty {UpdateIndicator()}}
-                Text(guest.version.map{L(verified ? "Installiert: \($0)":"Zuletzt gelesen: \($0)")} ?? L("Version unbekannt")).font(.caption).foregroundStyle(.secondary)
-                if let latest=candidates.first?.app.latest {Text(L("Version \(latest.displayVersion) verfügbar")).font(.caption.weight(.medium)).foregroundStyle(Style.accent)}
-                if !verified {Text(L("Nicht geprüft")).font(.caption2).foregroundStyle(.orange)}
+                Text(guest.name).font(.subheadline.bold()).lineLimit(2)
+                Text(guest.version ?? L("Version unbekannt")).font(.caption).foregroundStyle(.secondary)
             }
             Spacer(minLength:4)
             if candidates.count==1,let update=candidates.first {
-                Button(L("Aktualisieren")){LiveContainerBridge.importApp(update.app,source:update.source,engine:engine)}.font(.caption.bold()).buttonStyle(.borderedProminent).disabled(engine.busy || engine.readingContainer)
+                Button(L("Update")){LiveContainerBridge.importApp(update.app,source:update.source,engine:engine)}.font(.caption.bold()).buttonStyle(.borderedProminent).fixedSize(horizontal:true,vertical:false).disabled(engine.busy || engine.readingContainer)
             }else if !candidates.isEmpty {
                 Menu {
                     ForEach(candidates) {update in Button(update.source.name+" · "+(update.app.latest?.displayVersion ?? "")){LiveContainerBridge.importApp(update.app,source:update.source,engine:engine)}}
-                }label:{Text(L("Aktualisieren")).font(.caption.bold())}.disabled(engine.busy || engine.readingContainer)
+                }label:{Text(L("Update")).font(.caption.bold())}.fixedSize(horizontal:true,vertical:false).disabled(engine.busy || engine.readingContainer)
             }
         }.padding(.vertical,8)
     }

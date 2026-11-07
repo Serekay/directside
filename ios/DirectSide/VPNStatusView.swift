@@ -6,11 +6,10 @@ struct VPNStatusView:View {
     private var tone:Color {connection.vpnReachable ? .green:connection.vpnInstalled ? .orange:.red}
     var body:some View {
         VStack(alignment:.leading,spacing:14) {
-            HStack {
+            VStack(alignment:.leading,spacing:8) {
                 Label("LocalDevVPN",systemImage:"network").font(.subheadline.bold())
-                Spacer()
                 Label(L(connection.connectionState.title),systemImage:connection.vpnReachable ? "checkmark.circle.fill":"exclamationmark.circle.fill")
-                    .font(.caption.weight(.semibold)).foregroundStyle(tone)
+                    .font(.caption.weight(.semibold)).fixedSize(horizontal:false,vertical:true).foregroundStyle(tone)
                     .padding(.horizontal,11).padding(.vertical,7).background(tone.opacity(0.12),in:Capsule())
             }
             if connection.connectionState == .noWiFi {

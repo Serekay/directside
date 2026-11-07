@@ -150,7 +150,7 @@ enum CatalogUpdates {
         let order=next.compare(current,options:[.numeric,.caseInsensitive])
         if order != .orderedSame {return order == .orderedDescending}
         guard let nextBuild=normalized(buildVersion) else {return false}
-        guard let currentBuild=normalized(installed.buildVersion) else {return true}
+        guard let currentBuild=normalized(installed.buildVersion) else {return false}
         return nextBuild.compare(currentBuild,options:[.numeric,.caseInsensitive]) == .orderedDescending
     }
     static func entry(for installed:ManagedApp,in sources:[SourceCatalog])->(app:CatalogApp,source:SourceCatalog)? {

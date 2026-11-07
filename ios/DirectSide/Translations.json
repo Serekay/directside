@@ -652,5 +652,6 @@
   "LiveContainer konnte nicht gelesen werden. Verbindung prüfen und erneut versuchen.": "Could not read LiveContainer. Check the connection and try again.",
   "Installiert: %@": "Installed: %@",
   "Zuletzt gelesen: %@": "Last read: %@",
-  "Version unbekannt": "Version unknown"
+  "Version unbekannt": "Version unknown",
+  "Versionsprüfung derzeit nicht verfügbar.": "Version check is currently unavailable."
 }

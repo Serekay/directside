@@ -58,8 +58,9 @@ pub(crate) async fn read(afc:&mut AfcClient,host:&str)->Result<Value,Report> {
         if hidden(&metadata) {continue}
         let info=match dictionary(afc,&format!("{path}/Info.plist")).await {Ok(info)=>info,Err(_)=>{unreadable+=1;continue}};
         if hidden(&info) {continue}
-        if let Some(app)=record(host,&info,&metadata) {
-            let key=format!("{}|{}|{}",app["bundleID"],app["version"],app["buildVersion"]);
+        if let Some(mut app)=record(host,&info,&metadata) {
+            app["installationID"]=json!(name);
+            let key=name;
             apps.insert(key,app);
         } else {unreadable+=1;}
     }

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.9 (24) - 2026-11-07
+
+- Replace stale LiveContainer versions after a partial inventory read and identify installations independently of their version.
+- Only show confirmed installed-app updates; source changes and unknown build numbers no longer create update alerts.
+- Simplify app rows, remove repeated status labels and reserve space for update and renewal actions.
+
 ## 0.1.8 (23) - 2026-11-05
 
 - Read LiveContainer guest version metadata through the paired local connection and compare it with source versions.
